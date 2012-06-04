@@ -7,6 +7,13 @@ include_directories( ${SimpleGui_INCLUDE_DIRS} )
 find_package( RPG REQUIRED )
 include_directories( ${RPG_INCLUDE_DIRS} )
 
+set( BuildImuTest true CACHE "" force )
+if( BuildImuTest )
+    add_executable( ImuTest ImuTest.cpp )
+    target_link_libraries( ImuTest ${SimpleGui_LIBRARIES} ${RPG_LIBRARIES})
+    add_dependencies( ImuTest SimpleGui RPG )
+endif()
+
 set( BuildMeshTest true CACHE "" force )
 if( BuildMeshTest )
     add_executable( MeshTest MeshTest.cpp )
