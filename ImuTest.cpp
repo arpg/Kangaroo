@@ -38,7 +38,7 @@ public:
         meshtest.Init(MESH_NAME);
 
 //        window.AddChildToRoot(&meshtest);
-        window.AddPreRenderCallback(Application::PreRender, this);
+//        window.AddPreRenderCallback(Application::PreRender, this);
         window.AddPostRenderCallback(Application::PostRender, this);
     }
 
@@ -51,18 +51,19 @@ public:
 
     static void PreRender(GLWindow*, void* data)
     {
-
+        // Set Cars pose from IMU Data
+        Application* self = static_cast<Application*>(data);
+        Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
+        T.block<3,3>(0,0) = self->rotation.toRotationMatrix();
+        Eigen::Vector6d t = mvl::T2Cart(T);
+        self->meshtest.SetPose(t);
     }
 
     static void PostRender(GLWindow*, void* data)
     {
         Application* self = static_cast<Application*>(data);
-        Eigen::Matrix4d T;
-        T.setZero();
-        T(3,3) = 1;
-        self->updateMutex.lock();
+        Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
         T.block<3,3>(0,0) = self->rotation.toRotationMatrix();
-        self->updateMutex.unlock();
 
         glPushMatrix();
         glMultMatrixd(T.data());
