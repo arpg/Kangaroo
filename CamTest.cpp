@@ -10,10 +10,6 @@ using namespace Eigen;
 
 const dc1394video_mode_t DEFAULT_MODE = DC1394_VIDEO_MODE_640x480_MONO8;
 const unsigned DEFAULT_DMA = 8;
-unsigned int m_nImageWidth = 640;
-unsigned int m_nImageHeight = 480;
-unsigned int m_nImgSize = m_nImageWidth * m_nImageHeight;
-
 
 void SetAbsFrameRate(dc1394camera_t* camera, float val)
 {
@@ -68,10 +64,8 @@ void SetAbsExposure(dc1394camera_t* camera, float val)
     }
 }
 
-bool EnableTrigger(dc1394camera_t* camera, int src)
+bool EnableTrigger(dc1394camera_t* camera, dc1394trigger_source_t source)
 {
-    dc1394trigger_source_t source = dc1394trigger_source_t(DC1394_TRIGGER_SOURCE_0 + src);
-
     if(dc1394_external_trigger_set_power(camera, DC1394_ON)
        != DC1394_SUCCESS) {
         return false;
@@ -144,13 +138,151 @@ dc1394error_t SetCameraProperties(
     return DC1394_SUCCESS;
 }
 
+string convBase(unsigned long v, long base)
+{
+    string digits = "0123456789abcdef";
+    string result;
+    if((base < 2) || (base > 16)) {
+        result = "Error: base out of range.";
+    }
+    else {
+        do {
+            result = digits[v % base] + result;
+            v /= base;
+        }
+        while(v);
+    }
+    return result;
+}
+
+// Address relative to CONFIG_ROM_BASE = 0xFFFFFF000000
+//#define TRIGGER_MODE    0xF00830
+#define PIO_DIRECTION   0xF011F8
+#define STROBE_CTRL_INQ 0xF01300
+#define STROBE_0_INQ    0xF01400
+#define STROBE_0_CNT    0xF01500
+
+inline uint32_t PointGreyBitmask(unsigned bitIndex)
+{
+    // Count bitIndex from MSB
+    return 0x80000000 >> bitIndex;
+}
+
+inline void SetRegisterMasked(dc1394camera_t* cam, uint64_t offset, uint32_t mask, uint32_t value)
+{
+    dc1394error_t e;
+
+    cout << convBase(offset,16) << " ";
+    uint32_t val;
+    e = dc1394_get_register(cam, offset, &val);
+    assert(e == DC1394_SUCCESS);
+
+    cout << "was: " << convBase(val,2);
+    val |= value & mask;
+    val &= value | ~mask;
+    e = dc1394_set_register(cam, offset, val);
+    assert(e == DC1394_SUCCESS);
+    cout << ", set: " << convBase(val,2);
+
+    e = dc1394_get_register(cam, offset, &val);
+    assert(e == DC1394_SUCCESS);
+    cout << ", is: " << convBase(val,2) << endl;
+}
+
+void SetPointGreyGPIO(dc1394camera_t* cam, unsigned gpioPin, bool useAsOutput )
+{
+    const uint32_t pinVal = useAsOutput ? 1 : 0;
+    const uint32_t RegVal = pinVal * PointGreyBitmask(gpioPin);
+    // Set bit in register corresponding to gpioPin only.
+    SetRegisterMasked(cam, PIO_DIRECTION, RegVal, RegVal );
+}
+
+int SetPointGreyStobeWithShutter(dc1394camera_t* cam, uint32_t gpioPin)
+{
+    dc1394error_t e;
+    uint32_t strobe_inq;
+    e = dc1394_get_register(cam, STROBE_CTRL_INQ, &strobe_inq);
+    assert(e == DC1394_SUCCESS);
+    cout << "Strobe presence inq: " << convBase(strobe_inq,16) << endl;
+
+    e = dc1394_get_register(cam, STROBE_0_INQ + sizeof(uint32_t)*gpioPin, &strobe_inq);
+    assert(e == DC1394_SUCCESS);
+    cout << "Strobe 1 inq: " << convBase(strobe_inq,16) << endl;
+
+
+    SetPointGreyGPIO(cam, gpioPin, true);
+
+    uint32_t strobe_cnt_offset = STROBE_0_CNT + sizeof(uint32_t)*gpioPin;
+    uint32_t regVal = 0;
+    regVal |= PointGreyBitmask(6); // Enable strobe
+    regVal |= PointGreyBitmask(7); // High active output
+    // bits 8-19 are delay value
+    // bits 20-31 are signal duration (0 corresponds to exposure time)
+    SetRegisterMasked(cam, strobe_cnt_offset, 0xFFFFFFFF, regVal);
+}
+
+void SetTriggerCam1FromCam2(dc1394camera_t* cam1, dc1394camera_t* cam2)
+{
+    // Setup cameras symetrically, so it doesn't matter in which order they're enumerated
+    // GPIO1 of cam2 connected to GPIO0 of cam1
+    // GPIO1 of cam1 connected to GPIO0 of cam2
+
+    // Cam1 has external trigger on GPIO0
+    SetPointGreyGPIO(cam1, 0, false);
+    SetPointGreyGPIO(cam2, 0, false);
+    EnableTrigger(cam1, DC1394_TRIGGER_SOURCE_0);
+    SetTriggerMode(cam1, DC1394_TRIGGER_MODE_0);
+
+    // Cam2 has strobe on GPIO1
+    SetPointGreyStobeWithShutter(cam2, 1);
+}
+
+int CheckGLErrors()
+{
+  int errCount = 0;
+  for(GLenum currError = glGetError(); currError != GL_NO_ERROR; currError = glGetError())
+  {
+      cerr << "ERROR!!" << endl;
+    //Do something with `currError`.
+    ++errCount;
+  }
+
+  return errCount;
+}
+
+void glDrawTexturesQuad(float t, float b, float l, float r)
+{
+    glBegin(GL_QUADS);
+    glTexCoord2f(0,0); glVertex2f(l,b);
+    glTexCoord2f(1,0); glVertex2f(r,b);
+    glTexCoord2f(1,1); glVertex2f(r,t);
+    glTexCoord2f(0,1); glVertex2f(l,t);
+    glEnd();
+}
+
 class Application
 {
 public:
     Application()
-        : window(0, 0, 1024, 768, __FILE__ )
+        : window(0, 0, 640*2, 480, __FILE__ )
     {
         Init();
+    }
+
+    int Run()
+    {
+//        return window.Run();
+        while(1)
+        {
+            CaptureDraw();
+            window.swap_buffers();
+        }
+    }
+
+    static void PostRender(GLWindow*, void* data)
+    {
+        Application* self = (Application*)data;
+        self->CaptureDraw();
     }
 
     int Init()
@@ -190,8 +322,11 @@ public:
         cout << "Using camera with GUID " << m_pCam[1]->guid << endl;
 
         // Get width / height for mode
-        //    dc1394_get_image_size_from_video_mode(m_pCam[0], DEFAULT_MODE, &m_nImageWidth, &m_nImageHeight);
-        //    m_nImgSize = m_nImageWidth * m_nImageHeight;
+        uint32_t width, height;
+        dc1394_get_image_size_from_video_mode(m_pCam[0], DEFAULT_MODE, &width, &height);
+        m_width = width;
+        m_height = height;
+        m_sizeBytes = m_width * m_height;
 
         // Get highest framerate for mode
         dc1394framerates_t vFramerates;
@@ -207,24 +342,8 @@ public:
         SetAbsFrameRate(m_pCam[0], 60);
         SetAbsFrameRate(m_pCam[1], 60);
 
-        //    // Force fixed shutter time
-        //    SetAbsShutterTime(m_pCam[0], 1.0 / 120.0);
-        //    SetAbsShutterTime(m_pCam[1], 1.0 / 120.0);
-
-        //    // print camera features
-        //    dc1394featureset_t vFeatures;
-        //    e = dc1394_feature_get_all(m_pCam[0], &vFeatures);
-        //    if (e != DC1394_SUCCESS) {
-        //        dc1394_log_warning("Could not get feature set");
-        //    } else {
-        //        dc1394_feature_print_all( &vFeatures, stdout );
-        //    }
-        //    e = dc1394_feature_get_all(m_pCam[1], &vFeatures);
-        //    if (e != DC1394_SUCCESS) {
-        //        dc1394_log_warning("Could not get feature set");
-        //    } else {
-        //        dc1394_feature_print_all( &vFeatures, stdout );
-        //    }
+        // Setup Triggering
+        SetTriggerCam1FromCam2(m_pCam[1], m_pCam[0]);
 
         // initiate transmission
         e = dc1394_video_set_transmission(m_pCam[0], DC1394_ON);
@@ -232,17 +351,66 @@ public:
         e = dc1394_video_set_transmission(m_pCam[1], DC1394_ON);
         DC1394_ERR_RTN(e, "Could not start camera iso transmission");
 
+        // Create two OpenGL textures for stereo images
+        glGenTextures(2, m_glTex);
+
+        // Allocate texture memory on GPU
+        glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,0);
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+        glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,0);
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
         window.AddPostRenderCallback( Application::PostRender, this);
     }
 
-    int Run()
+    void CaptureDraw()
     {
-        return window.Run();
-    }
+        // Capture frame
+        dc1394error_t e;
+        dc1394video_frame_t * pFrame[2];
+        dc1394capture_policy_t nPolicy = DC1394_CAPTURE_POLICY_WAIT;
 
-    void GlSanityTest()
-    {
+        dc1394_capture_dequeue(m_pCam[0], nPolicy, &pFrame[0]);
+
+        if(pFrame[0] ) {
+            if(!dc1394_capture_is_frame_corrupt(m_pCam[0],pFrame[0]))
+            {
+                glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
+                glTexSubImage2D(GL_TEXTURE_2D,0,0,0,m_width,m_height,GL_LUMINANCE,GL_UNSIGNED_BYTE,pFrame[0]->image);
+            }else{
+                cerr << "Corrupt frame" << endl;
+            }
+            e = dc1394_capture_enqueue(m_pCam[0], pFrame[0]);
+        }else{
+            cerr << "No frame" << endl;
+        }
+
+        dc1394_capture_dequeue(m_pCam[1], nPolicy, &pFrame[1]);
+
+        if(pFrame[1]) {
+            if( !dc1394_capture_is_frame_corrupt(m_pCam[1],pFrame[1]) ) {
+                glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
+                glTexSubImage2D(GL_TEXTURE_2D,0,0,0,m_width,m_height,GL_LUMINANCE,GL_UNSIGNED_BYTE,pFrame[1]->image);
+            }else{
+                cerr << "Corrupt frame" << endl;
+            }
+            e = dc1394_capture_enqueue(m_pCam[1], pFrame[1]);
+        }else{
+            cerr << "Bad frame" << endl;
+        }
+
+        if(pFrame[0] && pFrame[1]) {
+            nFrames++;
+        }
+
+        // Display frames
         glDisable(GL_LIGHTING);
+        glDisable(GL_COLOR_MATERIAL );
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -252,55 +420,28 @@ public:
         glClearColor (0.0, 0.0, 0.0, 0.0);
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        glEnable(GL_TEXTURE_2D);
+
         glColor3f (1.0, 1.0, 1.0);
-        glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
-        glBegin(GL_POLYGON);
-        glVertex3f (0.25, 0.25, 0.0);
-        glVertex3f (0.75, 0.25, 0.0);
-        glVertex3f (0.75, 0.75, 0.0);
-        glVertex3f (0.25, 0.75, 0.0);
-        glEnd();
-    }
 
-    void CaptureDraw()
-    {
-        //  capture frame
-        dc1394error_t e;
-        dc1394video_frame_t * pFrame[2];
-        dc1394capture_policy_t nPolicy = DC1394_CAPTURE_POLICY_WAIT;
+        glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
+        glDrawTexturesQuad(1,-1,1,0);
 
-        e = dc1394_capture_dequeue(m_pCam[0], nPolicy, &pFrame[0]);
-        if (e != DC1394_SUCCESS)
-            std::cerr << "Warning: lost a 0 frame!" << std::endl;
+        glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
+        glDrawTexturesQuad(-1,1,-1,0);
 
-        if(pFrame[0]) {
-            //memcpy(fbp1,pFrame[0]->image, m_nImgSize);
-            e = dc1394_capture_enqueue(m_pCam[0], pFrame[0]);
-        }
-
-        e = dc1394_capture_dequeue(m_pCam[1], nPolicy, &pFrame[1]);
-        if (e != DC1394_SUCCESS)
-            std::cerr << "Warning: lost a 1 frame!" << std::endl;
-
-        if(pFrame[1]) {
-            //memcpy(fbp2,pFrame[1]->image, m_nImgSize);
-            e = dc1394_capture_enqueue(m_pCam[1], pFrame[1]);
-        }
-
-        if(pFrame[0] && pFrame[1]) {
-            nFrames++;
-        }
-    }
-
-    static void PostRender(GLWindow*, void* data)
-    {
-        Application* self = (Application*)data;
-        self->CaptureDraw();
+        glDisable(GL_TEXTURE_2D);
     }
 
     GLWindow window;
     dc1394_t* m_pBus;
     dc1394camera_t* m_pCam[2];
+    GLuint m_glTex[2];
+
+    GLsizei m_width;
+    GLsizei m_height;
+    size_t m_sizeBytes;
+
     int nFrames;
 };
 
