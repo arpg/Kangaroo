@@ -7,10 +7,16 @@ include_directories( ${SimpleGui_INCLUDE_DIRS} )
 find_package( RPG REQUIRED )
 include_directories( ${RPG_INCLUDE_DIRS} )
 
+find_package( OpenCV REQUIRED )
+
 # git://github.com/stevenlovegrove/fiducials.git
 find_package( Fiducials REQUIRED )
 include_directories( ${Fiducials_INCLUDE_DIRS} )
 link_directories(${Fiducials_LIBRARY_DIRS})
+
+IF(CMAKE_COMPILER_IS_GNUCXX)
+  SET(CMAKE_CXX_FLAGS "-std=c++0x")
+ENDIF()
 
 set( BuildImuTest true CACHE "" force )
 if( BuildImuTest )
@@ -33,5 +39,5 @@ endif()
 set( BuildStereoCalibration true CACHE "" force )
 if( BuildStereoCalibration )
     add_executable( StereoCalibration StereoCalibration.cpp )
-    target_link_libraries( StereoCalibration ${SimpleGui_LIBRARIES} ${RPG_LIBRARIES} ${Fiducials_LIBRARIES} )
+    target_link_libraries( StereoCalibration ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${OpenCV_LIBS} )
 endif()
