@@ -14,6 +14,11 @@ find_package( Fiducials REQUIRED )
 include_directories( ${Fiducials_INCLUDE_DIRS} )
 link_directories(${Fiducials_LIBRARY_DIRS})
 
+# git://github.com/stevenlovegrove/Sophus.git
+find_package(Sophus REQUIRED)
+include_directories( ${Sophus_INCLUDE_DIR} )
+link_directories( ${Sophus_LIBRARY_DIRS} )
+
 IF(CMAKE_COMPILER_IS_GNUCXX)
   SET(CMAKE_CXX_FLAGS "-std=c++0x")
 ENDIF()
@@ -39,5 +44,5 @@ endif()
 set( BuildStereoCalibration true CACHE "" force )
 if( BuildStereoCalibration )
     add_executable( StereoCalibration StereoCalibration.cpp )
-    target_link_libraries( StereoCalibration ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${OpenCV_LIBS} )
+    target_link_libraries( StereoCalibration ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${Sophus_LIBRARIES} ${OpenCV_LIBS} )
 endif()

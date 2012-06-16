@@ -7,8 +7,17 @@
 
 #include <RPG/Devices/Camera/CameraDevice.h>
 
+#include <fiducials/tracker.h>
+#include <fiducials/drawing.h>
+
 using namespace std;
 using namespace Eigen;
+
+const int DESIRED_WIDTH = 640;
+const int DESIRED_HEIGHT = 480;
+
+const int WINDOW_WIDTH  = 2 * DESIRED_WIDTH;
+const int WINDOW_HEIGHT = 2 * DESIRED_HEIGHT;
 
 void glDrawTexturesQuad(float t, float b, float l, float r)
 {
@@ -24,26 +33,43 @@ class Application
 {
 public:
     Application()
-        : window(0, 0, 640*2, 480, __FILE__ )
+        : window(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, __FILE__ ),
+          shouldQuit(false)
     {
         Init();
     }
 
+    ~Application()
+    {
+    }
+
     void Init()
     {
-        // -sdir /home/slovegrove/data/CityBlock-Noisy -sf 0
-        cam.SetProperty("StartFrame",    0);
-        cam.SetProperty("DataSourceDir", "/home/slovegrove/data/CityBlock-Noisy" );
-        cam.SetProperty("Channel-0",     "left.*pgm" );
-        cam.SetProperty("Channel-1",     "right.*pgm" );
-        cam.SetProperty("NumChannels",   2 );
-        cam.InitDriver("FileReader");
-
-        // Capture first images to get dimensions
-        cam.Capture(img);
+        if(false) {
+            // Setup Camera
+            camera.SetProperty("StartFrame",    0);
+            camera.SetProperty("DataSourceDir", "/home/slovegrove/data/CityBlock-Noisy" );
+            camera.SetProperty("Channel-0",     "left.*pgm" );
+            camera.SetProperty("Channel-1",     "right.*pgm" );
+            camera.SetProperty("NumChannels",   2 );
+            camera.InitDriver("FileReader");
+            camera.Capture(img);
+        }else{
+            camera.SetProperty("NumChannels", 2 );
+            camera.SetProperty("CamUUID0", 5004955);
+            camera.SetProperty("CamUUID1", 5004954);
+            camera.SetProperty("ImageWidth", DESIRED_WIDTH);
+            camera.SetProperty("ImageHeight", DESIRED_HEIGHT);
+            if(!camera.InitDriver( "AlliedVision" )) {
+                cerr << "Couldn't start driver for camera " << endl;
+                exit(1);
+            }
+            camera.Capture(img);
+        }
         width = img[0].width();
         height = img[0].height();
 
+        // Setup OpenGL Textures
         // Create two OpenGL textures for stereo images
         glGenTextures(2, m_glTex);
 
@@ -58,7 +84,9 @@ public:
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 
+        // Setup OpenGL Render Callback
         window.AddPostRenderCallback( Application::PostRender, this);
+
     }
 
     static void PostRender(GLWindow*, void* data)
@@ -69,12 +97,34 @@ public:
 
     void CameraRun()
     {
-        while(1) {
-            imageMutex.lock();
-            cam.Capture(img);
-            imageMutex.unlock();
+        // Unit hell!
+        const double ppi = 72; // Points Per Inch
+        const double USwp = 11 * ppi;
+        const double UShp = 8.5 * ppi;
+        const double mpi = 0.0254; // meters per inch
+        const double mpp = mpi / ppi; // meters per point
+        const double unit = 1; //mpp;
 
-            usleep(33000);
+        // Setup Trackers
+        Tracker tracker[2] = {{width,height},{width,height}};
+        for(int i=0; i<2; ++i) {
+            tracker[i].target.GenerateRandom(60,unit*USwp*25/(842.0),unit*USwp*75/(842.0),unit*USwp*40/(842.0),Eigen::Vector2d(unit*USwp,unit*UShp));
+            tracker[i].target.SaveEPS("stereo.eps");
+        }
+
+        Matrix<double,9,1> cam_params; // = Var<Matrix<double,9,1> >("cam_params");
+        cam_params << 0.808936, 1.06675, 0.495884, 0.520504, 0.180668, -0.354284, -0.00169838, 0.000600873, 0.0;
+        MatlabCamera camParams( width,height, width*cam_params[0],height*cam_params[1], width*cam_params[2],height*cam_params[3], cam_params[4], cam_params[5], cam_params[6], cam_params[7], cam_params[8]);
+
+        while(!shouldQuit) {
+//            imageMutex.lock();
+            camera.Capture(img);
+//            imageMutex.unlock();
+
+            for(int i=0; i<1; ++i) {
+                tracker[i].ProcessFrame(camParams,img[i].Image.data);
+                T_gw[i] = tracker[i].T_gw;
+            }
         }
     }
 
@@ -84,11 +134,17 @@ public:
         std::thread camThread( std::bind( &Application::CameraRun, this ) );
 
         // Run GUI
-        return window.Run();
+        window.Run();
+        shouldQuit = true;
+
+        camThread.join();
     }
 
     void Draw()
     {
+        // Draw Images
+        glViewport(0,DESIRED_HEIGHT,WINDOW_WIDTH,DESIRED_HEIGHT);
+
         if( img.size() >= 2 )
         {
             imageMutex.lock();
@@ -124,15 +180,32 @@ public:
 
             glDisable(GL_TEXTURE_2D);
         }
+
+        // Draw Poses
+        glViewport(0,0,DESIRED_WIDTH,DESIRED_HEIGHT);
+        for(int i=0; i<2; ++i) {
+            glSetFrameOfReferenceF(T_gw[i].inverse());
+            glDrawAxis(10);
+            glUnsetFrameOfReference();
+        }
+
+//        glViewport(DESIRED_WIDTH,0,DESIRED_WIDTH,DESIRED_HEIGHT);
+
+        // clear glViewport
+        glViewport(0,0,WINDOW_WIDTH,WINDOW_HEIGHT);
     }
+
+    GLWindow window;
+    CameraDevice camera;
 
     std::vector<rpg::ImageWrapper> img;
     GLuint m_glTex[2];
     int width, height;
     std::mutex imageMutex;
 
-    CameraDevice cam;
-    GLWindow window;
+    Sophus::SE3 T_gw[2];
+
+    bool shouldQuit;
 };
 
 int main (int argc, char** argv){
