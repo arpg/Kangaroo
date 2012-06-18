@@ -1,5 +1,8 @@
 #include <thread>
+#include <future>
 #include <mutex>
+
+#include <CVars/CVar.h>
 
 #include <SimpleGui/Gui.h>
 #include <SimpleGui/GetPot>
@@ -29,6 +32,84 @@ inline void glDrawTexturesQuad(float t, float b, float l, float r)
     glTexCoord2f(0,1); glVertex2f(l,t);
     glEnd();
     glDisable(GL_TEXTURE_2D);
+}
+
+//CVarUtils::CreateCVar<ConsoleFunc>("TestConsoleFunc",&TestConsoleFunc);
+//bool TestConsoleFunc( std::vector<std::string> *args)
+//{
+//    for(int i=0; i<args->size(); ++i ) {
+//        cout << args->at(i) << endl;
+//    }
+//}
+
+inline bool Pushed(bool& button)
+{
+    const bool pushed = button;
+    button = false;
+    return pushed;
+}
+
+struct StereoKeyframe
+{
+    Sophus::SE3 T_fw[2];
+    Eigen::Matrix<double,2,Eigen::Dynamic> obs[2];
+};
+
+template<typename T, unsigned NC, unsigned NJ0, unsigned NJ1>
+inline void AddSparseOuterProduct(
+        Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& JTJ,
+        Eigen::Matrix<T,Eigen::Dynamic,1>& JTy,
+        const Eigen::Matrix<T,NJ0,NC>& J0, int J0pos,
+        const Eigen::Matrix<T,NJ1,NC>& J1, int J1pos,
+        const Eigen::Matrix<T,NC,1>& err
+) {
+    // On diagonal blocks
+    JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
+    JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
+
+    // Lower diagonal blocks
+    JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
+
+    // Upper diagonal blocks TODO: use only one diagonal in future
+    JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
+
+    // Errors
+    for(int i=0; i<NC; ++i) {
+        JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
+        JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
+    }
+}
+
+template<typename T, unsigned NC, unsigned NJ0, unsigned NJ1, unsigned NJ2 >
+inline void AddSparseOuterProduct(
+        Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& JTJ,
+        Eigen::Matrix<T,Eigen::Dynamic,1>& JTy,
+        const Eigen::Matrix<T,NJ0,NC>& J0, int J0pos,
+        const Eigen::Matrix<T,NJ1,NC>& J1, int J1pos,
+        const Eigen::Matrix<T,NJ2,NC>& J2, int J2pos,
+        const Eigen::Matrix<T,NC,1>& err
+) {
+    // On diagonal blocks
+    JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
+    JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
+    JTJ.template block<NJ2,NJ2>(J2pos,J2pos) += J2 * J2.transpose();
+
+    // Lower diagonal blocks
+    JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
+    JTJ.template block<NJ2,NJ0>(J2pos,J0pos) += J2 * J0.transpose();
+    JTJ.template block<NJ2,NJ1>(J2pos,J1pos) += J2 * J1.transpose();
+
+    // Upper diagonal blocks TODO: use only one diagonal in future
+    JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
+    JTJ.template block<NJ0,NJ2>(J0pos,J2pos) += J0 * J2.transpose();
+    JTJ.template block<NJ1,NJ2>(J1pos,J2pos) += J1 * J2.transpose();
+
+    // Errors
+    for(int i=0; i<NC; ++i) {
+        JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
+        JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
+        JTy.template segment<NJ2>(J2pos) += J2.col(i) * err(i);
+    }
 }
 
 class Application
@@ -127,15 +208,141 @@ public:
         self->Draw();
     }
 
+    static void OptimiseIntrinsicsPoses(
+        Eigen::Matrix<double,3,Eigen::Dynamic> pattern,
+        std::vector<StereoKeyframe>& keyframes,
+        MatlabCamera& cam,
+        Sophus::SE3& T_rl
+    ) {
+        // keyframes.size might increase asynchronously, so save
+        const int N = keyframes.size();
+
+        // Params fu,fv,u0,v0,
+        // T_rl,
+        // T_0w, T_1w, ..., T_nw
+
+        const int PARAMS_K = 4;
+        const int PARAMS_T = 6;
+        const int PARAMS_TOTAL = PARAMS_K + PARAMS_T* (N+1);
+
+        unsigned int num_obs = 0;
+        double sumsqerr = 0;
+        Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> JTJ(PARAMS_TOTAL,PARAMS_TOTAL);
+        Eigen::Matrix<double,Eigen::Dynamic,1> JTy(PARAMS_TOTAL);
+        JTJ.setZero();
+        JTy.setZero();
+
+        Eigen::Matrix3d K = cam.K();
+
+        // Make JTJ and JTy from observations over each Keyframe
+        for( size_t kf=0; kf < N; ++kf ) {
+            // For each observation
+            for( size_t on=0; on < pattern.cols(); ++on ) {
+                // Construct block contributions for JTJ and JTy
+                const Eigen::Vector3d Pt = pattern.col(on);
+                const Sophus::SE3 T_lt = keyframes[kf].T_fw[0];
+
+                const Eigen::Vector2d obsl = keyframes[kf].obs[0].col(on);
+                if( isfinite(obsl[0]) ) {
+                    const Eigen::Vector3d Pl = T_lt * Pt;
+                    const Eigen::Vector2d pl = project( (Eigen::Vector3d)(K*Pl) );
+                    const Eigen::Vector2d errl = pl - obsl;
+                    sumsqerr += errl.squaredNorm();
+                    num_obs++;
+
+                    Eigen::Matrix<double,PARAMS_K,2> Jk;
+                    Eigen::Matrix<double,PARAMS_T,2> J_T_lw;
+
+                    // TODO: Compute these derivatives!
+
+                    AddSparseOuterProduct<double,2,PARAMS_K,PARAMS_T>(
+                        JTJ,JTy,  Jk,0,  J_T_lw,PARAMS_K+(1+kf)*PARAMS_T, errl
+                    );
+                }
+
+                const Eigen::Vector2d obsr = keyframes[kf].obs[1].col(on);
+                if(isfinite(obsr[0])) {
+                    const Eigen::Vector3d Pr = T_rl * T_lt * Pt;
+                    const Eigen::Vector2d pr = project( (Eigen::Vector3d)(K*Pr) );
+                    const Eigen::Vector2d errr = pr - obsr;
+                    sumsqerr += errr.squaredNorm();
+                    num_obs++;
+
+                    Eigen::Matrix<double,PARAMS_K,2> Jk;
+                    Eigen::Matrix<double,PARAMS_T,2> J_T_rl;
+                    Eigen::Matrix<double,PARAMS_T,2> J_T_lw;
+
+                    // TODO: Compute these derivatives!
+
+                    AddSparseOuterProduct<double,2,PARAMS_K,PARAMS_T,PARAMS_T>(
+                        JTJ,JTy,  Jk,0,  J_T_rl,PARAMS_K,  J_T_lw,PARAMS_K+(1+kf)*PARAMS_T, errr
+                    );
+                }
+            }
+        }
+
+        JTJ.ldlt().solveInPlace(JTy);
+
+        // New name for our inplace solution
+        const Eigen::Matrix<double,Eigen::Dynamic,1>& x = JTy;
+
+//        // Update K
+//        K(0,0) *= exp(x(0));
+//        K(1,1) *= exp(x(1));
+//        K(0,2) *= exp(x(2));
+//        K(1,2) *= exp(x(3));
+
+//        // Update poses
+//        for( size_t kf=0; kf < N; ++kf ) {
+//            keyframes[kf].T_fw[0] = keyframes[kf].T_fw[0] *
+//                Sophus::SE3::exp(-1.0 * x.segment<6>(PARAMS_K + (1+kf)*PARAMS_T));
+//            keyframes[kf].T_fw[1] = T_rl * keyframes[kf].T_fw[0];
+//        }
+
+        cout << "RMSE: " << sqrt(sumsqerr/num_obs) << endl;
+    }
+
+    void OptimiseRun()
+    {
+        Eigen::Matrix<double,3,Eigen::Dynamic> pattern = tracker[0]->TargetPattern3D();
+
+        while(!shouldQuit) {
+            if(keyframes.size() > 5 ) {
+                OptimiseIntrinsicsPoses(pattern,keyframes,camParams, T_rl);
+            }else{
+                usleep(1000);
+            }
+        }
+    }
+
     void CameraRun()
     {
+        bool& save_kf = CVarUtils::CreateCVar<bool>( "SaveKeyframe", false );
+
+        std::thread trackerThreads[2];
+
         while(!shouldQuit) {
-//            imageMutex.lock();
             camera.Capture(img);
-//            imageMutex.unlock();
 
             for(int i=0; i<2; ++i) {
-                tracker[i]->ProcessFrame(camParams,img[i].Image.data);
+                trackerThreads[i] = std::thread(boost::bind(&Tracker::ProcessFrame, tracker[i], camParams,img[i].Image.data) );
+//                tracker[i]->ProcessFrame(camParams,img[i].Image.data);
+            }
+            for(int i=0; i<2; ++i) {
+                trackerThreads[i].join();
+            }
+
+            if( Pushed(save_kf) ) {
+                cout << "Save Keyframe" << endl;
+
+                StereoKeyframe kf;
+                for(int i=0; i<2; ++i) {
+                    kf.obs[i] = tracker[i]->TargetPatternObservations();
+                    kf.T_fw[i] = tracker[i]->T_hw;
+                }
+                kfMutex.lock();
+                keyframes.push_back(kf);
+                kfMutex.unlock();
             }
         }
     }
@@ -144,6 +351,9 @@ public:
     {
         // Run Camera Loop
         std::thread camThread( std::bind( &Application::CameraRun, this ) );
+
+        // Run Optimisation Loop
+        std::thread optThread( std::bind( &Application::OptimiseRun, this ) );
 
         // Run GUI
         window.Run();
@@ -185,12 +395,10 @@ public:
 
         // Upload textures for images
         if( img.size() >= 2 ) {
-            imageMutex.lock();
             glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
             glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width,height,GL_LUMINANCE,GL_UNSIGNED_BYTE,img[0].Image.data);
             glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
             glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width,height,GL_LUMINANCE,GL_UNSIGNED_BYTE,img[1].Image.data);
-            imageMutex.unlock();
         }
 
         glOrtho(-0.5,width-0.5,height-0.5,-0.5,0,1.0);
@@ -201,7 +409,7 @@ public:
         glColor3f (1.0, 1.0, 1.0);
         glDrawTexturesQuad(height,0,0,width);
         for( int i=0; i<tracker[0]->conics.size(); ++i ) {
-          glColorBin(tracker[0]->conics_target_map[i],tracker[0]->target.circles3D().size());
+          glBinColor(tracker[0]->conics_target_map[i],tracker[0]->target.circles3D().size());
           DrawCross(tracker[0]->conics[i].center,2);
         }
 //        glDrawTexturesQuad(-1,1,-1,1);
@@ -212,7 +420,7 @@ public:
         glColor3f (1.0, 1.0, 1.0);
         glDrawTexturesQuad(height,0,0,width);
         for( int i=0; i<tracker[1]->conics.size(); ++i ) {
-          glColorBin(tracker[1]->conics_target_map[i],tracker[1]->target.circles3D().size());
+          glBinColor(tracker[1]->conics_target_map[i],tracker[1]->target.circles3D().size());
           DrawCross(tracker[1]->conics[i].center,2);
         }
 
@@ -234,10 +442,13 @@ public:
     std::vector<rpg::ImageWrapper> img;
     GLuint m_glTex[2];
     int width, height;
-    std::mutex imageMutex;
+    std::mutex kfMutex;
 
     MatlabCamera camParams;
     Tracker* tracker[2];
+
+    Sophus::SE3 T_rl;
+    std::vector<StereoKeyframe> keyframes;
 
     bool shouldQuit;
 };
