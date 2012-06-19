@@ -64,19 +64,19 @@ inline void AddSparseOuterProduct(
         const Eigen::Matrix<T,NC,1>& err
 ) {
     // On diagonal blocks
-    JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
-    JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
+    if(NJ0) JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
+    if(NJ1) JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
 
     // Lower diagonal blocks
-    JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
+    if(NJ0 && NJ1) JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
 
     // Upper diagonal blocks TODO: use only one diagonal in future
-    JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
+    if(NJ0 && NJ1) JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
 
     // Errors
     for(int i=0; i<NC; ++i) {
-        JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
-        JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
+        if(NJ0) JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
+        if(NJ1) JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
     }
 }
 
@@ -90,25 +90,25 @@ inline void AddSparseOuterProduct(
         const Eigen::Matrix<T,NC,1>& err
 ) {
     // On diagonal blocks
-    JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
-    JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
-    JTJ.template block<NJ2,NJ2>(J2pos,J2pos) += J2 * J2.transpose();
+    if(NJ0) JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
+    if(NJ1) JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
+    if(NJ2) JTJ.template block<NJ2,NJ2>(J2pos,J2pos) += J2 * J2.transpose();
 
     // Lower diagonal blocks
-    JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
-    JTJ.template block<NJ2,NJ0>(J2pos,J0pos) += J2 * J0.transpose();
-    JTJ.template block<NJ2,NJ1>(J2pos,J1pos) += J2 * J1.transpose();
+    if(NJ1 && NJ0) JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
+    if(NJ2 && NJ0) JTJ.template block<NJ2,NJ0>(J2pos,J0pos) += J2 * J0.transpose();
+    if(NJ2 && NJ1) JTJ.template block<NJ2,NJ1>(J2pos,J1pos) += J2 * J1.transpose();
 
     // Upper diagonal blocks TODO: use only one diagonal in future
-    JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
-    JTJ.template block<NJ0,NJ2>(J0pos,J2pos) += J0 * J2.transpose();
-    JTJ.template block<NJ1,NJ2>(J1pos,J2pos) += J1 * J2.transpose();
+    if(NJ0 && NJ1) JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
+    if(NJ0 && NJ2) JTJ.template block<NJ0,NJ2>(J0pos,J2pos) += J0 * J2.transpose();
+    if(NJ1 && NJ2) JTJ.template block<NJ1,NJ2>(J1pos,J2pos) += J1 * J2.transpose();
 
     // Errors
     for(int i=0; i<NC; ++i) {
-        JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
-        JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
-        JTy.template segment<NJ2>(J2pos) += J2.col(i) * err(i);
+        if(NJ0) JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
+        if(NJ1) JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
+        if(NJ2) JTy.template segment<NJ2>(J2pos) += J2.col(i) * err(i);
     }
 }
 
@@ -194,7 +194,8 @@ public:
         }
 
         Matrix<double,9,1> camParamsVec; // = Var<Matrix<double,9,1> >("cam_params");
-        camParamsVec << 0.808936, 1.06675, 0.495884, 0.520504, 0, 0, 0, 0, 0.0;
+        camParamsVec << 0.0680961, 0.0897988, 0.48231, 0.518867, 0, 0, 0, 0, 0.0;
+//        camParamsVec << 0.808936, 1.06675, 0.495884, 0.520504, 0, 0, 0, 0, 0.0;
         camParams = MatlabCamera( width,height, width*camParamsVec[0],height*camParamsVec[1], width*camParamsVec[2],height*camParamsVec[3], camParamsVec[4], camParamsVec[5], camParamsVec[6], camParamsVec[7], camParamsVec[8]);
 
         // Setup OpenGL Render Callback
@@ -207,6 +208,34 @@ public:
         Application* self = (Application*)data;
         self->Draw();
     }
+
+    static Eigen::Matrix<double,2,3> dpi_dx(const Eigen::Vector3d& x)
+    {
+        const double x2x2 = x(2)*x(2);
+        Eigen::Matrix<double,2,3> ret;
+        ret << 1.0 / x(2), 0,  -x(0) / x2x2,
+                0, 1.0 / x(2), -x(1) / x2x2;
+        return ret;
+    }
+
+    static Eigen::Matrix<double,4,4> se3_gen(unsigned i) {
+
+        Eigen::Matrix<double,4,4> ret;
+        ret.setZero();
+
+        switch(i) {
+        case 0: ret(0,3) = 1; break;
+        case 1: ret(1,3) = 1; break;
+        case 2: ret(2,3) = 1; break;
+        case 3: ret(1,2) = -1; ret(2,1) = 1; break;
+        case 4: ret(0,2) = 1; ret(2,0) = -1; break;
+        case 5: ret(0,1) = -1; ret(1,0) = 1; break;
+        }
+
+        return ret;
+    }
+
+#define PARAMS_K 3
 
     static void OptimiseIntrinsicsPoses(
         Eigen::Matrix<double,3,Eigen::Dynamic> pattern,
@@ -221,7 +250,7 @@ public:
         // T_rl,
         // T_0w, T_1w, ..., T_nw
 
-        const int PARAMS_K = 4;
+//        const int PARAMS_K = 0;
         const int PARAMS_T = 6;
         const int PARAMS_TOTAL = PARAMS_K + PARAMS_T* (N+1);
 
@@ -234,18 +263,24 @@ public:
 
         Eigen::Matrix3d K = cam.K();
 
+//        cout << "##################################################" << endl;
+
         // Make JTJ and JTy from observations over each Keyframe
         for( size_t kf=0; kf < N; ++kf ) {
             // For each observation
             for( size_t on=0; on < pattern.cols(); ++on ) {
+//                cout << "----------------------------------------------" << endl;
+
                 // Construct block contributions for JTJ and JTy
-                const Eigen::Vector3d Pt = pattern.col(on);
                 const Sophus::SE3 T_lt = keyframes[kf].T_fw[0];
+
+                const Eigen::Vector3d Pt = pattern.col(on);
+                const Eigen::Vector3d Pl = T_lt * Pt;
 
                 const Eigen::Vector2d obsl = keyframes[kf].obs[0].col(on);
                 if( isfinite(obsl[0]) ) {
-                    const Eigen::Vector3d Pl = T_lt * Pt;
-                    const Eigen::Vector2d pl = project( (Eigen::Vector3d)(K*Pl) );
+                    const Eigen::Vector3d pl_ = K*Pl;
+                    const Eigen::Vector2d pl = project(pl_);
                     const Eigen::Vector2d errl = pl - obsl;
                     sumsqerr += errl.squaredNorm();
                     num_obs++;
@@ -253,17 +288,45 @@ public:
                     Eigen::Matrix<double,PARAMS_K,2> Jk;
                     Eigen::Matrix<double,PARAMS_T,2> J_T_lw;
 
-                    // TODO: Compute these derivatives!
+                    const Eigen::Matrix<double,2,3> dpi = dpi_dx(pl_);
+                    const Eigen::Matrix<double,2,3> dpiK = dpi * cam.K();
+
+                    #if(PARAMS_K==3)
+                    // if(PARAMS_K==3)
+                    {
+                        Jk.row(0) = dpi * Eigen::Vector3d(cam.K()(0,0)* Pl(0), cam.K()(1,1)* Pl(1), 0);
+                        Jk.row(1) = dpi * Eigen::Vector3d(cam.K()(0,2)* Pl(2), 0, 0);
+                        Jk.row(2) = dpi * Eigen::Vector3d(0, cam.K()(1,2)* Pl(2), 0);
+                    }
+                    #elif(PARAMS_K==4)
+                    //else if(PARAMS_K==4)
+                    {
+                        Jk.row(0) = dpi * Eigen::Vector3d(cam.K()(0,0)* Pl(0), 0, 0);
+                        Jk.row(1) = dpi * Eigen::Vector3d(0, cam.K()(1,1)* Pl(1), 0);
+                        Jk.row(2) = dpi * Eigen::Vector3d(cam.K()(0,2)* Pl(2), 0, 0);
+                        Jk.row(3) = dpi * Eigen::Vector3d(0, cam.K()(1,2)* Pl(2), 0);
+                    }
+                    #endif
+                    for(int i=0; i<PARAMS_T; ++i ) {
+                        J_T_lw.row(i) = dpiK * T_lt.matrix().block<3,4>(0,0) * se3_gen(i) * unproject(Pt);
+                    }
+
+//                    cout << errl << endl;
+//                    cout << J_T_lw << endl;
 
                     AddSparseOuterProduct<double,2,PARAMS_K,PARAMS_T>(
                         JTJ,JTy,  Jk,0,  J_T_lw,PARAMS_K+(1+kf)*PARAMS_T, errl
                     );
+
+//                    cout << JTJ << endl;
+//                    cout << JTy << endl;
                 }
 
                 const Eigen::Vector2d obsr = keyframes[kf].obs[1].col(on);
                 if(isfinite(obsr[0])) {
-                    const Eigen::Vector3d Pr = T_rl * T_lt * Pt;
-                    const Eigen::Vector2d pr = project( (Eigen::Vector3d)(K*Pr) );
+                    const Eigen::Vector3d Pr = T_rl * Pl;
+                    const Eigen::Vector3d pr_ = K*Pr;
+                    const Eigen::Vector2d pr  = project(pr_);
                     const Eigen::Vector2d errr = pr - obsr;
                     sumsqerr += errr.squaredNorm();
                     num_obs++;
@@ -272,7 +335,29 @@ public:
                     Eigen::Matrix<double,PARAMS_T,2> J_T_rl;
                     Eigen::Matrix<double,PARAMS_T,2> J_T_lw;
 
-                    // TODO: Compute these derivatives!
+                    const Eigen::Matrix<double,2,3> dpi = dpi_dx(pr_);
+                    const Eigen::Matrix<double,2,3> dpiK = dpi * cam.K();
+                    const Eigen::Matrix<double,2,4> dpiKT_rl = dpiK * T_rl.matrix().block<3,4>(0,0);
+                    #if(PARAMS_K==3)
+                    {
+                        Jk.row(0) = dpi * Eigen::Vector3d(cam.K()(0,0)* Pr(0), cam.K()(1,1)* Pr(1), 0);
+                        Jk.row(1) = dpi * Eigen::Vector3d(cam.K()(0,2)* Pr(2), 0, 0);
+                        Jk.row(2) = dpi * Eigen::Vector3d(0, cam.K()(1,2)* Pr(2), 0);
+                    }
+                    #elif(PARAMS_K==4)
+                    //else if(PARAMS_K==4)
+                    {
+                        Jk.row(0) = dpi * Eigen::Vector3d(cam.K()(0,0)* Pr(0), 0, 0);
+                        Jk.row(1) = dpi * Eigen::Vector3d(0, cam.K()(1,1)* Pr(1), 0);
+                        Jk.row(2) = dpi * Eigen::Vector3d(cam.K()(0,2)* Pr(2), 0, 0);
+                        Jk.row(3) = dpi * Eigen::Vector3d(0, cam.K()(1,2)* Pr(2), 0);
+                    }
+                    #endif
+                    for(int i=0; i<PARAMS_T; ++i ) {
+//                        J_T_rl.row(i) = dpiKT_rl * se3_gen(i) * unproject(Pl);
+                        J_T_rl.row(i) = dpiKT_rl * se3_gen(i) * T_lt.matrix() * unproject(Pt);
+                        J_T_lw.row(i) = dpiKT_rl * T_lt.matrix() * se3_gen(i) * unproject(Pt);
+                    }
 
                     AddSparseOuterProduct<double,2,PARAMS_K,PARAMS_T,PARAMS_T>(
                         JTJ,JTy,  Jk,0,  J_T_rl,PARAMS_K,  J_T_lw,PARAMS_K+(1+kf)*PARAMS_T, errr
@@ -281,24 +366,42 @@ public:
             }
         }
 
-        JTJ.ldlt().solveInPlace(JTy);
+//        cout << "JTJ:" << endl << JTJ << endl;
+//        cout << "JTy:" << endl << JTy.transpose() << endl;
 
-        // New name for our inplace solution
-        const Eigen::Matrix<double,Eigen::Dynamic,1>& x = JTy;
+//        const Eigen::Matrix<double,Eigen::Dynamic,1> x = -1E-3 * JTJ.ldlt().solve(JTy);
 
-//        // Update K
-//        K(0,0) *= exp(x(0));
-//        K(1,1) *= exp(x(1));
-//        K(0,2) *= exp(x(2));
-//        K(1,2) *= exp(x(3));
+        const Eigen::Matrix<double,Eigen::Dynamic,1> x = -1E-2 * JTJ.lu().solve(JTy);
 
-//        // Update poses
-//        for( size_t kf=0; kf < N; ++kf ) {
-//            keyframes[kf].T_fw[0] = keyframes[kf].T_fw[0] *
-//                Sophus::SE3::exp(-1.0 * x.segment<6>(PARAMS_K + (1+kf)*PARAMS_T));
-//            keyframes[kf].T_fw[1] = T_rl * keyframes[kf].T_fw[0];
-//        }
+//        cout << "x:" << endl << x.transpose() << endl;
 
+        // Update K
+        if(PARAMS_K==3) {
+            K(0,0) *= exp(x(0));
+            K(1,1) *= exp(x(0));
+            K(0,2) *= exp(x(1));
+            K(1,2) *= exp(x(2));
+        }else if(PARAMS_K==4){
+            K(0,0) *= exp(x(0));
+            K(1,1) *= exp(x(1));
+            K(0,2) *= exp(x(2));
+            K(1,2) *= exp(x(3));
+        }
+        cam.SetK(K);
+
+        // Update baseline
+        T_rl = T_rl * Sophus::SE3::exp(x.segment<PARAMS_T>(PARAMS_K) );
+
+        // Update poses
+        for( size_t kf=0; kf < N; ++kf ) {
+            keyframes[kf].T_fw[0] = keyframes[kf].T_fw[0] *
+                Sophus::SE3::exp(x.segment<PARAMS_T>(PARAMS_K + (1+kf)*PARAMS_T));
+            keyframes[kf].T_fw[1] = T_rl * keyframes[kf].T_fw[0];
+        }
+
+
+        cout << K(0,0) / cam.width() << ", " << K(1,1) / cam.height() << ", " << K(0,2) / cam.width() << ", " << K(1,2) / cam.height() << endl;
+        cout << T_rl.matrix() << endl;
         cout << "RMSE: " << sqrt(sumsqerr/num_obs) << endl;
     }
 
@@ -307,7 +410,7 @@ public:
         Eigen::Matrix<double,3,Eigen::Dynamic> pattern = tracker[0]->TargetPattern3D();
 
         while(!shouldQuit) {
-            if(keyframes.size() > 5 ) {
+            if(keyframes.size() > 2 ) {
                 OptimiseIntrinsicsPoses(pattern,keyframes,camParams, T_rl);
             }else{
                 usleep(1000);
@@ -334,6 +437,11 @@ public:
 
             if( Pushed(save_kf) ) {
                 cout << "Save Keyframe" << endl;
+
+                if(keyframes.size() == 0) {
+                    // First keyframe. Initialise baseline estimate
+                    T_rl = tracker[1]->T_hw * tracker[0]->T_hw.inverse();
+                }
 
                 StereoKeyframe kf;
                 for(int i=0; i<2; ++i) {
@@ -374,6 +482,17 @@ public:
         DrawTarget(tracker[0]->target,Eigen::Vector2d(0,0),1,0.2,0.2);
         for(int i=0; i<2; ++i) {
             glSetFrameOfReferenceF(tracker[i]->T_hw.inverse());
+            glDrawAxis(0.2);
+            glUnsetFrameOfReference();
+        }
+
+        // Draw Stereo keyframes
+        for(size_t kf=0; kf < keyframes.size(); ++kf ) {
+            glSetFrameOfReferenceF(keyframes[kf].T_fw[0].inverse());
+            glDrawAxis(0.2);
+            glUnsetFrameOfReference();
+
+            glSetFrameOfReferenceF(keyframes[kf].T_fw[1].inverse());
             glDrawAxis(0.2);
             glUnsetFrameOfReference();
         }
