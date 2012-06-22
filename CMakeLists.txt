@@ -19,9 +19,13 @@ find_package(Sophus REQUIRED)
 include_directories( ${Sophus_INCLUDE_DIR} )
 link_directories( ${Sophus_LIBRARY_DIRS} )
 
-# https://github.com/obiou/FPL.git
-FIND_PACKAGE(CCAMERAMODEL QUIET)
-include_directories( ${CCAMERAMODEL_INCLUDE_DIR} )
+# git://github.com/stevenlovegrove/Pangolin.git
+FIND_PACKAGE(Pangolin REQUIRED)
+INCLUDE_DIRECTORIES(${Pangolin_INCLUDE_DIRS})
+LINK_DIRECTORIES(${Pangolin_LIBRARY_DIRS})
+LINK_LIBRARIES(${Pangolin_LIBRARIES})
+
+FIND_PACKAGE(CUDA QUIET)
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
   SET(CMAKE_CXX_FLAGS "-std=c++0x")
@@ -48,5 +52,17 @@ endif()
 set( BuildStereoCalibration true CACHE "" force )
 if( BuildStereoCalibration )
     add_executable( StereoCalibration StereoCalibration.cpp )
-    target_link_libraries( StereoCalibration ${CCAMERAMODEL_LIBRARIES} ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${Sophus_LIBRARIES} ${OpenCV_LIBS} )
+    target_link_libraries( StereoCalibration ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${Sophus_LIBRARIES} ${OpenCV_LIBS} )
+endif()
+
+set( BuildDenseStereo true CACHE "" force )
+if( BuildDenseStereo AND CUDA_FOUND)
+    cuda_add_executable( DenseStereo DenseStereo.cpp )
+    target_link_libraries( DenseStereo ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${Sophus_LIBRARIES} ${OpenCV_LIBS} )
+endif()
+
+set( BuildPangolinGLConsole true CACHE "" force )
+if( BuildPangolinGLConsole AND CUDA_FOUND)
+    cuda_add_executable( PangolinGLConsole PangolinGLConsole.cpp )
+    target_link_libraries( PangolinGLConsole ${RPG_LIBRARIES} ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} ${Sophus_LIBRARIES} ${OpenCV_LIBS} )
 endif()
