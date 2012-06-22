@@ -10,10 +10,10 @@ int main( int /*argc*/, char* argv[] )
 
     pangolin::CreateGlutWindowAndBind("Main",w,h);
 
-    for(int frame=0; !pangolin::ShouldQuit(); ++frame)
+    for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
-        DisplayBase().ActivateScissorAndClear();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        SwapBuffersProcessEvents();
+        pangolin::FinishGlutFrame();
     }
 }
