@@ -1,5 +1,4 @@
 #include <thread>
-#include <future>
 #include <mutex>
 
 #include <CVars/CVar.h>
