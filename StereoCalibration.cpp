@@ -15,8 +15,8 @@
 using namespace std;
 using namespace Eigen;
 
-const int DESIRED_WIDTH = 694;
-const int DESIRED_HEIGHT = 518;
+const int DESIRED_WIDTH = 320;
+const int DESIRED_HEIGHT = 240;
 
 const int WINDOW_WIDTH  = 2 * DESIRED_WIDTH;
 const int WINDOW_HEIGHT = 2 * DESIRED_HEIGHT;
@@ -440,8 +440,21 @@ public:
 
     void InitCamera()
     {
+        const int devid = 0;
+
         // Setup Camera device
-        if(false) {
+        if(devid == 0) {
+            camera.SetProperty<int>("NumImages", 2);
+            camera.SetProperty<int>("ImageWidth", 640);
+            camera.SetProperty<int>("ImageHeight", 480);
+//            camera.SetProperty<double>("FPS", 15);
+            camera.SetProperty<int>("BufferCount", 60);
+
+            if( !camera.InitDriver( "Dvi2Pci" ) ) {
+                std::cerr << "Failed to init Dvi2Pci." << std::endl;
+                exit(0);
+            }
+        }else if(devid == 1) {
             // Setup Camera
             camera.SetProperty("StartFrame",    0);
             camera.SetProperty("DataSourceDir", "/home/slovegrove/data/CityBlock-Noisy" );
@@ -449,8 +462,7 @@ public:
             camera.SetProperty("Channel-1",     "right.*pgm" );
             camera.SetProperty("NumChannels",   2 );
             camera.InitDriver("FileReader");
-            camera.Capture(img);
-        }else{
+        }else if(devid == 2){
             camera.SetProperty("NumChannels", 2 );
             camera.SetProperty("CamUUID0", 5004955);
             camera.SetProperty("CamUUID1", 5004954);
@@ -462,8 +474,10 @@ public:
                 cerr << "Couldn't start driver for camera " << endl;
                 exit(1);
             }
-            camera.Capture(img);
+        }else{
+            exit(0);
         }
+        camera.Capture(img);
         width = img[0].width();
         height = img[0].height();
 
