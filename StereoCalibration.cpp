@@ -12,6 +12,8 @@
 #include <fiducials/tracker.h>
 #include <fiducials/drawing.h>
 
+#include "StereoIntrinsicsOptimisation.h"
+
 using namespace std;
 using namespace Eigen;
 
@@ -20,175 +22,6 @@ const int DESIRED_HEIGHT = 240;
 
 const int WINDOW_WIDTH  = 2 * DESIRED_WIDTH;
 const int WINDOW_HEIGHT = 2 * DESIRED_HEIGHT;
-
-template<typename Cam>
-struct CamParamFixed {
-    const static int PARAMS = 0;
-
-    static inline Eigen::Matrix<double,2,2> dmap_by_duv(const LinearCamera& cam, const Eigen::Vector2d&)
-    {
-        Eigen::Matrix<double,2,2> ret;
-        ret << cam.K()(0,0), 0,
-                0, cam.K()(1,1);
-        return ret;
-    }
-
-    static inline Eigen::Matrix<double,PARAMS,2> dmap_by_dk(const Cam&, const Eigen::Vector2d&)
-    {
-        return Eigen::Matrix<double,PARAMS,2>();
-    }
-
-    static inline void UpdateCam(MatlabCamera&, const Eigen::Matrix<double,PARAMS,1>& )
-    {
-    }
-};
-
-template<typename Cam>
-struct CamParamLinearFuEqFv {
-    const static int PARAMS = 3;
-
-    static inline Eigen::Matrix<double,2,2> dmap_by_duv(const LinearCamera& cam, const Eigen::Vector2d&)
-    {
-        Eigen::Matrix<double,2,2> ret;
-        ret << cam.K()(0,0), 0,
-                0, cam.K()(1,1);
-        return ret;
-    }
-
-    static inline Eigen::Matrix<double,PARAMS,2> dmap_by_dk(const Cam& cam, const Eigen::Vector2d& x)
-    {
-        const double u = x(0);
-        const double v = x(1);
-        const double f  = cam.K()(0,0);
-        const double u0 = cam.K()(0,2);
-        const double v0 = cam.K()(1,2);
-
-        Eigen::Matrix<double,PARAMS,2> d;
-        d <<    f * u, f * v,
-                u0, 0,
-                0, v0;
-        return d;
-    }
-
-    static inline void UpdateCam(MatlabCamera& cam, const Eigen::Matrix<double,PARAMS,1>& x )
-    {
-        Eigen::Matrix3d K = cam.K();
-        K(0,0) *= exp(x(0));
-        K(1,1) *= exp(x(0));
-        K(0,2) *= exp(x(1));
-        K(1,2) *= exp(x(2));
-        cam.SetK(K);
-    }
-};
-
-template<typename Cam>
-struct CamParamLinear {
-    const static int PARAMS = 4;
-
-    static inline Eigen::Matrix<double,2,2> dmap_by_duv(const LinearCamera& cam, const Eigen::Vector2d&)
-    {
-        Eigen::Matrix<double,2,2> ret;
-        ret << cam.K()(0,0), 0,
-                0, cam.K()(1,1);
-        return ret;
-    }
-
-    static inline Eigen::Matrix<double,PARAMS,2> dmap_by_dk(const Cam& cam, const Eigen::Vector2d& x)
-    {
-        const double u = x(0);
-        const double v = x(1);
-        const double fu = cam.K()(0,0);
-        const double fv = cam.K()(1,1);
-        const double u0 = cam.K()(0,2);
-        const double v0 = cam.K()(1,2);
-
-        Eigen::Matrix<double,PARAMS,2> d;
-        d <<    fu * u, 0,
-                0, fv * v,
-                u0, 0,
-                0, v0;
-        return d;
-    }
-
-    static inline void UpdateCam(MatlabCamera& cam, const Eigen::Matrix<double,PARAMS,1>& x )
-    {
-        Eigen::Matrix3d K = cam.K();
-        K(0,0) *= exp(x(0));
-        K(1,1) *= exp(x(1));
-        K(0,2) *= exp(x(2));
-        K(1,2) *= exp(x(3));
-        cam.SetK(K);
-    }
-};
-
-template<typename Cam>
-struct CamParamMatlab {
-    const static int PARAMS = 4 + 2;
-
-    static inline Eigen::Matrix<double,2,2> dmap_by_duv(const MatlabCamera& cam, const Eigen::Vector2d& x)
-    {
-        const double k1 = cam._k1;
-        const double k2 = cam._k2;
-        const double u = x(0);
-        const double uu = u*u;
-        const double uuu = uu*u;
-        const double v = x(1);
-        const double vv = v*v;
-        const double vvv = vv*v;
-
-        const double dpoly_by_u = 2*k1*u + k2*(4*uuu + 4*u*vv); // + k3*(6*u*vvv*v + 12*uuu*vv + 6*uuu*uu);
-        const double dpoly_by_v = 2*k1*v + k2*(4*vvv + 4*v*uu); // + k3*(6*v*uuu*u + 12*vvv*uu + 6*vvv*vv);
-
-        Eigen::Matrix<double,2,2> ret;
-        ret << cam.K()(0,0) * (dpoly_by_u*u + 1), cam.K()(0,0) * dpoly_by_v * u,
-                cam.K()(1,1) * dpoly_by_u*v, cam.K()(1,1) * (dpoly_by_v*v + 1);
-        return ret;
-    }
-
-    static inline Eigen::Matrix<double,PARAMS,2> dmap_by_dk(const Cam& cam, const Eigen::Vector2d& x)
-    {
-        const double u = x(0);
-        const double v = x(1);
-
-        const double k1 = cam._k1;
-        const double k2 = cam._k2;
-
-        const double rd2 = u*u + v*v;
-        const double rd4 = rd2*rd2;
-//        const double rd6 = rd4*rd6;
-
-        const double fu = cam.K()(0,0);
-        const double fv = cam.K()(1,1);
-        const double u0 = cam.K()(0,2);
-        const double v0 = cam.K()(1,2);
-
-        const double poly = 1 + k1*rd2 + k2*rd4; // + k3*rd6;
-
-        Eigen::Matrix<double,PARAMS,2> d;
-        d <<    fu * poly * u, 0,
-                0, fv * poly * v,
-                u0, 0,
-                0, v0,
-                fu * k1*rd2 * u, fv * k1*rd2 * v,
-                fu * k2*rd4 * u, fv * k2*rd4 * v;
-//                fu * k3*rd6 * u, fv * k3*rd6 * v;
-        return d;
-    }
-
-    static inline void UpdateCam(MatlabCamera& cam, const Eigen::Matrix<double,PARAMS,1>& x )
-    {
-        Eigen::Matrix3d K = cam.K();
-        K(0,0) *= exp(x(0));
-        K(1,1) *= exp(x(1));
-        K(0,2) *= exp(x(2));
-        K(1,2) *= exp(x(3));
-        cam.SetK(K);
-
-        cam._k1 *= exp(x(4));
-        cam._k2 *= exp(x(5));
-//        cam._k3 *= exp(x(6));
-    }
-};
 
 inline void glDrawTexturesQuad(float t, float b, float l, float r)
 {
@@ -217,213 +50,6 @@ inline bool Pushed(bool& button)
     return pushed;
 }
 
-struct StereoKeyframe
-{
-    Sophus::SE3 T_fw[2];
-    Eigen::Matrix<double,2,Eigen::Dynamic> obs[2];
-};
-
-template<typename T, unsigned NC, unsigned NJ0, unsigned NJ1>
-inline void AddSparseOuterProduct(
-        Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& JTJ,
-        Eigen::Matrix<T,Eigen::Dynamic,1>& JTy,
-        const Eigen::Matrix<T,NJ0,NC>& J0, int J0pos,
-        const Eigen::Matrix<T,NJ1,NC>& J1, int J1pos,
-        const Eigen::Matrix<T,NC,1>& err
-) {
-    // On diagonal blocks
-    if(NJ0) JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
-    if(NJ1) JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
-
-    // Lower diagonal blocks
-    if(NJ0 && NJ1) JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
-
-    // Upper diagonal blocks TODO: use only one diagonal in future
-    if(NJ0 && NJ1) JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
-
-    // Errors
-    for(int i=0; i<NC; ++i) {
-        if(NJ0) JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
-        if(NJ1) JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
-    }
-}
-
-template<typename T, unsigned NC, unsigned NJ0, unsigned NJ1, unsigned NJ2 >
-inline void AddSparseOuterProduct(
-        Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& JTJ,
-        Eigen::Matrix<T,Eigen::Dynamic,1>& JTy,
-        const Eigen::Matrix<T,NJ0,NC>& J0, int J0pos,
-        const Eigen::Matrix<T,NJ1,NC>& J1, int J1pos,
-        const Eigen::Matrix<T,NJ2,NC>& J2, int J2pos,
-        const Eigen::Matrix<T,NC,1>& err
-) {
-    // On diagonal blocks
-    if(NJ0) JTJ.template block<NJ0,NJ0>(J0pos,J0pos) += J0 * J0.transpose();
-    if(NJ1) JTJ.template block<NJ1,NJ1>(J1pos,J1pos) += J1 * J1.transpose();
-    if(NJ2) JTJ.template block<NJ2,NJ2>(J2pos,J2pos) += J2 * J2.transpose();
-
-    // Lower diagonal blocks
-    if(NJ1 && NJ0) JTJ.template block<NJ1,NJ0>(J1pos,J0pos) += J1 * J0.transpose();
-    if(NJ2 && NJ0) JTJ.template block<NJ2,NJ0>(J2pos,J0pos) += J2 * J0.transpose();
-    if(NJ2 && NJ1) JTJ.template block<NJ2,NJ1>(J2pos,J1pos) += J2 * J1.transpose();
-
-    // Upper diagonal blocks TODO: use only one diagonal in future
-    if(NJ0 && NJ1) JTJ.template block<NJ0,NJ1>(J0pos,J1pos) += J0 * J1.transpose();
-    if(NJ0 && NJ2) JTJ.template block<NJ0,NJ2>(J0pos,J2pos) += J0 * J2.transpose();
-    if(NJ1 && NJ2) JTJ.template block<NJ1,NJ2>(J1pos,J2pos) += J1 * J2.transpose();
-
-    // Errors
-    for(int i=0; i<NC; ++i) {
-        if(NJ0) JTy.template segment<NJ0>(J0pos) += J0.col(i) * err(i);
-        if(NJ1) JTy.template segment<NJ1>(J1pos) += J1.col(i) * err(i);
-        if(NJ2) JTy.template segment<NJ2>(J2pos) += J2.col(i) * err(i);
-    }
-}
-
-static inline Eigen::Matrix<double,2,3> dpi_dx(const Eigen::Vector3d& x)
-{
-    const double x2x2 = x(2)*x(2);
-    Eigen::Matrix<double,2,3> ret;
-    ret << 1.0 / x(2), 0,  -x(0) / x2x2,
-            0, 1.0 / x(2), -x(1) / x2x2;
-    return ret;
-}
-
-static inline Eigen::Matrix<double,4,4> se3_gen(unsigned i) {
-
-    Eigen::Matrix<double,4,4> ret;
-    ret.setZero();
-
-    switch(i) {
-    case 0: ret(0,3) = 1; break;
-    case 1: ret(1,3) = 1; break;
-    case 2: ret(2,3) = 1; break;
-    case 3: ret(1,2) = -1; ret(2,1) = 1; break;
-    case 4: ret(0,2) = 1; ret(2,0) = -1; break;
-    case 5: ret(0,1) = -1; ret(1,0) = 1; break;
-    }
-
-    return ret;
-}
-
-static void OptimiseIntrinsicsPoses(
-    Eigen::Matrix<double,3,Eigen::Dynamic> pattern,
-    std::vector<StereoKeyframe>& keyframes,
-    MatlabCamera& cam,
-    Sophus::SE3& T_rl
-) {
-    // keyframes.size might increase asynchronously, so save
-    const int N = keyframes.size();
-
-    typedef CamParamMatlab<MatlabCamera> CamParam;
-    const int PARAMS_K = CamParam::PARAMS;
-    const int PARAMS_T = 6;
-    const int PARAMS_TOTAL = PARAMS_K + (1+N)* PARAMS_T;
-
-    unsigned int num_obs = 0;
-    double sumsqerr = 0;
-    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> JTJ(PARAMS_TOTAL,PARAMS_TOTAL);
-    Eigen::Matrix<double,Eigen::Dynamic,1> JTy(PARAMS_TOTAL);
-    JTJ.setZero();
-    JTy.setZero();
-
-    // Make JTJ and JTy from observations over each Keyframe
-    for( size_t kf=0; kf < N; ++kf ) {
-        // For each observation
-        for( size_t on=0; on < pattern.cols(); ++on ) {
-            // Construct block contributions for JTJ and JTy
-            const Sophus::SE3 T_lt = keyframes[kf].T_fw[0];
-
-            const Eigen::Vector3d Pt = pattern.col(on);
-            const Eigen::Vector3d Pl = T_lt * Pt;
-
-            const Eigen::Vector2d obsl = keyframes[kf].obs[0].col(on);
-            if( isfinite(obsl[0]) ) {
-                const Eigen::Vector2d pl_ = project(Pl);
-                const Eigen::Vector2d pl = cam.map(pl_);
-                const Eigen::Vector2d errl = pl - obsl;
-                sumsqerr += errl.squaredNorm();
-                num_obs++;
-
-                Eigen::Matrix<double,PARAMS_K,2> Jk = CamParam::dmap_by_dk(cam,pl_);
-
-                const Eigen::Matrix<double,2,3> dpi = dpi_dx(Pl);
-                const Eigen::Matrix<double,2,2> dmap = CamParam::dmap_by_duv(cam,pl_);
-                const Eigen::Matrix<double,2,3> dmapdpi = dmap * dpi;
-                const Eigen::Matrix<double,2,4> dmapdpiTlt = dmapdpi * T_lt.matrix3x4();
-
-                Eigen::Matrix<double,PARAMS_T,2> J_T_lw;
-                for(int i=0; i<PARAMS_T; ++i ) {
-                    J_T_lw.row(i) = dmapdpiTlt * se3_gen(i) * unproject(Pt);
-                }
-
-                AddSparseOuterProduct<double,2,PARAMS_K,PARAMS_T>(
-                    JTJ,JTy,  Jk,0,  J_T_lw,PARAMS_K+(1+kf)*PARAMS_T, errl
-                );
-            }
-
-            const Eigen::Vector2d obsr = keyframes[kf].obs[1].col(on);
-            if(isfinite(obsr[0])) {
-                const Eigen::Vector3d Pr = T_rl * Pl;
-                const Eigen::Vector2d pr_ = project(Pr);
-                const Eigen::Vector2d pr  = cam.map(pr_);
-                const Eigen::Vector2d errr = pr - obsr;
-                sumsqerr += errr.squaredNorm();
-                num_obs++;
-
-                Eigen::Matrix<double,PARAMS_K,2> Jk = CamParam::dmap_by_dk(cam,pr_);
-
-                const Eigen::Matrix<double,2,3> dpi = dpi_dx(Pr);
-                const Eigen::Matrix<double,2,2> dmap = CamParam::dmap_by_duv(cam,pr_);
-                const Eigen::Matrix<double,2,3> dmapdpi = dmap * dpi;
-                const Eigen::Matrix<double,2,4> dmapdpiT_rl = dmapdpi * T_rl.matrix3x4();
-
-                Eigen::Matrix<double,PARAMS_T,2> J_T_rl;
-                Eigen::Matrix<double,PARAMS_T,2> J_T_lw;
-                for(int i=0; i<PARAMS_T; ++i ) {
-                    J_T_rl.row(i) = dmapdpiT_rl * se3_gen(i) * T_lt.matrix() * unproject(Pt);
-                    J_T_lw.row(i) = dmapdpiT_rl * T_lt.matrix() * se3_gen(i) * unproject(Pt);
-                }
-
-                AddSparseOuterProduct<double,2,PARAMS_K,PARAMS_T,PARAMS_T>(
-                    JTJ,JTy,  Jk,0,  J_T_rl,PARAMS_K,  J_T_lw,PARAMS_K+(1+kf)*PARAMS_T, errr
-                );
-            }
-        }
-    }
-
-    cout << "=============== RMSE: " << sqrt(sumsqerr/num_obs) << " ====================" << endl;
-
-    FullPivLU<MatrixXd> lu_JTJ(JTJ);
-    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve(JTy);
-
-    if( x.norm() > 1 ) {
-        x = x / x.norm();
-    }
-
-    if( lu_JTJ.rank() == PARAMS_TOTAL )
-    {
-        CamParam::UpdateCam(cam, x.head<PARAMS_K>());
-
-        // Update baseline
-        T_rl = T_rl * Sophus::SE3::exp(x.segment<PARAMS_T>(PARAMS_K) );
-
-        // Update poses
-        for( size_t kf=0; kf < N; ++kf ) {
-            keyframes[kf].T_fw[0] = keyframes[kf].T_fw[0] *
-                Sophus::SE3::exp(x.segment<PARAMS_T>(PARAMS_K + (1+kf)*PARAMS_T));
-            keyframes[kf].T_fw[1] = T_rl * keyframes[kf].T_fw[0];
-        }
-
-        cout << cam << endl;
-        cout << T_rl.matrix() << endl;
-    }else{
-        cerr << "Rank deficient! Missing: " << (PARAMS_TOTAL - lu_JTJ.rank()) << endl;
-        cerr << lu_JTJ.kernel() << endl;
-    }
-}
-
-
 class Application
 {
 public:
@@ -440,7 +66,7 @@ public:
 
     void InitCamera()
     {
-        const int devid = 0;
+        const int devid = 2;
 
         // Setup Camera device
         if(devid == 0) {
@@ -640,11 +266,11 @@ public:
         // Draw Stereo keyframes
         for(size_t kf=0; kf < keyframes.size(); ++kf ) {
             glSetFrameOfReferenceF(keyframes[kf].T_fw[0].inverse());
-            glDrawAxis(0.2);
+            glDrawAxis(0.05);
             glUnsetFrameOfReference();
 
             glSetFrameOfReferenceF(keyframes[kf].T_fw[1].inverse());
-            glDrawAxis(0.2);
+            glDrawAxis(0.05);
             glUnsetFrameOfReference();
         }
 
