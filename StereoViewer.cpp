@@ -16,12 +16,16 @@ using namespace Gpu;
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
-    const std::string cam_uri =
-            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//";
+//    const std::string cam_uri =
+//            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//";
 //            "FileReader:[DataSourceDir=/home/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
 //            "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//";
+//    CameraDevice camera = OpenRpgCamera(cam_uri);
 
-    CameraDevice camera = OpenRpgCamera(cam_uri);
+    CameraDevice camera = OpenPangoCamera(
+        "file:[stream=0,fmt=GRAY8]///home/slovegrove/data/3DCam/DSCF0051.AVI",
+        "file:[stream=1,fmt=GRAY8]///home/slovegrove/data/3DCam/DSCF0051.AVI"
+    );
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;

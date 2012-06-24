@@ -286,7 +286,7 @@ __global__ void KernMakeAnaglyth(Image<uchar4> anaglyth, const Image<uchar1> lef
     const unsigned char leftI  = left(x,y).x;
     const unsigned char rightI = right(x,y).x;
 
-    anaglyth(x,y) = make_uchar4(leftI, rightI, rightI,255);
+    anaglyth(x,y) = make_uchar4(leftI, 0, rightI,255);
 }
 
 void MakeAnaglyth(Image<uchar4> anaglyth, const Image<uchar1> left, const Image<uchar1> right)
