@@ -51,13 +51,7 @@ int main( int /*argc*/, char* argv[] )
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
     // Tell the base view to arrange its children equally
-    View& screen = DisplayBase();
-    screen.SetLayout(LayoutEqual);
-
-    const int N = 4;
-    for(int i=0; i<N; ++i ) {
-        CreateDisplay().SetAspect((double)w/h);
-    }
+    View& screen = CreateDisplay().SetAspect((double)w/h);
 
     // Texture we will use to display camera images
     GlTextureCudaArray tex(w,h,GL_LUMINANCE8);
@@ -82,22 +76,15 @@ int main( int /*argc*/, char* argv[] )
                     img[i].Image.data, w*sizeof(uchar1), w*sizeof(uchar1),h, cudaMemcpyHostToDevice
                 );
             }
-//            MakeAnaglyth(d3d, dCamImg[0], dCamImg[1]);
+            MakeAnaglyth(d3d, dCamImg[0], dCamImg[1]);
         }
 
         // Perform drawing
         {
-            // Draw Stereo images
-            for(int i=0; i<2; ++i ) {
-                screen[i].Activate();
-                tex.Upload(img[i].Image.data,GL_LUMINANCE, GL_UNSIGNED_BYTE);
-                tex.RenderToViewportFlipY();
-            }
-
-//            // Draw Anaglyph
-//            screen[2].Activate();
-//            CopyDevMemtoTex(d3d.ptr, d3d.pitch, texrgb );
-//            texrgb.RenderToViewportFlipY();
+            // Draw Anaglyph
+            screen.Activate();
+            CopyDevMemtoTex(d3d.ptr, d3d.pitch, texrgb );
+            texrgb.RenderToViewportFlipY();
         }
 
         pangolin::FinishGlutFrame();
