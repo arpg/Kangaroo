@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <boost/static_assert.hpp>
 
+#include <cuda_runtime.h>
+
 namespace Gpu
 {
 
@@ -157,6 +159,20 @@ struct Image {
     const T& operator[](size_t ix) const
     {
         return ptr[ix];
+    }
+
+    template <typename DT>
+    inline __host__
+    void MemcpyFromHost(DT* hptr, size_t hpitch )
+    {
+        cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
+    }
+
+    template <typename DT>
+    inline __host__
+    void MemcpyFromHost(DT* ptr )
+    {
+        MemcpyFromHost(ptr, w*sizeof(T) );
     }
 
     T* ptr;

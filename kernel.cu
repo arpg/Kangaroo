@@ -20,6 +20,16 @@ inline __host__ __device__ float3 operator*(uchar3 a, float b)
     return make_float3(b * a.x, b * a.y, b * a.z);
 }
 
+inline __host__ __device__ float1 operator*(float b, uchar1 a)
+{
+    return make_float1(b * a.x);
+}
+
+inline __host__ __device__ float1 operator*(uchar1 a, float b)
+{
+    return make_float1(b * a.x);
+}
+
 //////////////////////////////////////////////////////
 // Sampling
 //////////////////////////////////////////////////////
@@ -264,19 +274,109 @@ inline void InitDimFromOutputImage(dim3& blockDim, dim3& gridDim, const Image<T>
     gridDim =  dim3( image.w / blockDim.x, image.h / blockDim.y, 1);
 }
 
-__global__ void KernCreateMatlabLookupTable(
-    Image<LookupWeights> lookup, float fu, float fv, float u0, float v0, float k1, float k2
-) {
+//////////////////////////////////////////////////////
+// Create Matlab Lookup table
+//////////////////////////////////////////////////////
 
+__global__ void KernCreateMatlabLookupTable(
+    Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2
+) {
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float pnu = (u-u0) / fu;
+    const float pnv = (v-v0) / fv;
+    const float r = sqrt(pnu*pnu + pnv*pnv);
+    const float rr = r*r;
+    const float rf = 1 + k1*rr + k2*rr*rr; // + k3*rr*rr*rr;
+
+    lookup(u,v) = make_float2(
+        (pnu*rf /*+ 2*p1*pn.x*pn.y + p2*(rr + 2*pn.x*pn.x)*/) * fu + u0,
+        (pnv*rf /*+ p1*(rr + 2*pn.y*pn.y) + 2*p2*pn.x*pn.y*/) * fv + v0
+    );
 }
 
 void CreateMatlabLookupTable(
-    Image<LookupWeights> lookup, float fu, float fv, float u0, float v0, float k1, float k2
+    Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, lookup);
     KernCreateMatlabLookupTable<<<gridDim,blockDim>>>(lookup,fu,fv,u0,v0,k1,k2);
 }
+
+//////////////////////////////////////////////////////
+// Create Matlab Lookup table applying homography
+//////////////////////////////////////////////////////
+
+__global__ void KernCreateMatlabLookupTable(
+    Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Array<float,9> H_on
+) {
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    // Apply homography H_on, moving New image to Original
+    const float hdiv = H_on[6] * x + H_on[7] * y + H_on[8];
+    const float u = (H_on[0] * x + H_on[1] * y + H_on[2]) / hdiv;
+    const float v = (H_on[3] * x + H_on[4] * y + H_on[5]) / hdiv;
+
+    // Apply distortion to achieve true image coordinates
+    const float pnu = (u-u0) / fu;
+    const float pnv = (v-v0) / fv;
+    const float r = sqrt(pnu*pnu + pnv*pnv);
+    const float rr = r*r;
+    const float rf = 1 + k1*rr + k2*rr*rr; // + k3*rr*rr*rr;
+
+    float2 pos = make_float2(
+        (pnu*rf /*+ 2*p1*pn.x*pn.y + p2*(rr + 2*pn.x*pn.x)*/) * fu + u0,
+        (pnv*rf /*+ p1*(rr + 2*pn.y*pn.y) + 2*p2*pn.x*pn.y*/) * fv + v0
+    );
+
+    // Clamp to image bounds
+    pos.x = max(pos.x, 1.0f);
+    pos.y = max(pos.y, 1.0f);
+    pos.x = min(pos.x, lookup.w-2.0f);
+    pos.y = min(pos.y, lookup.h-2.0f);
+
+    lookup(x,y) = pos;
+}
+
+void CreateMatlabLookupTable(
+        Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Array<float,9> H_no
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, lookup);
+    KernCreateMatlabLookupTable<<<gridDim,blockDim>>>(lookup,fu,fv,u0,v0,k1,k2,H_no);
+}
+
+//////////////////////////////////////////////////////
+// Warp image using lookup table
+//////////////////////////////////////////////////////
+
+__global__ void KernWarp(
+    Image<uchar1> out, const Image<uchar1> in, const Image<float2> lookup
+) {
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float2 lu = lookup(x,y);
+    out(x,y).x = bicubic<float,unsigned char>((unsigned char*)in.ptr, in.stride, lu.x, lu.y);
+}
+
+void Warp(
+    Image<uchar1> out, const Image<uchar1> in, const Image<float2> lookup
+) {
+    assert(out.w <= lookup.w && out.h <= lookup.h);
+    assert(out.w <= in.w && out.h <= in.w);
+
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, out);
+    KernWarp<<<gridDim,blockDim>>>(out, in, lookup);
+
+}
+
+//////////////////////////////////////////////////////
+// Anaglyph: Join left / right images into anagly stereo
+//////////////////////////////////////////////////////
 
 __global__ void KernMakeAnaglyth(Image<uchar4> anaglyth, const Image<uchar1> left, const Image<uchar1> right)
 {
