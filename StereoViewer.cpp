@@ -38,7 +38,7 @@ int main( int /*argc*/, char* argv[] )
     const int h = img[0].height();
 
     // Setup OpenGL Display (based on GLUT)
-    pangolin::CreateGlutWindowAndBind("Main",2*w,2*h);
+    pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
 
     // Initialise CUDA, allowing it to use OpenGL context
     cudaGLSetGLDevice(0);

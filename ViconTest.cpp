@@ -59,7 +59,7 @@ int main( int /*argc*/, char* argv[] )
     const int w = 640;
     const int h = 480;
 
-    pangolin::CreateGlutWindowAndBind("Main",w,h);
+    pangolin::CreateGlutWindowAndBind(__FILE__,w,h);
 
     glEnable (GL_LINE_SMOOTH);
     glEnable (GL_BLEND);

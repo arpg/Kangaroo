@@ -57,9 +57,9 @@ if( BuildStereoCalibration )
     target_link_libraries( StereoCalibration ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} )
 endif()
 
-set( BuildPangolinGLConsole true CACHE "" force )
-if( BuildPangolinGLConsole )
-    add_executable( PangolinGLConsole PangolinGLConsole.cpp )
+set( BuildMultiStreamViewer true CACHE "" force )
+if( BuildMultiStreamViewer )
+    add_executable( MultiStreamViewer MultiStreamViewer.cpp )
 endif()
 
 set( BuildViconTest true CACHE "" force )

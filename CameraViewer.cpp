@@ -32,14 +32,11 @@ int main( int /*argc*/, char* argv[] )
     const int h = img[0].height();
 
     // Setup OpenGL Display (based on GLUT)
-    pangolin::CreateGlutWindowAndBind("Main",N*w,h);
+    pangolin::CreateGlutWindowAndBind(__FILE__,N*w,h);
 
-    // Setup default OpenGL parameters
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable (GL_BLEND);
-    glEnable (GL_LINE_SMOOTH);
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+    GlTexture tex(w,h,GL_LUMINANCE8);
 
     // Create Smart viewports for each camera image that preserve aspect
     View* view[N];
@@ -49,9 +46,6 @@ int main( int /*argc*/, char* argv[] )
 
     // Tell the base view to arrange its children equally
     DisplayBase().SetLayout(LayoutEqual);
-
-    // Texture we will use to display camera images
-    GlTexture tex(w,h,GL_LUMINANCE8);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
