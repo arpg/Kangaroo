@@ -62,7 +62,7 @@ int main( int /*argc*/, char* argv[] )
     GlTextureCudaArray texrgb(w,h,GL_RGBA8);
 
     // Allocate Camera Images on device for processing
-    Image<uchar1, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> d3d(w,h);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)

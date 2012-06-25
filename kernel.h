@@ -33,14 +33,26 @@ void CreateMatlabLookupTable(Image<float2> lookup,
 //////////////////////////////////////////////////////
 
 void Warp(
-    Image<uchar1> out, const Image<uchar1> in, const Image<float2> lookup
+    Image<unsigned char> out, const Image<unsigned char> in, const Image<float2> lookup
+);
+
+//////////////////////////////////////////////////////
+
+void DenseStereo(
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int disp
+);
+
+//////////////////////////////////////////////////////
+
+void BilateralFilter(
+    Image<float> dOut, Image<float> dIn, float gs, float gr, uint size
 );
 
 //////////////////////////////////////////////////////
 
 void MakeAnaglyth(
     Image<uchar4> anaglyth,
-    const Image<uchar1> left, const Image<uchar1> right
+    const Image<unsigned char> left, const Image<unsigned char> right
 );
 
 }

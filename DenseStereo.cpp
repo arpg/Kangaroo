@@ -15,7 +15,8 @@ using namespace Gpu;
 template<typename T, typename Owner>
 inline void operator<<(pangolin::GlTextureCudaArray& tex, const Image<T,TargetDevice,Owner>& dImg)
 {
-    pangolin::CopyDevMemtoTex(dImg.ptr, dImg.pitch, tex );
+    CudaScopedMappedArray arr_tex(tex);
+    cudaMemcpy2DToArray(*arr_tex, 0, 0, dImg.ptr, dImg.pitch, dImg.w*sizeof(T), dImg.h, cudaMemcpyDeviceToDevice );
 }
 
 Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size_t h)
@@ -134,9 +135,9 @@ int main( int /*argc*/, char* argv[] )
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
     // Tell the base view to arrange its children equally
-    const int UI_WIDTH = 0;
-//    View& d_panel = pangolin::CreatePanel("ui")
-//        .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
+    const int UI_WIDTH = 180;
+    View& d_panel = pangolin::CreatePanel("ui")
+        .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
 
     View& container = CreateDisplay()
             .SetBounds(0,1.0, Attach::Pix(UI_WIDTH), 1.0)
@@ -149,13 +150,17 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // Texture we will use to display camera images
-    GlTextureCudaArray tex(w,h,GL_LUMINANCE8);
-    GlTextureCudaArray texrgb(w,h,GL_RGBA8);
+    GlTextureCudaArray tex8(w,h,GL_LUMINANCE8);
+    GlTextureCudaArray texrgb8(w,h,GL_RGBA8);
+    GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
 
     // Allocate Camera Images on device for processing
-    Image<uchar1, TargetDevice, Manage> dCamImgDist[] = {{w,h},{w,h}};
-    Image<uchar1, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
-    Image<float2, TargetDevice, Manage> dlookup[] = {{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> dCamImgDist[] = {{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
+    Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
+    Image<uchar4, TargetDevice, Manage> d3d(w,h);
+    Image<float, TargetDevice, Manage>  dDisp(640,480);
+    Image<float, TargetDevice, Manage>  dDispFilt(640,480);
 
     // Camera Parameters
     Eigen::VectorXd camParamsVec(6);
@@ -179,10 +184,15 @@ int main( int /*argc*/, char* argv[] )
         const Sophus::SE3 T_rl_orig = Sophus::SE3(R_rl_orig, l_r_orig);
 
         T_rl = CreateScanlineRectifiedLookupAndT_rl(
-            dlookup[0], dlookup[1], T_rl_orig,
+            dLookup[0], dLookup[1], T_rl_orig,
             camParamsVec, w, h
         );
     }
+
+    static Var<int> disp("ui.disp",0, 0, 64);
+    static Var<int> size("ui.size",5, 1, 20);
+    static Var<float> gs("ui.gs",1E-3, 1E-3, 5);
+    static Var<float> gr("ui.gr",1E-3, 1E-3, 5);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -194,20 +204,32 @@ int main( int /*argc*/, char* argv[] )
         /////////////////////////////////////////////////////////////
         // Upload images to device
         for(int i=0; i<2; ++i ) {
-            dCamImgDist[i].MemcpyFromHost(img[i].Image.data);
-            Warp(dCamImg[i],dCamImgDist[i],dlookup[i]);
+            dCamImgDist[i].MemcpyFromHost(img[i].Image.data, w*sizeof(uchar1) );
+            Warp(dCamImg[i],dCamImgDist[i],dLookup[i]);
         }
+
+        DenseStereo(dDisp, dCamImg[0], dCamImg[1], disp);
+        BilateralFilter(dDispFilt, dDisp, gs, gr, size);
+//        MakeAnaglyth(d3d, dCamImg[0], dCamImg[1]);
 
         /////////////////////////////////////////////////////////////
         // Perform drawing
         // Draw Stereo images
         for(int i=0; i<2; ++i ) {
             container[i].Activate();
-            tex << dCamImg[i];
-            tex.RenderToViewportFlipY();
+            tex8 << dCamImg[i];
+            tex8.RenderToViewportFlipY();
         }
 
-//        d_panel.Render();
+        container[2].Activate();
+        texf << dDisp;
+        texf.RenderToViewportFlipY();
+
+        container[3].Activate();
+        texf << dDispFilt;
+        texf.RenderToViewportFlipY();
+
+        d_panel.Render();
 
         pangolin::FinishGlutFrame();
     }

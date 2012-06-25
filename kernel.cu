@@ -281,8 +281,8 @@ inline void InitDimFromOutputImage(dim3& blockDim, dim3& gridDim, const Image<T>
 __global__ void KernCreateMatlabLookupTable(
     Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2
 ) {
-    const int u = blockIdx.x*blockDim.x + threadIdx.x;
-    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const uint u = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint v = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float pnu = (u-u0) / fu;
     const float pnv = (v-v0) / fv;
@@ -311,8 +311,8 @@ void CreateMatlabLookupTable(
 __global__ void KernCreateMatlabLookupTable(
     Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Array<float,9> H_on
 ) {
-    const int x = blockIdx.x*blockDim.x + threadIdx.x;
-    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     // Apply homography H_on, moving New image to Original
     const float hdiv = H_on[6] * x + H_on[7] * y + H_on[8];
@@ -353,17 +353,17 @@ void CreateMatlabLookupTable(
 //////////////////////////////////////////////////////
 
 __global__ void KernWarp(
-    Image<uchar1> out, const Image<uchar1> in, const Image<float2> lookup
+    Image<unsigned char> out, const Image<unsigned char> in, const Image<float2> lookup
 ) {
-    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float2 lu = lookup(x,y);
-    out(x,y).x = bicubic<float,unsigned char>((unsigned char*)in.ptr, in.stride, lu.x, lu.y);
+    out(x,y) = bicubic<float,unsigned char>((unsigned char*)in.ptr, in.stride, lu.x, lu.y);
 }
 
 void Warp(
-    Image<uchar1> out, const Image<uchar1> in, const Image<float2> lookup
+    Image<unsigned char> out, const Image<unsigned char> in, const Image<float2> lookup
 ) {
     assert(out.w <= lookup.w && out.h <= lookup.h);
     assert(out.w <= in.w && out.h <= in.w);
@@ -375,21 +375,117 @@ void Warp(
 }
 
 //////////////////////////////////////////////////////
+// Scanline rectified dense stereo
+//////////////////////////////////////////////////////
+
+template<typename T, int size>
+__device__ inline
+float Score(
+    Image<T> img1, int x1, int y1,
+    Image<T> img2, int x2, int y2
+) {
+    float sum_abs_diff = 0;
+
+    for(int r=-size; r <=size; ++r ) {
+        for(int c=-size; c <=size; ++c ) {
+            float i1 = img1.GetWithClampedRange(x1+c,y1+r);
+            float i2 = img2.GetWithClampedRange(x2+c,y2+r);
+            sum_abs_diff += abs(i1 - i2);
+        }
+    }
+
+    return sum_abs_diff / (size*size);
+}
+
+template<typename T, int MAX_DISP>
+__global__ void KernDenseStereo(
+    Image<float> dDisp, Image<T> dCamLeft, Image<T> dCamRight, int disp
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+//    dDisp(x,y) = abs(dCamLeft(x,y).x - dCamRight(x,y).x) / 255.0f;
+//    dDisp(x,y) = Score<unsigned char,2>(dCamLeft, x,y, dCamRight, x-disp, y) / 255.0f;
+
+    // Search for best matching pixel
+    int bestDisp = MAX_DISP;
+    float bestScore = 1E10;
+
+    for(int c = 0; c < MAX_DISP; ++c ) {
+        const float score = Score<unsigned char,2>(dCamLeft, x,y, dCamRight, x-c, y);
+        if(score < bestScore) {
+            bestScore = score;
+            bestDisp = c;
+        }
+    }
+
+    dDisp(x,y) = (float)bestDisp / (float)MAX_DISP;
+}
+
+void DenseStereo(
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int disp
+) {
+//    const int MAX_DISP = 128;
+//    dim3 blockDim, gridDim;
+//    InitDimFromOutputImage(blockDim,gridDim, dDisp);
+    dim3 blockDim(16,16);
+    dim3 gridDim(dDisp.w / blockDim.x,dDisp.h / blockDim.y );
+    KernDenseStereo<unsigned char,50><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,disp);
+}
+
+//////////////////////////////////////////////////////
+// Quick and dirty Bilateral filer
+//////////////////////////////////////////////////////
+
+__global__ void KernBilateralFilter(
+    Image<float> dOut, Image<float> dIn, float gs, float gr, int size
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float p = dIn(x,y);
+    float sum = 0;
+    float sumw = 0;
+
+    for(int r = -size; r <= size; ++r ) {
+        for(int c = -size; c <= size; ++c ) {
+            const float q = dIn.GetWithClampedRange(x+c, y+r);
+            const float sd2 = r*r + c*c;
+            const float id = abs(p - q);
+            const float sw = __expf(-(sd2) / (2 * gs * gs));
+            const float iw = __expf(-(id * id) / (2 * gr * gr));
+            const float w = sw*iw;
+            sumw += w;
+            sum += w * q;
+//            sumw += 1;
+//            sum += q;
+        }
+    }
+
+    dOut(x,y) = sum / sumw;
+}
+
+void BilateralFilter(
+    Image<float> dOut, Image<float> dIn, float gs, float gr, uint size
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut);
+    KernBilateralFilter<<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
+}
+
+//////////////////////////////////////////////////////
 // Anaglyph: Join left / right images into anagly stereo
 //////////////////////////////////////////////////////
 
-__global__ void KernMakeAnaglyth(Image<uchar4> anaglyth, const Image<uchar1> left, const Image<uchar1> right)
+__global__ void KernMakeAnaglyth(Image<uchar4> anaglyth, const Image<unsigned char> left, const Image<unsigned char> right)
 {
-    const int x = blockIdx.x*blockDim.x + threadIdx.x;
-    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
-    const unsigned char leftI  = left(x,y).x;
-    const unsigned char rightI = right(x,y).x;
-
-    anaglyth(x,y) = make_uchar4(leftI, 0, rightI,255);
+    anaglyth(x,y) = make_uchar4(left(x,y), 0, right(x,y),255);
 }
 
-void MakeAnaglyth(Image<uchar4> anaglyth, const Image<uchar1> left, const Image<uchar1> right)
+void MakeAnaglyth(Image<uchar4> anaglyth, const Image<unsigned char> left, const Image<unsigned char> right)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, anaglyth);

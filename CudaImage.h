@@ -161,6 +161,14 @@ struct Image {
         return ptr[ix];
     }
 
+    inline  __device__ __host__
+    const T& GetWithClampedRange(int x, int y) const
+    {
+        x = max((int)0, min((int)w-1,x));
+        y = max((int)0, min((int)h-1,y));
+        return ptr[y*stride + x];
+    }
+
     template <typename DT>
     inline __host__
     void MemcpyFromHost(DT* hptr, size_t hpitch )
