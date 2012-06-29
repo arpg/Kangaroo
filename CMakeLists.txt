@@ -1,5 +1,6 @@
-project( Kangaroo )
-cmake_minimum_required(VERSION 2.8)
+PROJECT( Kangaroo )
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 FIND_PACKAGE( SimpleGui REQUIRED )
 INCLUDE_DIRECTORIES( ${SimpleGui_INCLUDE_DIRS} )
@@ -8,6 +9,7 @@ INCLUDE_DIRECTORIES( ${SimpleGui_INCLUDE_DIRS} )
 FIND_PACKAGE( Fiducials REQUIRED )
 INCLUDE_DIRECTORIES( ${Fiducials_INCLUDE_DIRS} )
 LINK_DIRECTORIES(${Fiducials_LIBRARY_DIRS})
+LINK_LIBRARIES(${Fiducials_LIBRARIES})
 
 # git://github.com/stevenlovegrove/Sophus.git
 FIND_PACKAGE(Sophus REQUIRED)
@@ -24,9 +26,6 @@ LINK_LIBRARIES(${Pangolin_LIBRARIES})
 FIND_PACKAGE( RPG REQUIRED )
 INCLUDE_DIRECTORIES( ${RPG_INCLUDE_DIRS} )
 LINK_LIBRARIES(${RPG_LIBRARIES})
-
-FIND_PACKAGE( OpenCV REQUIRED )
-LINK_LIBRARIES(${OpenCV_LIBS})
 
 SET(COMMON_SRC "")
 
@@ -46,7 +45,7 @@ if( BuildMeshTest )
     target_link_libraries( MeshTest ${SimpleGui_LIBRARIES} )
 endif()
 
-set( BuildTriggerTest true CACHE "" force )
+set( BuildTriggerTest false CACHE "" force )
 if( BuildTriggerTest )
     add_executable( TriggerTest TriggerTest.cpp ${COMMON_SRC})
     target_link_libraries( TriggerTest ${SimpleGui_LIBRARIES} )
