@@ -8,6 +8,9 @@
 #include "RpgCameraOpen.h"
 #include "kernel.h"
 
+#include <Mvlpp/Mvl.h>
+#include <Mvlpp/Cameras.h>
+
 using namespace std;
 using namespace pangolin;
 using namespace Gpu;
@@ -39,10 +42,10 @@ Eigen::Matrix3d MakeKinv(const Eigen::Matrix3d& K)
 
 Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     Image<float2> dlookup_left, Image<float2> dlookup_right,
-    const Sophus::SE3 T_rl, const Eigen::VectorXd& camParamsVec,
+    const Sophus::SE3 T_rl, const Eigen::Matrix3d& K, double kappa1, double kappa2,
     size_t w, size_t h
 ) {
-    Eigen::Matrix3d K =    MakeK(camParamsVec, w, h);
+//    Eigen::Matrix3d K =    MakeK(camParamsVec, w, h);
     Eigen::Matrix3d Kinv = MakeKinv(K);
 
     const Sophus::SO3 R_rl = T_rl.so3();
@@ -91,21 +94,64 @@ Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     }
 
     // Invoke CUDA Kernel to generate lookup table
-    CreateMatlabLookupTable(dlookup_left, camParamsVec[0]*w, camParamsVec[1]*h,camParamsVec[2]*w,camParamsVec[3]*h,camParamsVec[4],camParamsVec[5],H_ol_nl);
-    CreateMatlabLookupTable(dlookup_right,camParamsVec[0]*w, camParamsVec[1]*h,camParamsVec[2]*w,camParamsVec[3]*h,camParamsVec[4],camParamsVec[5],H_or_nr);
+    CreateMatlabLookupTable(dlookup_left, K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_ol_nl);
+    CreateMatlabLookupTable(dlookup_right,K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_or_nr);
 
     return T_nr_nl;
+}
+
+Sophus::SE3 T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl::CameraModel& rcmod, const Eigen::Matrix3d& targetRDF)
+{
+    // Transformation matrix to adjust to target RDF
+    Eigen::Matrix4d Tadj[2] = {Eigen::Matrix4d::Identity(),Eigen::Matrix4d::Identity()};
+    Tadj[0].block<3,3>(0,0) = targetRDF.transpose() * lcmod.RDF();
+    Tadj[1].block<3,3>(0,0) = targetRDF.transpose() * rcmod.RDF();
+
+    // Computer Poses in our adjust coordinate system
+    const Eigen::Matrix4d T_lw_ = Tadj[0] * lcmod.GetPose().inverse();
+    const Eigen::Matrix4d T_rw_ = Tadj[1] * rcmod.GetPose().inverse();
+
+    // Computer transformation to right camera frame from left
+    const Eigen::Matrix4d T_rl = T_rw_ * T_lw_.inverse();
+
+    return Sophus::SE3(T_rl.block<3,3>(0,0), T_rl.block<3,1>(0,3) );
 }
 
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
-    const std::string cam_uri =
-            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//";
-//            "FileReader:[DataSourceDir=/home/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
-//            "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//";
+//    const std::string cam_uri =
+    CameraDevice camera = OpenRpgCamera(
+//        "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+//        "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
+    );
 
-    CameraDevice camera = OpenRpgCamera(cam_uri);
+//    CameraDevice camera = OpenPangoCamera(
+//        "file:[stream=0,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI",
+//        "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
+//    );
+
+    mvl::CameraModel camModel[] = {
+        camera.GetProperty("DataSourceDir") + "/lcmod.xml",
+        camera.GetProperty("DataSourceDir") + "/rcmod.xml"
+    };
+
+    Eigen::Matrix3d RDFgl;
+    RDFgl << 1,0,0,  0,-1,0,  0,0,-1;
+
+    const Sophus::SE3 T_rl_orig = T_rlFromCamModelRDF(camModel[0], camModel[1], RDFgl);
+    double k1 = 0;
+    double k2 = 0;
+
+    if(camModel[0].Type() == MVL_CAMERA_WARPED)
+    {
+        k1 = camModel[0].GetModel()->warped.kappa1;
+        k2 = camModel[0].GetModel()->warped.kappa2;
+    }
+
+    const bool rectify = (k1!=0 || k2!=0); // || camModel[0].GetPose().block<3,3>(0,0)
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
@@ -118,8 +164,8 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // N cameras, each w*h in dimension, greyscale
-    const int w = img[0].width();
-    const int h = img[0].height();
+    const unsigned int w = img[0].width();
+    const unsigned int h = img[0].height();
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
@@ -163,30 +209,31 @@ int main( int /*argc*/, char* argv[] )
     Image<float, TargetDevice, Manage>  dDispFilt(640,480);
 
     // Camera Parameters
-    Eigen::VectorXd camParamsVec(6);
-    camParamsVec << 0.558526, 0.747774, 0.484397, 0.494393, -0.249261, 0.0825967;
+//    Eigen::VectorXd camParamsVec(6);
+//    camParamsVec << 0.558526, 0.747774, 0.484397, 0.494393, -0.249261, 0.0825967;
 
     // Stereo transformation (post-rectification)
-    Sophus::SE3 T_rl;
+    Sophus::SE3 T_rl = T_rl_orig;
 
     // Build camera distortion lookup tables
+    if(rectify)
     {
-        // Actual Original Stereo configuration
-        Eigen::Matrix3d mR_rl_orig;
-        mR_rl_orig << 0.999995,   0.00188482,  -0.00251896,
-                -0.0018812,     0.999997,   0.00144025,
-                0.00252166,  -0.00143551,     0.999996;
+//        // Actual Original Stereo configuration
+//        Eigen::Matrix3d mR_rl_orig;
+//        mR_rl_orig << 0.999995,   0.00188482,  -0.00251896,
+//                -0.0018812,     0.999997,   0.00144025,
+//                0.00252166,  -0.00143551,     0.999996;
 
-        Eigen::Vector3d l_r_orig;
-        l_r_orig <<    -0.203528, -0.000750334, 0.00403201;
+//        Eigen::Vector3d l_r_orig;
+//        l_r_orig <<    -0.203528, -0.000750334, 0.00403201;
 
-        const Sophus::SO3 R_rl_orig = Sophus::SO3(mR_rl_orig);
-        const Sophus::SE3 T_rl_orig = Sophus::SE3(R_rl_orig, l_r_orig);
+//        const Sophus::SO3 R_rl_orig = Sophus::SO3(mR_rl_orig);
+//        const Sophus::SE3 T_rl_orig = Sophus::SE3(R_rl_orig, l_r_orig);
 
         T_rl = CreateScanlineRectifiedLookupAndT_rl(
-            dLookup[0], dLookup[1], T_rl_orig,
-            camParamsVec, w, h
-        );
+                    dLookup[0], dLookup[1], T_rl_orig,
+                    camModel[0].K(), k1, k2, w, h
+                    );
     }
 
     static Var<int> disp("ui.disp",0, 0, 64);
@@ -204,8 +251,12 @@ int main( int /*argc*/, char* argv[] )
         /////////////////////////////////////////////////////////////
         // Upload images to device
         for(int i=0; i<2; ++i ) {
-            dCamImgDist[i].MemcpyFromHost(img[i].Image.data, w*sizeof(uchar1) );
-            Warp(dCamImg[i],dCamImgDist[i],dLookup[i]);
+            if(rectify) {
+                dCamImgDist[i].MemcpyFromHost(img[i].Image.data, w*sizeof(uchar1) );
+                Warp(dCamImg[i],dCamImgDist[i],dLookup[i]);
+            }else{
+                dCamImg[i].MemcpyFromHost(img[i].Image.data, w*sizeof(uchar1) );
+            }
         }
 
         DenseStereo(dDisp, dCamImg[0], dCamImg[1], disp);

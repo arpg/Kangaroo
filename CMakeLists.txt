@@ -30,7 +30,7 @@ LINK_LIBRARIES(${RPG_LIBRARIES})
 SET(COMMON_SRC "")
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
-  SET(CMAKE_CXX_FLAGS "-std=c++0x")
+  SET(CMAKE_CXX_FLAGS "-std=c++11")
 ENDIF()
 
 set( BuildImuTest true CACHE "" force )
@@ -75,6 +75,11 @@ FIND_PACKAGE(CUDA QUIET)
 
 if(CUDA_FOUND)
   set(CUDA_NVCC_FLAGS "-arch=sm_20 --compiler-options \"-std=c++03\"" )
+
+  set( BuildCheckMemory true CACHE "" force )
+  if( BuildCheckMemory )
+      cuda_add_executable( CheckMemory CheckMemory.cpp)
+  endif()
 
   set( BuildDenseStereo true CACHE "" force )
   if( BuildDenseStereo )

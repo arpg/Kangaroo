@@ -16,16 +16,17 @@ using namespace Gpu;
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
-//    const std::string cam_uri =
-//            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//";
-//            "FileReader:[DataSourceDir=/home/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
-//            "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//";
-//    CameraDevice camera = OpenRpgCamera(cam_uri);
-
-    CameraDevice camera = OpenPangoCamera(
-        "file:[stream=0,fmt=GRAY8]///home/slovegrove/data/3DCam/DSCF0051.AVI",
-        "file:[stream=1,fmt=GRAY8]///home/slovegrove/data/3DCam/DSCF0051.AVI"
+    CameraDevice camera = OpenRpgCamera(
+//            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
+//            "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+            "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+//            "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
+
+//    CameraDevice camera = OpenPangoCamera(
+//        "file:[stream=0,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI",
+//        "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
+//    );
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
@@ -38,8 +39,8 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // N cameras, each w*h in dimension, greyscale
-    const int w = img[0].width();
-    const int h = img[0].height();
+    const unsigned int w = img[0].width();
+    const unsigned int h = img[0].height();
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
