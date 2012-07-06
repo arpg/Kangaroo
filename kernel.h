@@ -39,7 +39,13 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void DenseStereo(
-    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int disp
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+);
+
+//////////////////////////////////////////////////////
+
+void DenseStereoSubpixelRefine(
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
 );
 
 //////////////////////////////////////////////////////

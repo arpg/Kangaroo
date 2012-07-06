@@ -375,62 +375,147 @@ void Warp(
 }
 
 //////////////////////////////////////////////////////
-// Scanline rectified dense stereo
+// Patch Scores
 //////////////////////////////////////////////////////
 
 template<typename T, int size>
 __device__ inline
-float Score(
+float Sum(
+    Image<T> img, int x, int y
+) {
+    float sum = 0;
+    for(int r=-size; r <=size; ++r ) {
+        for(int c=-size; c <=size; ++c ) {
+            sum += img.GetWithClampedRange(x+c,y+r);
+        }
+    }
+    return sum;
+}
+
+// Mean Absolute Difference
+template<typename T, int rad>
+__device__ inline
+float MADScore(
     Image<T> img1, int x1, int y1,
     Image<T> img2, int x2, int y2
 ) {
+    const int w = 2*rad+1;
     float sum_abs_diff = 0;
 
-    for(int r=-size; r <=size; ++r ) {
-        for(int c=-size; c <=size; ++c ) {
+    for(int r=-rad; r <=rad; ++r ) {
+        for(int c=-rad; c <=rad; ++c ) {
             float i1 = img1.GetWithClampedRange(x1+c,y1+r);
             float i2 = img2.GetWithClampedRange(x2+c,y2+r);
             sum_abs_diff += abs(i1 - i2);
         }
     }
 
-    return sum_abs_diff / (size*size);
+    return sum_abs_diff / (w*w);
 }
 
-template<typename T, int MAX_DISP>
+// Mean Normalised Difference
+template<typename T, int rad>
+__device__ inline
+float MNDScore(
+    Image<T> img1, int x1, int y1,
+    Image<T> img2, int x2, int y2
+) {
+    const int w = 2*rad+1;
+    const float m1 = Sum<T,rad>(img1,x1,y1) / (w*w);
+    const float m2 = Sum<T,rad>(img2,x2,y2) / (w*w);
+
+    float sum_abs_diff = 0;
+
+    for(int r=-rad; r <=rad; ++r ) {
+        for(int c=-rad; c <=rad; ++c ) {
+            float i1 = img1.GetWithClampedRange(x1+c,y1+r) - m1;
+//            float i2 = img1.GetWithClampedRange(x2+c,y2+r) - m1;
+            float i2 = img2.GetWithClampedRange(x2+c,y2+r) - m2;
+            sum_abs_diff += abs(i1 - i2);
+        }
+    }
+
+    return sum_abs_diff;
+}
+
+//////////////////////////////////////////////////////
+// Scanline rectified dense stereo
+//////////////////////////////////////////////////////
+
+template<typename T, unsigned int rad>
 __global__ void KernDenseStereo(
-    Image<float> dDisp, Image<T> dCamLeft, Image<T> dCamRight, int disp
+    Image<float> dDisp, Image<T> dCamLeft, Image<T> dCamRight, int maxDisp
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
-//    dDisp(x,y) = abs(dCamLeft(x,y).x - dCamRight(x,y).x) / 255.0f;
-//    dDisp(x,y) = Score<unsigned char,2>(dCamLeft, x,y, dCamRight, x-disp, y) / 255.0f;
-
     // Search for best matching pixel
-    int bestDisp = MAX_DISP;
+    int bestDisp = 0;
     float bestScore = 1E10;
 
-    for(int c = 0; c < MAX_DISP; ++c ) {
-        const float score = Score<unsigned char,2>(dCamLeft, x,y, dCamRight, x-c, y);
+    for(int c = 0; c < maxDisp; ++c ) {
+        const float score = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-c, y);
         if(score < bestScore) {
             bestScore = score;
             bestDisp = c;
         }
     }
 
-    dDisp(x,y) = (float)bestDisp / (float)MAX_DISP;
+    dDisp(x,y) = bestDisp; //(float)bestDisp / (float)maxDisp;
 }
 
 void DenseStereo(
-    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int disp
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
 ) {
-//    const int MAX_DISP = 128;
-//    dim3 blockDim, gridDim;
-//    InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    dim3 blockDim(16,16);
-    dim3 gridDim(dDisp.w / blockDim.x,dDisp.h / blockDim.y );
-    KernDenseStereo<unsigned char,50><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,disp);
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dDisp);
+    KernDenseStereo<unsigned char,3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
+}
+
+//////////////////////////////////////////////////////
+// Scanline rectified dense stereo sub-pixel refinement
+//////////////////////////////////////////////////////
+
+template<typename T, unsigned int rad>
+__global__ void KernDenseStereoSubpixelRefine(
+    Image<float> dDisp, Image<T> dCamLeft, Image<T> dCamRight, int maxDisp
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const int bestDisp = dDisp(x,y);
+
+    // Fit parabola to neighbours
+    const float d1 = bestDisp+1;
+    const float d2 = bestDisp;
+    const float d3 = bestDisp-1;
+    const float s1 = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d1,y);
+    const float s2 = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d2,y);
+    const float s3 = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d3,y);
+
+    // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
+    const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
+    const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
+    const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
+//    const float C = (x2 * x3 * (x2 - x3) * y1 + x3 * x1 * (x3 - x1) * y2 + x1 * x2 * (x1 - x2) * y3) / denom;
+
+    // Minima of parabola
+    const float newDisp = -B / (2*A);
+
+    // Check that minima is sensible. Maybe we don't really need to do this.
+    if( d3 < newDisp && newDisp < d1 ) {
+        dDisp(x,y) = newDisp / (float)maxDisp;
+    }else{
+        dDisp(x,y) = bestDisp / (float)maxDisp;
+    }
+}
+
+void DenseStereoSubpixelRefine(
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dDisp);
+    KernDenseStereoSubpixelRefine<unsigned char,3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
 }
 
 //////////////////////////////////////////////////////
@@ -451,9 +536,10 @@ __global__ void KernBilateralFilter(
         for(int c = -size; c <= size; ++c ) {
             const float q = dIn.GetWithClampedRange(x+c, y+r);
             const float sd2 = r*r + c*c;
-            const float id = abs(p - q);
+            const float id = p-q;
+            const float id2 = id*id;
             const float sw = __expf(-(sd2) / (2 * gs * gs));
-            const float iw = __expf(-(id * id) / (2 * gr * gr));
+            const float iw = __expf(-(id2) / (2 * gr * gr));
             const float w = sw*iw;
             sumw += w;
             sum += w * q;

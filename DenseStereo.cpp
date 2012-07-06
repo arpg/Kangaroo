@@ -19,7 +19,10 @@ template<typename T, typename Owner>
 inline void operator<<(pangolin::GlTextureCudaArray& tex, const Image<T,TargetDevice,Owner>& dImg)
 {
     CudaScopedMappedArray arr_tex(tex);
-    cudaMemcpy2DToArray(*arr_tex, 0, 0, dImg.ptr, dImg.pitch, dImg.w*sizeof(T), dImg.h, cudaMemcpyDeviceToDevice );
+    cudaError_t err = cudaMemcpy2DToArray(*arr_tex, 0, 0, dImg.ptr, dImg.pitch, dImg.w*sizeof(T), dImg.h, cudaMemcpyDeviceToDevice );
+    if( err != cudaSuccess ) {
+        std::cerr << "cudaMemcpy2DToArray failed: " << err << std::endl;
+    }
 }
 
 Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size_t h)
@@ -122,10 +125,10 @@ int main( int /*argc*/, char* argv[] )
     // Open video device
 //    const std::string cam_uri =
     CameraDevice camera = OpenRpgCamera(
-//        "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-//        "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
+//        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+//        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
 //    CameraDevice camera = OpenPangoCamera(
@@ -152,6 +155,9 @@ int main( int /*argc*/, char* argv[] )
     }
 
     const bool rectify = (k1!=0 || k2!=0); // || camModel[0].GetPose().block<3,3>(0,0)
+    if(!rectify) {
+        cout << "Using pre-rectified images" << endl;
+    }
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
@@ -198,6 +204,7 @@ int main( int /*argc*/, char* argv[] )
     // Texture we will use to display camera images
     GlTextureCudaArray tex8(w,h,GL_LUMINANCE8);
     GlTextureCudaArray texrgb8(w,h,GL_RGBA8);
+//    GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
     GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
 
     // Allocate Camera Images on device for processing
@@ -205,8 +212,8 @@ int main( int /*argc*/, char* argv[] )
     Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> d3d(w,h);
-    Image<float, TargetDevice, Manage>  dDisp(640,480);
-    Image<float, TargetDevice, Manage>  dDispFilt(640,480);
+    Image<float, TargetDevice, Manage>  dDisp(w,h);
+    Image<float, TargetDevice, Manage>  dDispFilt(w,h);
 
     // Camera Parameters
 //    Eigen::VectorXd camParamsVec(6);
@@ -236,10 +243,10 @@ int main( int /*argc*/, char* argv[] )
                     );
     }
 
-    static Var<int> disp("ui.disp",0, 0, 64);
+    static Var<int> maxDisp("ui.disp",60, 0, 64);
     static Var<int> size("ui.size",5, 1, 20);
-    static Var<float> gs("ui.gs",1E-3, 1E-3, 5);
-    static Var<float> gr("ui.gr",1E-3, 1E-3, 5);
+    static Var<float> gs("ui.gs",2, 1E-3, 5);
+    static Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -259,7 +266,8 @@ int main( int /*argc*/, char* argv[] )
             }
         }
 
-        DenseStereo(dDisp, dCamImg[0], dCamImg[1], disp);
+        DenseStereo(dDisp, dCamImg[0], dCamImg[1], maxDisp);
+        DenseStereoSubpixelRefine(dDisp, dCamImg[0], dCamImg[1],maxDisp);
         BilateralFilter(dDispFilt, dDisp, gs, gr, size);
 //        MakeAnaglyth(d3d, dCamImg[0], dCamImg[1]);
 
