@@ -83,7 +83,8 @@ if(CUDA_FOUND)
 
   set( BuildDenseStereo true CACHE "" force )
   if( BuildDenseStereo )
-      cuda_add_executable( DenseStereo DenseStereo.cpp kernel.h kernel.cu ${COMMON_SRC})
+      cuda_add_executable( DenseStereo DenseStereo.cpp kernel.h kernel.cu ScanlineRectify.h CudaImage.h ${COMMON_SRC})
+      target_link_libraries( DenseStereo ${CUDA_npp_LIBRARY} )
   endif()
 
   set( BuildStereoViewer true CACHE "" force )

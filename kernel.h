@@ -1,3 +1,6 @@
+#ifndef KANGAROO_KERNEL_H
+#define KANGAROO_KERNEL_H
+
 #include "CUDA_SDK/cutil_math.h"
 #include "CudaImage.h"
 
@@ -20,6 +23,9 @@ struct Array
     T arr[Size];
 };
 
+template<typename To, typename Ti>
+void ConvertImage(Image<To> dOut, Image<Ti> dIn);
+
 //////////////////////////////////////////////////////
 
 void CreateMatlabLookupTable(Image<float2> lookup,
@@ -39,14 +45,24 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void DenseStereo(
-    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
 );
 
 //////////////////////////////////////////////////////
 
 void DenseStereoSubpixelRefine(
-    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+    Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 );
+
+//////////////////////////////////////////////////////
+
+void DisparityImageToVbo(
+    Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
+);
+
+//////////////////////////////////////////////////////
+
+void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo);
 
 //////////////////////////////////////////////////////
 
@@ -62,3 +78,5 @@ void MakeAnaglyth(
 );
 
 }
+
+#endif // KANGAROO_KERNEL_H

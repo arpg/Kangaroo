@@ -258,12 +258,52 @@ void resample(
   resample_kernal<<<griddim,blockdim>>>(out,ostride,ow,oh,in,istride,iw,ih, resample_type);
 }
 
-//////////////////////////////////////////////////////
-// Image warping
-//////////////////////////////////////////////////////
-
 namespace Gpu
 {
+
+//////////////////////////////////////////////////////
+// Image Conversion
+//////////////////////////////////////////////////////
+
+template<typename To, typename Ti>
+__host__ __device__
+To ConvertPixel(Ti);
+
+template<>
+__host__ __device__
+uchar4 ConvertPixel(unsigned char p)
+{
+    return make_uchar4(p,p,p,255);
+}
+
+template<>
+__host__ __device__
+float ConvertPixel(unsigned char p)
+{
+    return p;
+}
+
+template<typename To, typename Ti>
+__global__
+void KernConvertImage(Image<To> dOut, const Image<Ti> dIn)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+    dOut(x,y) = ConvertPixel<To,Ti>(dIn(x,y));
+}
+
+template<typename To, typename Ti>
+void ConvertImage(Image<To> dOut, const Image<Ti> dIn)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dOut);
+    KernConvertImage<<<gridDim,blockDim>>>(dOut,dIn);
+}
+
+// Explicit instantiation
+template void ConvertImage<uchar4,unsigned char>(Image<uchar4>, const Image<unsigned char>);
+template void ConvertImage<float,unsigned char>(Image<float>, const Image<unsigned char>);
+
 
 //! Utility for attempting to estimate safe block/grid dimensions from working image dimensions
 //! These are not necesserily optimal. Far from it.
@@ -393,19 +433,19 @@ float Sum(
 }
 
 // Mean Absolute Difference
-template<typename T, int rad>
+template<typename To, typename T, int rad>
 __device__ inline
 float MADScore(
     Image<T> img1, int x1, int y1,
     Image<T> img2, int x2, int y2
 ) {
     const int w = 2*rad+1;
-    float sum_abs_diff = 0;
+    To sum_abs_diff = 0;
 
     for(int r=-rad; r <=rad; ++r ) {
         for(int c=-rad; c <=rad; ++c ) {
-            float i1 = img1.GetWithClampedRange(x1+c,y1+r);
-            float i2 = img2.GetWithClampedRange(x2+c,y2+r);
+            T i1 = img1.GetWithClampedRange(x1+c,y1+r);
+            T i2 = img2.GetWithClampedRange(x2+c,y2+r);
             sum_abs_diff += abs(i1 - i2);
         }
     }
@@ -413,85 +453,118 @@ float MADScore(
     return sum_abs_diff / (w*w);
 }
 
-// Mean Normalised Difference
-template<typename T, int rad>
+// Sum Square Normalised Difference
+template<typename To, typename T, int rad>
 __device__ inline
-float MNDScore(
+To SSNDScore(
     Image<T> img1, int x1, int y1,
     Image<T> img2, int x2, int y2
 ) {
-    const int w = 2*rad+1;
-    const float m1 = Sum<T,rad>(img1,x1,y1) / (w*w);
-    const float m2 = Sum<T,rad>(img2,x2,y2) / (w*w);
+//    // Straightforward approach
+//    const int w = 2*rad+1;
+//    const float m1 = Sum<T,rad>(img1,x1,y1) / (w*w);
+//    const float m2 = Sum<T,rad>(img2,x2,y2) / (w*w);
 
-    float sum_abs_diff = 0;
+//    float sum_abs_diff = 0;
+//    for(int r=-rad; r <=rad; ++r ) {
+//        for(int c=-rad; c <=rad; ++c ) {
+//            float i1 = img1.GetWithClampedRange(x1+c,y1+r) - m1;
+//            float i2 = img2.GetWithClampedRange(x2+c,y2+r) - m2;
+//            sum_abs_diff += abs(i1 - i2);
+//        }
+//    }
+//    return sum_abs_diff;
+
+    To sxi = 0;
+    To sxi2 = 0;
+    To syi = 0;
+    To syi2 = 0;
+    To sxiyi = 0;
+
+    const int w = 2*rad+1;
+    const int n = w*w;
 
     for(int r=-rad; r <=rad; ++r ) {
         for(int c=-rad; c <=rad; ++c ) {
-            float i1 = img1.GetWithClampedRange(x1+c,y1+r) - m1;
-//            float i2 = img1.GetWithClampedRange(x2+c,y2+r) - m1;
-            float i2 = img2.GetWithClampedRange(x2+c,y2+r) - m2;
-            sum_abs_diff += abs(i1 - i2);
+            To xi = img1.GetWithClampedRange(x1+c,y1+r);
+            To yi = img2.GetWithClampedRange(x2+c,y2+r);
+            sxi += xi;
+            syi += yi;
+            sxi2 += xi*xi;
+            syi2 += yi*yi;
+            sxiyi += xi*yi;
         }
     }
 
-    return sum_abs_diff;
+    const To mx = (float)sxi / (float)n;
+    const To my = (float)syi / (float)n;
+
+    const To score = 0
+            + sxi2 - 2*mx*sxi + n*mx*mx
+            + 2*(-sxiyi + my*sxi + mx*syi - n*mx*my)
+            + syi2 - 2*my*syi + n*my*my;
+    return score;
 }
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo
 //////////////////////////////////////////////////////
 
-template<typename T, unsigned int rad>
+template<typename TI, typename TD, unsigned int rad>
 __global__ void KernDenseStereo(
-    Image<float> dDisp, Image<T> dCamLeft, Image<T> dCamRight, int maxDisp
+    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, int maxDisp
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     // Search for best matching pixel
     int bestDisp = 0;
-    float bestScore = 1E10;
+    float bestScore = 1E20;
 
-    for(int c = 0; c < maxDisp; ++c ) {
-        const float score = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-c, y);
+    for(int c = 0; c <= maxDisp; ++c ) {
+        const float score = SSNDScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
         if(score < bestScore) {
             bestScore = score;
             bestDisp = c;
         }
     }
 
-    dDisp(x,y) = bestDisp; //(float)bestDisp / (float)maxDisp;
+    dDisp(x,y) = bestDisp < maxDisp ? bestDisp : -1;
 }
 
 void DenseStereo(
-    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereo<unsigned char,3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
+    KernDenseStereo<unsigned char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
 }
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo sub-pixel refinement
 //////////////////////////////////////////////////////
 
-template<typename T, unsigned int rad>
+template<typename TDo, typename TDi, typename TI, unsigned int rad>
 __global__ void KernDenseStereoSubpixelRefine(
-    Image<float> dDisp, Image<T> dCamLeft, Image<T> dCamRight, int maxDisp
+    Image<TDo> dDispOut, const Image<TDi> dDisp, const Image<TI> dCamLeft, const Image<TI> dCamRight
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const int bestDisp = dDisp(x,y);
 
+    if(bestDisp == -1) {
+        dDispOut(x,y) = -1;
+        return;
+    }
+
     // Fit parabola to neighbours
     const float d1 = bestDisp+1;
     const float d2 = bestDisp;
     const float d3 = bestDisp-1;
-    const float s1 = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d1,y);
-    const float s2 = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d2,y);
-    const float s3 = MNDScore<unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d3,y);
+    const float s1 = SSNDScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d1,y);
+    const float s2 = SSNDScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d2,y);
+    const float s3 = SSNDScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d3,y);
 
     // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
     const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
@@ -502,20 +575,68 @@ __global__ void KernDenseStereoSubpixelRefine(
     // Minima of parabola
     const float newDisp = -B / (2*A);
 
-    // Check that minima is sensible. Maybe we don't really need to do this.
+    // Check that minima is sensible. Otherwise assume bad data.
     if( d3 < newDisp && newDisp < d1 ) {
-        dDisp(x,y) = newDisp / (float)maxDisp;
+        dDispOut(x,y) = newDisp;
     }else{
-        dDisp(x,y) = bestDisp / (float)maxDisp;
+//        dDisp(x,y) = bestDisp / maxDisp;
+        dDispOut(x,y) = -1;
     }
 }
 
 void DenseStereoSubpixelRefine(
-    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+    Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereoSubpixelRefine<unsigned char,3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
+    KernDenseStereoSubpixelRefine<float,unsigned char,unsigned char,3><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
+}
+
+//////////////////////////////////////////////////////
+// Upgrade disparity image to vertex array
+//////////////////////////////////////////////////////
+
+__global__ void KernDisparityImageToVbo(
+    Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
+) {
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float disp = dDisp(u,v);
+    const float z = disp >= 0 ? fu * baseline / -disp : -1E10;
+
+    // (x,y,1) = kinv * (u,v,1)'
+    const float x = z * (u-u0) / fu;
+    const float y = z * (v-v0) / fv;
+
+    dVbo(u,v) = make_float4(x,y,z,1);
+}
+
+void DisparityImageToVbo(Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dVbo);
+    KernDisparityImageToVbo<<<gridDim,blockDim>>>(dVbo, dDisp, baseline, fu, fv, u0, v0);
+}
+
+//////////////////////////////////////////////////////
+// Make Index Buffer for rendering
+//////////////////////////////////////////////////////
+
+__global__ void KernGenerateTriangleStripIndexBuffer(Image<uint2> dIbo)
+{
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const unsigned int pixIndex = y*dIbo.w + x;
+    dIbo(x,y) = make_uint2(pixIndex, pixIndex + dIbo.w);
+}
+
+void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dIbo);
+    KernGenerateTriangleStripIndexBuffer<<<gridDim,blockDim>>>(dIbo);
 }
 
 //////////////////////////////////////////////////////

@@ -4,8 +4,13 @@
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
+#include <npp.h>
+
+#include <fiducials/drawing.h>
 
 #include "RpgCameraOpen.h"
+#include "ScanlineRectify.h"
+#include "CudaImage.h"
 #include "kernel.h"
 
 #include <Mvlpp/Mvl.h>
@@ -25,99 +30,35 @@ inline void operator<<(pangolin::GlTextureCudaArray& tex, const Image<T,TargetDe
     }
 }
 
-Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size_t h)
+void RenderMesh(GlBufferCudaPtr& ibo, GlBufferCudaPtr& vbo, GlBufferCudaPtr& cbo, int w, int h, bool draw_mesh = true, bool draw_color = true)
 {
-    Eigen::Matrix3d K;
-    K << camParamsVec(0)*w, 0, camParamsVec(2)*w,
-            0, camParamsVec(1)*h, camParamsVec(3)*h,
-            0,0,1;
-    return K;
-}
-
-Eigen::Matrix3d MakeKinv(const Eigen::Matrix3d& K)
-{
-    Eigen::Matrix3d Kinv = Eigen::Matrix3d::Identity();
-    Kinv << 1.0/K(0,0), 0, - K(0,2) / K(0,0),
-            0, 1.0/K(1,1), - K(1,2) / K(1,1),
-            0,0,1;
-    return Kinv;
-}
-
-Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
-    Image<float2> dlookup_left, Image<float2> dlookup_right,
-    const Sophus::SE3 T_rl, const Eigen::Matrix3d& K, double kappa1, double kappa2,
-    size_t w, size_t h
-) {
-//    Eigen::Matrix3d K =    MakeK(camParamsVec, w, h);
-    Eigen::Matrix3d Kinv = MakeKinv(K);
-
-    const Sophus::SO3 R_rl = T_rl.so3();
-    const Sophus::SO3 R_lr = R_rl.inverse();
-    const Eigen::Vector3d l_r = T_rl.translation();
-    const Eigen::Vector3d r_l = - (R_lr * l_r);
-
-    // Current up vector for each camera (in left FoR)
-    const Eigen::Vector3d lup_l = Eigen::Vector3d(0,1,0);
-    const Eigen::Vector3d rup_l = R_lr * Eigen::Vector3d(0,1,0);
-
-    // Hypothetical fwd vector for each camera, perpendicular to baseline (in left FoR)
-    const Eigen::Vector3d lfwd = lup_l.cross(r_l);
-    const Eigen::Vector3d rfwd = rup_l.cross(r_l);
-
-    // New fwd is average of left / right hypothetical baselines (also perpendicular to baseline)
-    const Eigen::Vector3d new_fwd = (lfwd + rfwd).normalized();
-
-    // Define new basis (in left FoR);
-    const Eigen::Vector3d x = r_l.normalized();
-    const Eigen::Vector3d z = -new_fwd;
-    const Eigen::Vector3d y  = z.cross(x).normalized();
-
-    // New orientation for both left and right cameras (expressed relative to original left)
-    Eigen::Matrix3d mR_nl;
-    mR_nl << x, y, z;
-
-    // By definition, the right camera now lies exactly on the x-axis with the same orientation
-    // as the left camera.
-    const Sophus::SE3 T_nr_nl = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(-r_l.norm(),0,0) );
-
-
-    // Homographies which should be applied to left and right images to scan-line rectify them
-    const Eigen::Matrix3d Hl_nl = K * mR_nl.transpose() * Kinv;
-    const Eigen::Matrix3d Hr_nr = K * (mR_nl * R_lr.matrix()).transpose() * Kinv;
-
-    // Copy to simple Array objects to pass to CUDA by Value
-    Gpu::Array<float,9> H_ol_nl;
-    Gpu::Array<float,9> H_or_nr;
-
-    for(int r=0; r<3; ++r) {
-        for(int c=0; c<3; ++c) {
-            H_ol_nl[3*r+c] = Hl_nl(r,c);
-            H_or_nr[3*r+c] = Hr_nr(r,c);
-        }
+    if(draw_color) {
+        cbo.Bind();
+        glColorPointer(4, GL_UNSIGNED_BYTE, 0, 0);
+        glEnableClientState(GL_COLOR_ARRAY);
     }
 
-    // Invoke CUDA Kernel to generate lookup table
-    CreateMatlabLookupTable(dlookup_left, K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_ol_nl);
-    CreateMatlabLookupTable(dlookup_right,K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_or_nr);
+    vbo.Bind();
+    glVertexPointer(4, GL_FLOAT, 0, 0);
+    glEnableClientState(GL_VERTEX_ARRAY);
 
-    return T_nr_nl;
-}
+    if(draw_mesh) {
+        ibo.Bind();
+        for( int r=0; r<h-1; ++r) {
+            glDrawElements(GL_TRIANGLE_STRIP,2*w, GL_UNSIGNED_INT, (uint*)0 + 2*w*r);
+        }
+        ibo.Unbind();
+    }else{
+        glDrawArrays(GL_POINTS, 0, w * h);
+    }
 
-Sophus::SE3 T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl::CameraModel& rcmod, const Eigen::Matrix3d& targetRDF)
-{
-    // Transformation matrix to adjust to target RDF
-    Eigen::Matrix4d Tadj[2] = {Eigen::Matrix4d::Identity(),Eigen::Matrix4d::Identity()};
-    Tadj[0].block<3,3>(0,0) = targetRDF.transpose() * lcmod.RDF();
-    Tadj[1].block<3,3>(0,0) = targetRDF.transpose() * rcmod.RDF();
+    if(draw_color) {
+        glDisableClientState(GL_COLOR_ARRAY);
+        cbo.Unbind();
+    }
 
-    // Computer Poses in our adjust coordinate system
-    const Eigen::Matrix4d T_lw_ = Tadj[0] * lcmod.GetPose().inverse();
-    const Eigen::Matrix4d T_rw_ = Tadj[1] * rcmod.GetPose().inverse();
-
-    // Computer transformation to right camera frame from left
-    const Eigen::Matrix4d T_rl = T_rw_ * T_lw_.inverse();
-
-    return Sophus::SE3(T_rl.block<3,3>(0,0), T_rl.block<3,1>(0,3) );
+    glDisableClientState(GL_VERTEX_ARRAY);
+    vbo.Unbind();
 }
 
 int main( int /*argc*/, char* argv[] )
@@ -128,6 +69,7 @@ int main( int /*argc*/, char* argv[] )
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
         "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
@@ -144,6 +86,8 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Matrix3d RDFgl;
     RDFgl << 1,0,0,  0,-1,0,  0,0,-1;
 
+    const Eigen::Matrix3d K = camModel[0].K();
+    const Eigen::Matrix3d Kinv = MakeKinv(K);
     const Sophus::SE3 T_rl_orig = T_rlFromCamModelRDF(camModel[0], camModel[1], RDFgl);
     double k1 = 0;
     double k2 = 0;
@@ -175,6 +119,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
+    glewInit();
 
     // Initialise CUDA, allowing it to use OpenGL context
     cudaGLSetGLDevice(0);
@@ -188,7 +133,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Tell the base view to arrange its children equally
     const int UI_WIDTH = 180;
-    View& d_panel = pangolin::CreatePanel("ui")
+    pangolin::CreatePanel("ui")
         .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
 
     View& container = CreateDisplay()
@@ -201,18 +146,37 @@ int main( int /*argc*/, char* argv[] )
         container.AddDisplay(disp);
     }
 
+    // Define Camera Render Object (for view / scene browsing)
+    pangolin::OpenGlRenderState s_cam;
+    s_cam.Set(ProjectionMatrix(640,480,420,420,320,240,0.1,1000));
+    s_cam.Set(IdentityMatrix(GlModelViewStack));
+    container[3].SetHandler(new Handler3D(s_cam));
+
     // Texture we will use to display camera images
     GlTextureCudaArray tex8(w,h,GL_LUMINANCE8);
-    GlTextureCudaArray texrgb8(w,h,GL_RGBA8);
-//    GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
+//    GlTextureCudaArray texrgba8(w,h,GL_RGBA8);
     GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
+
+    GlBufferCudaPtr vbo(GlArrayBuffer, w*h*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo(GlArrayBuffer, w*h*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo(GlElementArrayBuffer, w*h*sizeof(uint2) );
+
+    // Generate Index Buffer Object for rendering mesh
+    {
+        CudaScopedMappedPtr var(ibo);
+        Gpu::Image<uint2> dIbo((uint2*)*var,w,h);
+        GenerateTriangleStripIndexBuffer(dIbo);
+    }
 
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetDevice, Manage> dCamImgDist[] = {{w,h},{w,h}};
     Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
+    Image<uchar4, TargetDevice, Manage> dCamColor(w,h);
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> d3d(w,h);
+    Image<unsigned char, TargetDevice, Manage> dDispInt(w,h);
     Image<float, TargetDevice, Manage>  dDisp(w,h);
+//    Image<float4, TargetDevice, Manage>  dVbo(w,h);
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
 
     // Camera Parameters
@@ -239,37 +203,74 @@ int main( int /*argc*/, char* argv[] )
 
         T_rl = CreateScanlineRectifiedLookupAndT_rl(
                     dLookup[0], dLookup[1], T_rl_orig,
-                    camModel[0].K(), k1, k2, w, h
+                    K, k1, k2, w, h
                     );
     }
 
-    static Var<int> maxDisp("ui.disp",60, 0, 64);
-    static Var<int> size("ui.size",5, 1, 20);
-    static Var<float> gs("ui.gs",2, 1E-3, 5);
-    static Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+    const double baseline = T_rl.translation().norm();
+
+    Var<bool> run("ui.run", true, true);
+    Var<int> maxDisp("ui.disp",55, 0, 64);
+    Var<bool> subpix("ui.subpix", true, true);
+    Var<bool> show_mesh("ui.show mesh", true, true);
+    Var<bool> show_color("ui.show color", true, true);
+
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+    Var<float> gs("ui.gs",2, 1E-3, 5);
+    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        camera.Capture(img);
+        if(run) {
+            camera.Capture(img);
 
-        /////////////////////////////////////////////////////////////
-        // Upload images to device
-        for(int i=0; i<2; ++i ) {
-            if(rectify) {
-                dCamImgDist[i].MemcpyFromHost(img[i].Image.data, w*sizeof(uchar1) );
-                Warp(dCamImg[i],dCamImgDist[i],dLookup[i]);
-            }else{
-                dCamImg[i].MemcpyFromHost(img[i].Image.data, w*sizeof(uchar1) );
+            /////////////////////////////////////////////////////////////
+            // Upload images to device
+            for(int i=0; i<2; ++i ) {
+                if(rectify) {
+                    dCamImgDist[i].MemcpyFromHost(img[i].Image.data );
+                    Warp(dCamImg[i],dCamImgDist[i],dLookup[i]);
+                }else{
+                    dCamImg[i].MemcpyFromHost(img[i].Image.data );
+                }
             }
         }
 
-        DenseStereo(dDisp, dCamImg[0], dCamImg[1], maxDisp);
-        DenseStereoSubpixelRefine(dDisp, dCamImg[0], dCamImg[1],maxDisp);
-        BilateralFilter(dDispFilt, dDisp, gs, gr, size);
-//        MakeAnaglyth(d3d, dCamImg[0], dCamImg[1]);
+        if(run || GuiVarHasChanged() ) {
+            ConvertImage<uchar4,unsigned char>(dCamColor, dCamImg[0]);
+            DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp);
+
+            if(subpix) {
+                DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
+            }else{
+                ConvertImage<float, unsigned char>(dDisp, dDispInt);
+            }
+
+            if(applyBilateralFilter) {
+                BilateralFilter(dDispFilt,dDisp,gs,gr,bilateralWinSize);
+                dDisp.CopyFrom(dDispFilt);
+            }
+
+            // Generate VBO
+            {
+                CudaScopedMappedPtr var(vbo);
+                Gpu::Image<float4> dVbo((float4*)*var,w,h);
+                DisparityImageToVbo(dVbo, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
+            }
+
+            // Generate CBO
+            {
+                CudaScopedMappedPtr var(cbo);
+                cudaMemcpy2D(*var, w*sizeof(uchar4), dCamColor.ptr, dCamColor.pitch, w*sizeof(uchar4), h, cudaMemcpyDeviceToDevice);
+            }
+
+            // normalise dDisp
+            nppiDivC_32f_C1IR(maxDisp,dDisp.ptr,dDisp.pitch,dDisp.Size());
+        }
 
         /////////////////////////////////////////////////////////////
         // Perform drawing
@@ -284,12 +285,17 @@ int main( int /*argc*/, char* argv[] )
         texf << dDisp;
         texf.RenderToViewportFlipY();
 
-        container[3].Activate();
-        texf << dDispFilt;
-        texf.RenderToViewportFlipY();
+        container[3].ActivateAndScissor(s_cam);
+        glEnable(GL_DEPTH_TEST);
 
-        d_panel.Render();
+        glDrawAxis(1.0);
+        glDrawFrustrum(Kinv,w,h,-1.0);
 
+        // Render Mesh
+        glColor3f(1.0,1.0,1.0);
+        RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+
+        pangolin::RenderViews();
         pangolin::FinishGlutFrame();
     }
 }

@@ -1,8 +1,12 @@
+#ifndef CUDAIMAGE_H
+#define CUDAIMAGE_H
+
 #include <iostream>
 #include <assert.h>
 #include <boost/static_assert.hpp>
 
 #include <cuda_runtime.h>
+#include <npp.h>
 
 namespace Gpu
 {
@@ -33,6 +37,14 @@ struct TargetDevice
         cudaFree(devPtr);
     }
 };
+
+template<typename TargetTo, typename TargetFrom>
+cudaMemcpyKind TargetCopyKind();
+
+template<> inline cudaMemcpyKind TargetCopyKind<TargetHost,TargetHost>() { return cudaMemcpyHostToHost;}
+template<> inline cudaMemcpyKind TargetCopyKind<TargetDevice,TargetHost>() { return cudaMemcpyHostToDevice;}
+template<> inline cudaMemcpyKind TargetCopyKind<TargetHost,TargetDevice>() { return cudaMemcpyDeviceToHost;}
+template<> inline cudaMemcpyKind TargetCopyKind<TargetDevice,TargetDevice>() { return cudaMemcpyDeviceToDevice;}
 
 struct Manage
 {
@@ -79,6 +91,13 @@ struct DontManage
     }
 };
 
+//! Return v clamped to interval [vmin,vmax]
+template<typename T> __host__ __device__
+inline T clamp(T vmin, T vmax, T v) {
+    return v < vmin ? vmin : (vmax < v ? vmax : v);
+}
+
+
 //! Simple templated strided image type for use with Cuda
 //! Type encapsulates ptr, pitch, stride, width and height
 //! Instantiate Image<T,Target,ManagementAllocDealloc> to handle memory allocation
@@ -105,7 +124,7 @@ struct Image {
     }
 
     inline __host__
-    Image(uint w, uint h)
+    Image(unsigned int w, unsigned int h)
         :w(w), h(h)
     {
         Management::AllocateCheck();
@@ -137,6 +156,13 @@ struct Image {
     {
     }
 
+    template<typename TargetFrom, typename ManagementFrom>
+    inline __host__
+    void CopyFrom(const Image<T,TargetFrom,ManagementFrom>& img)
+    {
+        cudaMemcpy2D(ptr,pitch,img.ptr,img.pitch, std::min(img.w,w)*sizeof(T), std::min(img.h,h), TargetCopyKind<Target,TargetFrom>() );
+    }
+
     inline  __device__ __host__
     T& operator()(size_t x, size_t y)
     {
@@ -161,11 +187,25 @@ struct Image {
         return ptr[ix];
     }
 
+    inline __host__
+    const NppiSize Size() const
+    {
+        NppiSize ret = {(int)w,(int)h};
+        return ret;
+    }
+
+    inline __host__
+    const NppiRect Rect() const
+    {
+        NppiRect ret = {0,0,w,h};
+        return ret;
+    }
+
     inline  __device__ __host__
     const T& GetWithClampedRange(int x, int y) const
     {
-        x = max((int)0, min((int)w-1,x));
-        y = max((int)0, min((int)h-1,y));
+        x = Gpu::clamp<int>(0,w-1,x);
+        y = Gpu::clamp<int>(0,h-1,y);
         return ptr[y*stride + x];
     }
 
@@ -191,3 +231,5 @@ struct Image {
 };
 
 }
+
+#endif // CUDAIMAGE_H
