@@ -93,5 +93,6 @@ int main( int /*argc*/, char* argv[] )
         }
 
         pangolin::FinishGlutFrame();
+        usleep(30000);
     }
 }

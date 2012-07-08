@@ -267,20 +267,16 @@ namespace Gpu
 
 template<typename To, typename Ti>
 __host__ __device__
-To ConvertPixel(Ti);
+To ConvertPixel(Ti p)
+{
+    return p;
+}
 
 template<>
 __host__ __device__
 uchar4 ConvertPixel(unsigned char p)
 {
     return make_uchar4(p,p,p,255);
-}
-
-template<>
-__host__ __device__
-float ConvertPixel(unsigned char p)
-{
-    return p;
 }
 
 template<typename To, typename Ti>
@@ -303,7 +299,7 @@ void ConvertImage(Image<To> dOut, const Image<Ti> dIn)
 // Explicit instantiation
 template void ConvertImage<uchar4,unsigned char>(Image<uchar4>, const Image<unsigned char>);
 template void ConvertImage<float,unsigned char>(Image<float>, const Image<unsigned char>);
-
+template void ConvertImage<float,char>(Image<float>, const Image<char>);
 
 //! Utility for attempting to estimate safe block/grid dimensions from working image dimensions
 //! These are not necesserily optimal. Far from it.
@@ -510,7 +506,7 @@ To SSNDScore(
 // Scanline rectified dense stereo
 //////////////////////////////////////////////////////
 
-template<typename TI, typename TD, unsigned int rad>
+template<typename TD, typename TI, unsigned int rad>
 __global__ void KernDenseStereo(
     Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, int maxDisp
 ) {
@@ -519,25 +515,31 @@ __global__ void KernDenseStereo(
 
     // Search for best matching pixel
     int bestDisp = 0;
-    float bestScore = 1E20;
+    float bestScore = 1E10;
+    float sndBestScore = 1E11;
 
     for(int c = 0; c <= maxDisp; ++c ) {
         const float score = SSNDScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
         if(score < bestScore) {
+            sndBestScore = bestScore;
             bestScore = score;
             bestDisp = c;
+        }else if( score < sndBestScore) {
+            sndBestScore = score;
         }
     }
 
-    dDisp(x,y) = bestDisp < maxDisp ? bestDisp : -1;
+    const bool valid = true; //(bestScore * 1.2) < sndBestScore;
+
+    dDisp(x,y) = valid ? bestDisp : -1;
 }
 
 void DenseStereo(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
+    Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereo<unsigned char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
+    KernDenseStereo<char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp);
 }
 
 //////////////////////////////////////////////////////
@@ -585,11 +587,11 @@ __global__ void KernDenseStereoSubpixelRefine(
 }
 
 void DenseStereoSubpixelRefine(
-    Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
+    Image<float> dDispOut, const Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereoSubpixelRefine<float,unsigned char,unsigned char,3><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
+    KernDenseStereoSubpixelRefine<float,char,unsigned char,3><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
 }
 
 //////////////////////////////////////////////////////
@@ -640,22 +642,23 @@ void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo)
 }
 
 //////////////////////////////////////////////////////
-// Quick and dirty Bilateral filer
+// Experimental and dirty Bilateral filer
 //////////////////////////////////////////////////////
 
-__global__ void KernBilateralFilter(
-    Image<float> dOut, Image<float> dIn, float gs, float gr, int size
+template<typename To, typename Ti>
+__global__ void KernRobustBilateralFilter(
+    Image<To> dOut, Image<Ti> dIn, float gs, float gr, float go, int size
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
-    const float p = dIn(x,y);
+    const Ti p = dIn(x,y);
     float sum = 0;
     float sumw = 0;
 
     for(int r = -size; r <= size; ++r ) {
         for(int c = -size; c <= size; ++c ) {
-            const float q = dIn.GetWithClampedRange(x+c, y+r);
+            const Ti q = dIn.GetWithClampedRange(x+c, y+r);
             const float sd2 = r*r + c*c;
             const float id = p-q;
             const float id2 = id*id;
@@ -669,7 +672,80 @@ __global__ void KernBilateralFilter(
         }
     }
 
-    dOut(x,y) = sum / sumw;
+    dOut(x,y) = (To)(sum / sumw);
+
+    syncthreads();
+
+    const float r = (sumw-1) / sumw;
+
+    if( r < go ) {
+//        // Downweight pixel as outlier
+//        sum -= p;
+//        sumw -=1;
+
+        // Downweight each pixel
+        for(int r = -size; r <= size; ++r ) {
+            for(int c = -size; c <= size; ++c ) {
+                const To q = dOut.GetWithClampedRange(x+c, y+r);
+                const float sd2 = r*r + c*c;
+                const float id = p-q;
+                const float id2 = id*id;
+                const float sw = __expf(-(sd2) / (2 * gs * gs));
+                const float iw = __expf(-(id2) / (2 * gr * gr));
+                const float w = sw*iw;
+                const float rq = (sumw-w) / sumw;
+                if(rq < go) {
+                    sum -= w*q;
+                    sumw -= w;
+                }
+            }
+        }
+    }
+
+    dOut(x,y) = (To)(sum / sumw);
+//    dOut(x,y) = r;
+}
+
+void RobustBilateralFilter(
+    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, float go, uint size
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut);
+    KernRobustBilateralFilter<float,unsigned char><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, go, size);
+}
+
+//////////////////////////////////////////////////////
+// Quick and dirty Bilateral filer
+//////////////////////////////////////////////////////
+
+template<typename To, typename Ti>
+__global__ void KernBilateralFilter(
+    Image<To> dOut, Image<Ti> dIn, float gs, float gr, int size
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const Ti p = dIn(x,y);
+    float sum = 0;
+    float sumw = 0;
+
+    for(int r = -size; r <= size; ++r ) {
+        for(int c = -size; c <= size; ++c ) {
+            const Ti q = dIn.GetWithClampedRange(x+c, y+r);
+            const float sd2 = r*r + c*c;
+            const float id = p-q;
+            const float id2 = id*id;
+            const float sw = __expf(-(sd2) / (2 * gs * gs));
+            const float iw = __expf(-(id2) / (2 * gr * gr));
+            const float w = sw*iw;
+            sumw += w;
+            sum += w * q;
+//            sumw += 1;
+//            sum += q;
+        }
+    }
+
+    dOut(x,y) = (To)(sum / sumw);
 }
 
 void BilateralFilter(
@@ -677,7 +753,99 @@ void BilateralFilter(
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dOut);
-    KernBilateralFilter<<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
+    KernBilateralFilter<float,float><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
+}
+
+void BilateralFilter(
+    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, uint size
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut);
+    KernBilateralFilter<float,unsigned char><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
+}
+
+//////////////////////////////////////////////////////
+// Median Filter
+//////////////////////////////////////////////////////
+
+// Exchange trick: Morgan McGuire, ShaderX 2008
+#define s2(a,b)            { float tmp = a; a = min(a,b); b = max(tmp,b); }
+#define mn3(a,b,c)         s2(a,b); s2(a,c);
+#define mx3(a,b,c)         s2(b,c); s2(a,c);
+
+#define mnmx3(a,b,c)       mx3(a,b,c); s2(a,b);                               // 3 exchanges
+#define mnmx4(a,b,c,d)     s2(a,b); s2(c,d); s2(a,c); s2(b,d);                // 4 exchanges
+#define mnmx5(a,b,c,d,e)   s2(a,b); s2(c,d); mn3(a,c,e); mx3(b,d,e);          // 6 exchanges
+#define mnmx6(a,b,c,d,e,f) s2(a,d); s2(b,e); s2(c,f); mn3(a,b,c); mx3(d,e,f); // 7 exchanges
+
+#define SMEM(x,y)  smem[(x)+1][(y)+1]
+#define IN(x,y)    d_in[(y)*nx + (x)]
+
+// http://blog.accelereyes.com/blog/2010/03/04/median-filtering-cuda-tips-and-tricks/
+// Which in turn is based on http://graphics.cs.williams.edu/papers/MedianShaderX6/
+template<int BLOCK_X, int BLOCK_Y>
+__global__ void KernMedianFilter3x3(int nx, int ny, float *d_out, float *d_in)
+{
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    // guards: is at boundary?
+    bool is_x_top = (tx == 0), is_x_bot = (tx == BLOCK_X-1);
+    bool is_y_top = (ty == 0), is_y_bot = (ty == BLOCK_Y-1);
+
+    __shared__ float smem[BLOCK_X+2][BLOCK_Y+2];
+    // clear out shared memory (zero padding)
+    if (is_x_top)           SMEM(tx-1, ty  ) = 0;
+    else if (is_x_bot)      SMEM(tx+1, ty  ) = 0;
+    if (is_y_top) {         SMEM(tx  , ty-1) = 0;
+        if (is_x_top)       SMEM(tx-1, ty-1) = 0;
+        else if (is_x_bot)  SMEM(tx+1, ty-1) = 0;
+    } else if (is_y_bot) {  SMEM(tx  , ty+1) = 0;
+        if (is_x_top)       SMEM(tx-1, ty+1) = 0;
+        else if (is_x_bot)  SMEM(tx+1, ty+1) = 0;
+    }
+
+    // guards: is at boundary and still more image?
+    int x = blockIdx.x * blockDim.x + tx;
+    int y = blockIdx.y * blockDim.y + ty;
+    is_x_top &= (x > 0); is_x_bot &= (x < nx - 1);
+    is_y_top &= (y > 0); is_y_bot &= (y < ny - 1);
+
+    // each thread pulls from image
+                            SMEM(tx  , ty  ) = IN(x  , y  ); // self
+    if (is_x_top)           SMEM(tx-1, ty  ) = IN(x-1, y  );
+    else if (is_x_bot)      SMEM(tx+1, ty  ) = IN(x+1, y  );
+    if (is_y_top) {         SMEM(tx  , ty-1) = IN(x  , y-1);
+        if (is_x_top)       SMEM(tx-1, ty-1) = IN(x-1, y-1);
+        else if (is_x_bot)  SMEM(tx+1, ty-1) = IN(x+1, y-1);
+    } else if (is_y_bot) {  SMEM(tx  , ty+1) = IN(x  , y+1);
+        if (is_x_top)       SMEM(tx-1, ty+1) = IN(x-1, y+1);
+        else if (is_x_bot)  SMEM(tx+1, ty+1) = IN(x+1, y+1);
+    }
+    __syncthreads();
+
+    // pull top six from shared memory
+    float v[6] = { SMEM(tx-1, ty-1), SMEM(tx  , ty-1), SMEM(tx+1, ty-1),
+                   SMEM(tx-1, ty  ), SMEM(tx  , ty  ), SMEM(tx+1, ty  ) };
+
+    // with each pass, remove min and max values and add new value
+    mnmx6(v[0], v[1], v[2], v[3], v[4], v[5]);
+    v[5] = SMEM(tx-1, ty+1); // add new contestant
+    mnmx5(v[1], v[2], v[3], v[4], v[5]);
+    v[5] = SMEM(tx  , ty+1);
+    mnmx4(v[2], v[3], v[4], v[5]);
+    v[5] = SMEM(tx+1, ty+1);
+    mnmx3(v[3], v[4], v[5]);
+
+    // pick the middle one
+    d_out[y*nx + x] = v[4];
+}
+
+void MedianFilter3x3(
+    Image<float> dOut, Image<float> dIn
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut, 16, 16);
+    KernMedianFilter3x3<16,16><<<gridDim,blockDim>>>((int)dOut.w, (int)dOut.h, dOut.ptr, dIn.ptr);
 }
 
 //////////////////////////////////////////////////////

@@ -9,8 +9,10 @@
 #include <fiducials/drawing.h>
 
 #include "RpgCameraOpen.h"
+#include "DisplayUtils.h"
 #include "ScanlineRectify.h"
 #include "CudaImage.h"
+
 #include "kernel.h"
 
 #include <Mvlpp/Mvl.h>
@@ -20,56 +22,15 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
-template<typename T, typename Owner>
-inline void operator<<(pangolin::GlTextureCudaArray& tex, const Image<T,TargetDevice,Owner>& dImg)
-{
-    CudaScopedMappedArray arr_tex(tex);
-    cudaError_t err = cudaMemcpy2DToArray(*arr_tex, 0, 0, dImg.ptr, dImg.pitch, dImg.w*sizeof(T), dImg.h, cudaMemcpyDeviceToDevice );
-    if( err != cudaSuccess ) {
-        std::cerr << "cudaMemcpy2DToArray failed: " << err << std::endl;
-    }
-}
-
-void RenderMesh(GlBufferCudaPtr& ibo, GlBufferCudaPtr& vbo, GlBufferCudaPtr& cbo, int w, int h, bool draw_mesh = true, bool draw_color = true)
-{
-    if(draw_color) {
-        cbo.Bind();
-        glColorPointer(4, GL_UNSIGNED_BYTE, 0, 0);
-        glEnableClientState(GL_COLOR_ARRAY);
-    }
-
-    vbo.Bind();
-    glVertexPointer(4, GL_FLOAT, 0, 0);
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    if(draw_mesh) {
-        ibo.Bind();
-        for( int r=0; r<h-1; ++r) {
-            glDrawElements(GL_TRIANGLE_STRIP,2*w, GL_UNSIGNED_INT, (uint*)0 + 2*w*r);
-        }
-        ibo.Unbind();
-    }else{
-        glDrawArrays(GL_POINTS, 0, w * h);
-    }
-
-    if(draw_color) {
-        glDisableClientState(GL_COLOR_ARRAY);
-        cbo.Unbind();
-    }
-
-    glDisableClientState(GL_VERTEX_ARRAY);
-    vbo.Unbind();
-}
-
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
 //    const std::string cam_uri =
     CameraDevice camera = OpenRpgCamera(
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
@@ -174,7 +135,7 @@ int main( int /*argc*/, char* argv[] )
     Image<uchar4, TargetDevice, Manage> dCamColor(w,h);
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> d3d(w,h);
-    Image<unsigned char, TargetDevice, Manage> dDispInt(w,h);
+    Image<char, TargetDevice, Manage> dDispInt(w,h);
     Image<float, TargetDevice, Manage>  dDisp(w,h);
 //    Image<float4, TargetDevice, Manage>  dVbo(w,h);
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
@@ -209,6 +170,7 @@ int main( int /*argc*/, char* argv[] )
 
     const double baseline = T_rl.translation().norm();
 
+    Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<int> maxDisp("ui.disp",55, 0, 64);
     Var<bool> subpix("ui.subpix", true, true);
@@ -222,10 +184,9 @@ int main( int /*argc*/, char* argv[] )
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glColor3f(1,1,1);
+        const bool go = frame==0 || run || Pushed(step);
 
-        if(run) {
+        if(go) {
             camera.Capture(img);
 
             /////////////////////////////////////////////////////////////
@@ -240,14 +201,14 @@ int main( int /*argc*/, char* argv[] )
             }
         }
 
-        if(run || GuiVarHasChanged() ) {
+        if(go || GuiVarHasChanged() ) {
             ConvertImage<uchar4,unsigned char>(dCamColor, dCamImg[0]);
             DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp);
 
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
             }else{
-                ConvertImage<float, unsigned char>(dDisp, dDispInt);
+                ConvertImage<float, char>(dDisp, dDispInt);
             }
 
             if(applyBilateralFilter) {
@@ -274,6 +235,9 @@ int main( int /*argc*/, char* argv[] )
 
         /////////////////////////////////////////////////////////////
         // Perform drawing
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glColor3f(1,1,1);
+
         // Draw Stereo images
         for(int i=0; i<2; ++i ) {
             container[i].Activate();

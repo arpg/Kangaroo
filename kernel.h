@@ -45,13 +45,12 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void DenseStereo(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
+    Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
 );
 
 //////////////////////////////////////////////////////
 
-void DenseStereoSubpixelRefine(
-    Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
+void DenseStereoSubpixelRefine(Image<float> dDispOut, const Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 );
 
 //////////////////////////////////////////////////////
@@ -68,6 +67,20 @@ void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo);
 
 void BilateralFilter(
     Image<float> dOut, Image<float> dIn, float gs, float gr, uint size
+);
+
+void BilateralFilter(
+    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, uint size
+);
+
+void RobustBilateralFilter(
+    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, float go, uint size
+);
+
+//////////////////////////////////////////////////////
+
+void MedianFilter3x3(
+    Image<float> dOut, Image<float> dIn
 );
 
 //////////////////////////////////////////////////////
