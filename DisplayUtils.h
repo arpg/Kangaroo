@@ -1,7 +1,7 @@
 #ifndef DISPLAYUTILS_H
 #define DISPLAYUTILS_H
 
-#include <Pangolin/glcuda.h>
+#include <pangolin/glcuda.h>
 
 #include "CudaImage.h"
 
