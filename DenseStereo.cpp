@@ -173,6 +173,8 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<int> maxDisp("ui.disp",55, 0, 64);
+    Var<float> acceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
+
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_color("ui.show color", true, true);
@@ -181,6 +183,10 @@ int main( int /*argc*/, char* argv[] )
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
     Var<float> gs("ui.gs",2, 1E-3, 5);
     Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+
+    Var<int> domedits("ui.median its",1, 1, 10);
+    Var<bool> domed5x5("ui.median 5x5", false, true);
+    Var<bool> domed3x3("ui.median 3x3", false, true);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -203,7 +209,7 @@ int main( int /*argc*/, char* argv[] )
 
         if(go || GuiVarHasChanged() ) {
             ConvertImage<uchar4,unsigned char>(dCamColor, dCamImg[0]);
-            DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp);
+            DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, acceptThresh);
 
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
@@ -214,6 +220,16 @@ int main( int /*argc*/, char* argv[] )
             if(applyBilateralFilter) {
                 BilateralFilter(dDispFilt,dDisp,gs,gr,bilateralWinSize);
                 dDisp.CopyFrom(dDispFilt);
+            }
+
+            for(int i=0; i < domedits; ++i ) {
+                if(domed3x3) {
+                    MedianFilter3x3(dDisp,dDisp);
+                }
+
+                if(domed5x5) {
+                    MedianFilter5x5(dDisp,dDisp);
+                }
             }
 
             // Generate VBO

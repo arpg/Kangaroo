@@ -34,6 +34,7 @@ inline void RenderMesh(pangolin::GlBufferCudaPtr& ibo, pangolin::GlBufferCudaPtr
         }
         ibo.Unbind();
     }else{
+        glPointSize(2.0);
         glDrawArrays(GL_POINTS, 0, w * h);
     }
 

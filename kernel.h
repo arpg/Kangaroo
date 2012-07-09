@@ -45,7 +45,7 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void DenseStereo(
-    Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp
+    Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
 );
 
 //////////////////////////////////////////////////////
@@ -80,6 +80,10 @@ void RobustBilateralFilter(
 //////////////////////////////////////////////////////
 
 void MedianFilter3x3(
+    Image<float> dOut, Image<float> dIn
+);
+
+void MedianFilter5x5(
     Image<float> dOut, Image<float> dIn
 );
 

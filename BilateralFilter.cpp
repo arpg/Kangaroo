@@ -98,8 +98,10 @@ int main( int /*argc*/, char* argv[] )
     Var<float> bigs("ui.gs",5, 1E-3, 5);
     Var<float> bigr("ui.gr",20, 1E-3, 200);
     Var<float> bigo("ui.go",0, 0, 1);
-    Var<float> divis("ui.div",255, 1, 1E10, true);
-    Var<bool> domed("ui.median", false, true);
+
+    Var<int> domedits("ui.median its",1, 1, 10);
+    Var<bool> domed5x5("ui.median 5x5", true, true);
+    Var<bool> domed3x3("ui.median 3x3", false, true);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -114,12 +116,18 @@ int main( int /*argc*/, char* argv[] )
             RobustBilateralFilter(dImgFilt,dImg,bigs,bigr,bigo,bilateralWinSize);
 //            ConvertImage<float,unsigned char>(dImgFilt,dImg);
 
-            if(domed) {
-                MedianFilter3x3(dImgFilt,dImgFilt);
+            for(int i=0; i < domedits; ++i ) {
+                if(domed3x3) {
+                    MedianFilter3x3(dImgFilt,dImgFilt);
+                }
+
+                if(domed5x5) {
+                    MedianFilter5x5(dImgFilt,dImgFilt);
+                }
             }
 
             // normalise dImgFilt
-            nppiDivC_32f_C1IR(divis,dImgFilt.ptr,dImgFilt.pitch,dImgFilt.Size());
+            nppiDivC_32f_C1IR(255,dImgFilt.ptr,dImgFilt.pitch,dImgFilt.Size());
         }
 
         /////////////////////////////////////////////////////////////
