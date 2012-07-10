@@ -18,6 +18,8 @@
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>
 
+#include <Node.h>
+
 using namespace std;
 using namespace pangolin;
 using namespace Gpu;

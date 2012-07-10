@@ -4,8 +4,14 @@
 //! Convenience method to load camera based on string URI containing PropertyMap and device.
 CameraDevice OpenRpgCamera( const std::string& str_uri);
 
+//! Convenience method to initialise camera based on string URI containing PropertyMap and device.
+void InitRpgCamera( CameraDevice& camera, const std::string& str_uri);
+
 //! Convenience method to retrieve pangolin video wrapped as RPG Video object.
 CameraDevice OpenPangoCamera( const std::string& str_uri, const std::string& str_uri2 = "");
+
+//! Convenience method to retrieve pangolin video wrapped as RPG Video object.
+void InitPangoCamera( CameraDevice& camera, const std::string& str_uri, const std::string& str_uri2 = "");
 
 //////////////////////////////////////////////////////////////////////
 
@@ -25,6 +31,12 @@ protected:
 inline CameraDevice OpenRpgCamera( const std::string& str_uri)
 {
     CameraDevice camera;
+    InitRpgCamera(camera, str_uri);
+    return camera;
+}
+
+inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
+{
     pangolin::Uri uri = pangolin::ParseUri(str_uri);
 
     for(std::map<std::string,std::string>::const_iterator i= uri.params.begin(); i!= uri.params.end(); ++i) {
@@ -34,10 +46,7 @@ inline CameraDevice OpenRpgCamera( const std::string& str_uri)
     if( !camera.InitDriver(uri.scheme) ) {
         throw pangolin::VideoException("Couldn't start driver");
     }
-
-    return camera;
 }
-
 
 
 inline CameraDevice OpenPangoCamera( const std::string& str_uri, const std::string& str_uri2)
@@ -56,6 +65,21 @@ inline CameraDevice OpenPangoCamera( const std::string& str_uri, const std::stri
     }
 
     return camera;
+}
+
+inline void InitPangoCamera( CameraDevice& camera, const std::string& str_uri, const std::string& str_uri2)
+{
+    static CameraDriverRegisteryEntry<PangolinRpgVideoAdapterDriver> initialise("pangolin");
+
+    camera.SetProperty("URI0", str_uri);
+
+    if(!str_uri2.empty()) {
+        camera.SetProperty("URI1", str_uri2);
+    }
+
+    if( !camera.InitDriver("pangolin") ) {
+        throw pangolin::VideoException("Couldn't start driver");
+    }
 }
 
 inline bool PangolinRpgVideoAdapterDriver::Capture( std::vector<rpg::ImageWrapper>& vImages )

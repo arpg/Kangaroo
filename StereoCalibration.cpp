@@ -1,27 +1,27 @@
 #include <thread>
 #include <mutex>
 
+#include <boost/thread.hpp>
+#include <boost/bind.hpp>
+
 #include <CVars/CVar.h>
 
-#include <SimpleGui/Gui.h>
-#include <SimpleGui/GetPot>
-#include <SimpleGui/GLMesh.h>
-
 #include <RPG/Devices/Camera/CameraDevice.h>
+#include "RpgCameraOpen.h"
 
 #include <fiducials/tracker.h>
 #include <fiducials/drawing.h>
 
+#include <pangolin/pangolin.h>
+
 #include "StereoIntrinsicsOptimisation.h"
+#include "DisplayUtils.h"
 
 using namespace std;
 using namespace Eigen;
+using namespace pangolin;
 
-const int DESIRED_WIDTH = 320;
-const int DESIRED_HEIGHT = 240;
-
-const int WINDOW_WIDTH  = 2 * DESIRED_WIDTH;
-const int WINDOW_HEIGHT = 2 * DESIRED_HEIGHT;
+const int UI_WIDTH = 150;
 
 inline void glDrawTexturesQuad(float t, float b, float l, float r)
 {
@@ -43,21 +43,13 @@ inline void glDrawTexturesQuad(float t, float b, float l, float r)
 //    }
 //}
 
-inline bool Pushed(bool& button)
-{
-    const bool pushed = button;
-    button = false;
-    return pushed;
-}
-
 class Application
 {
 public:
     Application()
-        : window(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, __FILE__ ),
+        : // window(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, __FILE__ ),
           shouldQuit(false)
     {
-        Init();
     }
 
     ~Application()
@@ -66,43 +58,19 @@ public:
 
     void InitCamera()
     {
-        const int devid = 2;
+//        InitRpgCamera( camera,
+//        //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
+//        //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+//                "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+//        //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+//        //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
+//        );
 
-        // Setup Camera device
-        if(devid == 0) {
-            camera.SetProperty<int>("NumImages", 2);
-            camera.SetProperty<int>("ImageWidth", 640);
-            camera.SetProperty<int>("ImageHeight", 480);
-//            camera.SetProperty<double>("FPS", 15);
-            camera.SetProperty<int>("BufferCount", 60);
+        InitPangoCamera( camera,
+            "file:[stream=0,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI",
+            "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
+        );
 
-            if( !camera.InitDriver( "Dvi2Pci" ) ) {
-                std::cerr << "Failed to init Dvi2Pci." << std::endl;
-                exit(0);
-            }
-        }else if(devid == 1) {
-            // Setup Camera
-            camera.SetProperty("StartFrame",    0);
-            camera.SetProperty("DataSourceDir", "/home/slovegrove/data/CityBlock-Noisy" );
-            camera.SetProperty("Channel-0",     "left.*pgm" );
-            camera.SetProperty("Channel-1",     "right.*pgm" );
-            camera.SetProperty("NumChannels",   2 );
-            camera.InitDriver("FileReader");
-        }else if(devid == 2){
-            camera.SetProperty("NumChannels", 2 );
-            camera.SetProperty("CamUUID0", 5004955);
-            camera.SetProperty("CamUUID1", 5004954);
-            camera.SetProperty("ImageBinningX", 2);
-            camera.SetProperty("ImageBinningY", 2);
-            camera.SetProperty("ImageWidth", 694);
-            camera.SetProperty("ImageHeight", 518);
-            if(!camera.InitDriver( "AlliedVision" )) {
-                cerr << "Couldn't start driver for camera " << endl;
-                exit(1);
-            }
-        }else{
-            exit(0);
-        }
         camera.Capture(img);
         width = img[0].width();
         height = img[0].height();
@@ -124,26 +92,6 @@ public:
         T_rl = Sophus::SE3(R_rl, l_r);
     }
 
-    void InitOpenGLTextures()
-    {
-        // Create two OpenGL textures for stereo images
-        glGenTextures(2, m_glTex);
-
-        // Allocate texture memory on GPU
-        glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE8, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,0);
-        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-
-        glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE8, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,0);
-        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-
-        glPixelStorei(GL_PACK_ALIGNMENT,1);
-        glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-    }
-
     void InitTrackers()
     {
         // Setup Tracker objects
@@ -163,26 +111,6 @@ public:
         }
     }
 
-    void Init()
-    {
-        InitCamera();
-        InitOpenGLTextures();
-        InitTrackers();
-
-        // Setup floor grid
-        window.AddChildToRoot(new GLGrid());
-
-        // Setup OpenGL Render Callback
-        window.AddPostRenderCallback( Application::PostRender, this);
-
-    }
-
-    static void PostRender(GLWindow*, void* data)
-    {
-        Application* self = (Application*)data;
-        self->Draw();
-    }
-
     void OptimiseRun()
     {
         Eigen::Matrix<double,3,Eigen::Dynamic> pattern = tracker[0]->TargetPattern3D();
@@ -196,17 +124,67 @@ public:
         }
     }
 
-    void CameraRun()
+    int Run()
     {
-        bool& save_kf = CVarUtils::CreateCVar<bool>( "SaveKeyframe", false );
+        InitCamera();
+        InitTrackers();
 
-        std::thread trackerThreads[2];
+        // Create Graphics Context using Glut
+        pangolin::CreateGlutWindowAndBind(__FILE__,width*2+UI_WIDTH, height*2);
+        glewInit();
 
-        while(!shouldQuit) {
-            camera.Capture(img);
+        // Setup default OpenGL parameters
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+        glEnable(GL_LINE_SMOOTH);
+        glPixelStorei(GL_PACK_ALIGNMENT,1);
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
+        // Tell the base view to arrange its children equally
+        pangolin::CreatePanel("ui")
+            .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
+
+        View& container = CreateDisplay()
+                .SetBounds(0,1.0, Attach::Pix(UI_WIDTH), 1.0)
+                .SetLayout(LayoutEqual);
+
+        const int N = 4;
+        for(int i=0; i<N; ++i ) {
+            View& disp = CreateDisplay().SetAspect((double)width/height);
+            container.AddDisplay(disp);
+        }
+
+        // Define Camera Render Object (for view / scene browsing)
+        pangolin::OpenGlRenderState s_cam;
+        s_cam.Set(ProjectionMatrix(width,height,420,420,width/2,height/2,0.1,1000));
+        s_cam.Set(IdentityMatrix(GlModelViewStack));
+        container[2].SetHandler(new Handler3D(s_cam));
+
+        GlTexture tex8(width,height,GL_LUMINANCE8);
+
+        boost::thread trackerThreads[2];
+
+        // Run Optimisation Loop
+        boost::thread optThread( std::bind( &Application::OptimiseRun, this ) );
+
+        Var<bool> run("ui.Run", true, true);
+        Var<bool> step("ui.Step", false, false);
+        Var<bool> save_kf("ui.Save Keyframe", false, false);
+
+        // Run main loop
+        for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
+        {
+            const bool go = frame==0 || run || Pushed(step);
+
+            if(go) {
+                // Capture camera images
+                camera.Capture(img);
+            }
+
+            // Track
             for(int i=0; i<2; ++i) {
-                trackerThreads[i] = std::thread(boost::bind(&Tracker::ProcessFrame, tracker[i], camParams,img[i].Image.data) );
+//                tracker[i]->ProcessFrame(camParams,img[i].Image.data);
+                trackerThreads[i] = boost::thread(boost::bind(&Tracker::ProcessFrame, tracker[i], camParams,img[i].Image.data) );
             }
             for(int i=0; i<2; ++i) {
                 trackerThreads[i].join();
@@ -229,110 +207,62 @@ public:
                 keyframes.push_back(kf);
                 kfMutex.unlock();
             }
+
+            // Display
+            pangolin::DisplayBase().ActivateScissorAndClear();
+
+            // Draw Stereo images
+            for(int c=0; c<2; ++c ) {
+                container[c].Activate();
+                tex8.Upload(img[c].Image.data, GL_LUMINANCE, GL_UNSIGNED_BYTE);
+                glColor3f(1,1,1);
+                tex8.RenderToViewportFlipY();
+
+                glOrtho(-0.5,width-0.5,height-0.5,-0.5,0,1.0);
+                for( int i=0; i<tracker[c]->conics.size(); ++i ) {
+                    glBinColor(tracker[c]->conics_target_map[i],tracker[c]->target.circles3D().size());
+                    DrawCross(tracker[c]->conics[i].center,2);
+                }
+            }
+
+            // Draw Threshold image
+            container[3].Activate();
+            glColor3f(1,1,1);
+            tex8.Upload(tracker[0]->tI.get(), GL_LUMINANCE, GL_UNSIGNED_BYTE);
+            tex8.RenderToViewportFlipY();
+
+            // Draw current tracker poses
+            container[2].ActivateAndScissor(s_cam);
+            glEnable(GL_DEPTH_TEST);
+
+            DrawTarget(tracker[0]->target,Eigen::Vector2d(0,0),1,0.2,0.2);
+            for(int i=0; i<2; ++i) {
+                glSetFrameOfReferenceF(tracker[i]->T_hw.inverse());
+                glDrawAxis(0.2);
+                glUnsetFrameOfReference();
+            }
+
+            // Draw Stereo keyframes
+            for(size_t kf=0; kf < keyframes.size(); ++kf ) {
+                glSetFrameOfReferenceF(keyframes[kf].T_fw[0].inverse());
+                glDrawAxis(0.05);
+                glUnsetFrameOfReference();
+
+                glSetFrameOfReferenceF(keyframes[kf].T_fw[1].inverse());
+                glDrawAxis(0.05);
+                glUnsetFrameOfReference();
+            }
+
+            pangolin::RenderViews();
+            pangolin::FinishGlutFrame();
         }
-    }
 
-    int Run()
-    {
-        // Run Camera Loop
-        std::thread camThread( std::bind( &Application::CameraRun, this ) );
-
-        // Run Optimisation Loop
-        std::thread optThread( std::bind( &Application::OptimiseRun, this ) );
-
-        // Run GUI
-        window.Run();
+//        window.Run();
         shouldQuit = true;
 
-        camThread.join();
+        optThread.join();
     }
 
-    void Draw()
-    {
-        glClearColor (0.0, 0.0, 0.0, 0.0);
-//        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDisable(GL_LIGHTING);
-        glDisable(GL_COLOR_MATERIAL );
-
-        // Draw 3D stuff using the ModelView Matrix from SimpleGUI
-        glViewport(0,0,DESIRED_WIDTH,DESIRED_HEIGHT);
-        DrawTarget(tracker[0]->target,Eigen::Vector2d(0,0),1,0.2,0.2);
-        for(int i=0; i<2; ++i) {
-            glSetFrameOfReferenceF(tracker[i]->T_hw.inverse());
-            glDrawAxis(0.2);
-            glUnsetFrameOfReference();
-        }
-
-        // Draw Stereo keyframes
-        for(size_t kf=0; kf < keyframes.size(); ++kf ) {
-            glSetFrameOfReferenceF(keyframes[kf].T_fw[0].inverse());
-            glDrawAxis(0.05);
-            glUnsetFrameOfReference();
-
-            glSetFrameOfReferenceF(keyframes[kf].T_fw[1].inverse());
-            glDrawAxis(0.05);
-            glUnsetFrameOfReference();
-        }
-
-        // Reset model view matrices for displaying images
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-
-        // Draw Threshold images for cam 0
-        glViewport(DESIRED_WIDTH,0,DESIRED_WIDTH,DESIRED_HEIGHT);
-        glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
-        glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width,height,GL_LUMINANCE,GL_UNSIGNED_BYTE,tracker[0]->tI.get());
-        glColor3f (1.0, 1.0, 1.0);
-        glDrawTexturesQuad(-1,1,-1,1);
-
-        // Upload textures for images
-        if( img.size() >= 2 ) {
-            glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
-            glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width,height,GL_LUMINANCE,GL_UNSIGNED_BYTE,img[0].Image.data);
-            glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
-            glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width,height,GL_LUMINANCE,GL_UNSIGNED_BYTE,img[1].Image.data);
-        }
-
-        glOrtho(-0.5,width-0.5,height-0.5,-0.5,0,1.0);
-
-        // Draw left image
-        glViewport(0,DESIRED_HEIGHT,DESIRED_WIDTH,DESIRED_HEIGHT);
-        glBindTexture(GL_TEXTURE_2D, m_glTex[0]);
-        glColor3f (1.0, 1.0, 1.0);
-        glDrawTexturesQuad(height,0,0,width);
-        for( int i=0; i<tracker[0]->conics.size(); ++i ) {
-          glBinColor(tracker[0]->conics_target_map[i],tracker[0]->target.circles3D().size());
-          DrawCross(tracker[0]->conics[i].center,2);
-        }
-//        glDrawTexturesQuad(-1,1,-1,1);
-
-        // Draw right image
-        glViewport(DESIRED_WIDTH,DESIRED_HEIGHT,DESIRED_WIDTH,DESIRED_HEIGHT);
-        glBindTexture(GL_TEXTURE_2D, m_glTex[1]);
-        glColor3f (1.0, 1.0, 1.0);
-        glDrawTexturesQuad(height,0,0,width);
-        for( int i=0; i<tracker[1]->conics.size(); ++i ) {
-          glBinColor(tracker[1]->conics_target_map[i],tracker[1]->target.circles3D().size());
-          DrawCross(tracker[1]->conics[i].center,2);
-        }
-
-        glDisable(GL_TEXTURE_2D);
-
-        // Reset OpenGL to what SimpleGui expects
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-//        glViewport(0,0,WINDOW_WIDTH,WINDOW_HEIGHT);
-        glViewport(0,0,DESIRED_WIDTH,DESIRED_HEIGHT);
-
-    }
-
-    GLWindow window;
     CameraDevice camera;
 
     std::vector<rpg::ImageWrapper> img;

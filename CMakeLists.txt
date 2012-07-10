@@ -2,47 +2,60 @@ PROJECT( Kangaroo )
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
-FIND_PACKAGE( SimpleGui REQUIRED )
-INCLUDE_DIRECTORIES( ${SimpleGui_INCLUDE_DIRS} )
-
 # git://github.com/stevenlovegrove/fiducials.git
-FIND_PACKAGE( Fiducials REQUIRED )
-INCLUDE_DIRECTORIES( ${Fiducials_INCLUDE_DIRS} )
+find_package( Fiducials REQUIRED )
+include_directories( ${Fiducials_INCLUDE_DIRS} )
 LINK_DIRECTORIES(${Fiducials_LIBRARY_DIRS})
 LINK_LIBRARIES(${Fiducials_LIBRARIES})
 
 # git://github.com/stevenlovegrove/Sophus.git
-FIND_PACKAGE(Sophus REQUIRED)
-INCLUDE_DIRECTORIES(${Sophus_INCLUDE_DIR})
+find_package(Sophus REQUIRED)
+include_directories(${Sophus_INCLUDE_DIR})
 LINK_DIRECTORIES(${Sophus_LIBRARY_DIRS})
 LINK_LIBRARIES(${Sophus_LIBRARIES})
 
 # git://github.com/stevenlovegrove/Pangolin.git
-FIND_PACKAGE(Pangolin REQUIRED)
-INCLUDE_DIRECTORIES(${Pangolin_INCLUDE_DIRS})
+find_package(Pangolin REQUIRED)
+include_directories(${Pangolin_INCLUDE_DIRS})
 LINK_DIRECTORIES(${Pangolin_LIBRARY_DIRS})
 LINK_LIBRARIES(${Pangolin_LIBRARIES})
 
-FIND_PACKAGE( RPG REQUIRED )
-INCLUDE_DIRECTORIES( ${RPG_INCLUDE_DIRS} )
+find_package( RPG REQUIRED )
+include_directories( ${RPG_INCLUDE_DIRS} )
 LINK_LIBRARIES(${RPG_LIBRARIES})
+
+#FIND_PACKAGE( NODE REQUIRED )
+#find_package( ZeroMQ REQUIRED )
+find_package( Protobuf REQUIRED )
+set(NODE_INCLUDE_DIRS "/Users/slovegrove/code/RpgDev/Hermes1.0")
+include_directories( ${ZeroMQ_INCLUDE_DIRS} )
+include_directories( ${PROTOBUF_INCLUDE_DIRS} )
+include_directories( ${NODE_INCLUDE_DIRS} )
+PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
+
 
 SET(COMMON_SRC "")
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
-  SET(CMAKE_CXX_FLAGS "-std=c++0x -pg")
+  SET(CMAKE_CXX_FLAGS "-std=c++0x -g")
 ENDIF()
 
-set( BuildImuTest true CACHE "" force )
-if( BuildImuTest )
-    add_executable( ImuTest ImuTest.cpp ${COMMON_SRC})
-    target_link_libraries( ImuTest ${SimpleGui_LIBRARIES} )
-endif()
+FIND_PACKAGE( SimpleGui QUIET )
 
-set( BuildMeshTest true CACHE "" force )
-if( BuildMeshTest )
-    add_executable( MeshTest MeshTest.cpp ${COMMON_SRC})
-    target_link_libraries( MeshTest ${SimpleGui_LIBRARIES} )
+if(SimpleGui_FOUND)
+set( BuildImuTest true CACHE "" force )
+    include_directories( ${SimpleGui_INCLUDE_DIRS} )
+
+    if( BuildImuTest )
+        add_executable( ImuTest ImuTest.cpp ${COMMON_SRC})
+        target_link_libraries( ImuTest ${SimpleGui_LIBRARIES} )
+    endif()
+
+    set( BuildMeshTest true CACHE "" force )
+    if( BuildMeshTest )
+        add_executable( MeshTest MeshTest.cpp ${COMMON_SRC})
+        target_link_libraries( MeshTest ${SimpleGui_LIBRARIES} )
+    endif()
 endif()
 
 set( BuildTriggerTest false CACHE "" force )
@@ -54,7 +67,7 @@ endif()
 set( BuildStereoCalibration true CACHE "" force )
 if( BuildStereoCalibration )
     add_executable( StereoCalibration StereoCalibration.cpp ${COMMON_SRC})
-    target_link_libraries( StereoCalibration ${SimpleGui_LIBRARIES} ${Fiducials_LIBRARIES} )
+    target_link_libraries( StereoCalibration ${Fiducials_LIBRARIES} )
 endif()
 
 set( BuildViconTest true CACHE "" force )
