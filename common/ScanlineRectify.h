@@ -1,5 +1,4 @@
-#ifndef SCANLINERECTIFY_H
-#define SCANLINERECTIFY_H
+#pragma once
 
 #include <Eigen/Eigen>
 
@@ -8,15 +7,13 @@
 
 #include "../cu/all.h"
 
-inline void CamModelScaleToDimensions(mvl::CameraModel& camModel, int w, int h)
+inline void CamModelScale(mvl::CameraModel& camModel, double scale)
 {
-    const double scale = w / camModel.Width();
-
     if(scale != 1.0) {
         mvl_camera_t* cam = camModel.GetModel();
 
-        cam->linear.width  = w;
-        cam->linear.height = h;
+        cam->linear.width  *= scale;
+        cam->linear.height *= scale;
 
         cam->linear.fx *= scale;
         cam->linear.fy *= scale;
@@ -31,6 +28,12 @@ inline void CamModelScaleToDimensions(mvl::CameraModel& camModel, int w, int h)
             exit(1);
         }
     }
+}
+
+inline void CamModelScaleToDimensions(mvl::CameraModel& camModel, int w, int h)
+{
+    const double scale = w / camModel.Width();
+    CamModelScale(camModel, scale);
 }
 
 inline void CamModelCropToRegionOfInterest(mvl::CameraModel& camModel, const NppiRect& roi)
@@ -146,6 +149,3 @@ Sophus::SE3 T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl::Camera
 
     return Sophus::SE3(T_rl.block<3,3>(0,0), T_rl.block<3,1>(0,3) );
 }
-
-
-#endif // SCANLINERECTIFY_H

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vrpn_Tracker.h>
 #include <quat.h>
 #include <sophus/se3.h>

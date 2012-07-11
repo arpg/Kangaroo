@@ -88,7 +88,7 @@ FIND_PACKAGE(CUDA QUIET)
 
 if(CUDA_FOUND)
   set(CUDA_NVCC_FLAGS "-arch=sm_20 --compiler-options \"-std=c++03\"" )
-  LIST(APPEND CU_COMMON_SRC cu/cu_all.cu cu/all.h )
+  LIST(APPEND CU_COMMON_SRC cu/cu_all.cu cu/all.h cu/Image.h )
   LIST(APPEND CU_COMMON_SRC cu/cu_anaglyph.h cu/cu_bilateral.h cu/cu_convert.h cu/cu_cutil_math_extra.h cu/cu_dense_stereo.h cu/cu_lookup_warp.h cu/cu_median.h cu/cu_patch_score.h cu/cu_resample.h)
 
   if(NOT CUDA_npp_LIBRARY)

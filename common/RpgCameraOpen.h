@@ -1,3 +1,5 @@
+#pragma once
+
 #include <pangolin/pangolin.h>
 #include <RPG/Devices/Camera/CameraDevice.h>
 

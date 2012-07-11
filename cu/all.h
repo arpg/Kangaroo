@@ -1,5 +1,4 @@
-#ifndef KANGAROO_KERNEL_H
-#define KANGAROO_KERNEL_H
+#pragma once
 
 #include "CUDA_SDK/cutil_math.h"
 #include "Image.h"
@@ -25,6 +24,31 @@ struct Array
 
 template<typename To, typename Ti>
 void ConvertImage(Image<To> dOut, Image<Ti> dIn);
+
+template<typename To, typename UpType, typename Ti>
+void BoxHalf( Image<To> out, const Image<Ti> in);
+
+template<typename To, typename UpType, typename Ti>
+inline void BoxReduce( Image<To> out, Image<Ti> in_temp, Image<To> temp, int level)
+{
+    const int w = in_temp.w;
+    const int h = in_temp.h;
+
+    // in_temp has size (w,h)
+    // out has size (w>>l,h>>l)
+    // temp has at least size (w/2,h/2)
+
+    Image<Ti>* t[] = {&in_temp, &temp};
+
+    for(int l=0; l < (level-1); ++l ) {
+        BoxHalf<To,UpType,Ti>(
+            t[(l+1) % 2]->SubImage(w >> (l+1), h >> (l+1) ),
+            t[l % 2]->SubImage(w >> l, h >> l)
+        );
+    }
+
+    BoxHalf<To,UpType,Ti>(out, t[(level+1)%2]->SubImage(w >> (level-1), h >> (level-1) ) );
+}
 
 //////////////////////////////////////////////////////
 
@@ -92,7 +116,7 @@ void MedianFilter5x5(
 void MakeAnaglyth(
     Image<uchar4> anaglyth,
     const Image<unsigned char> left, const Image<unsigned char> right,
-    int shift = 0);
-}
+    int shift = 0
+);
 
-#endif // KANGAROO_KERNEL_H
+}

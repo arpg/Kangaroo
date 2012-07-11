@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Eigen/Eigen>
 
 //! Update JTJ and JTy with sparse outer product of NR sparse rows of J.

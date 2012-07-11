@@ -1,3 +1,5 @@
+#pragma once
+
 #include <boost/math/common_factor.hpp>
 
 #include "Image.h"

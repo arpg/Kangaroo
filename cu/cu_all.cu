@@ -1,9 +1,10 @@
 #include "all.h"
 
-#include "CUDA_SDK/cutil_math.h"
-
 #include "launch_utils.h"
+
+#include "CUDA_SDK/cutil_math.h"
 #include "cu_cutil_math_extra.h"
+
 #include "cu_resample.h"
 #include "cu_convert.h"
 #include "cu_lookup_warp.h"

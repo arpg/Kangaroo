@@ -1,5 +1,4 @@
-#ifndef DISPLAYUTILS_H
-#define DISPLAYUTILS_H
+#pragma once
 
 #include <pangolin/glcuda.h>
 
@@ -46,5 +45,3 @@ inline void RenderMesh(pangolin::GlBufferCudaPtr& ibo, pangolin::GlBufferCudaPtr
     glDisableClientState(GL_VERTEX_ARRAY);
     vbo.Unbind();
 }
-
-#endif // DISPLAYUTILS_H

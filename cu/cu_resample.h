@@ -1,3 +1,10 @@
+#pragma once
+
+#include "launch_utils.h"
+
+namespace Gpu
+{
+
 //////////////////////////////////////////////////////
 // Sampling
 //////////////////////////////////////////////////////
@@ -216,7 +223,7 @@ __global__ void  resample_kernal(
 }
 
 
-void resample(
+void Resample(
     float4* out, int ostride, int ow, int oh,
     float4* in,  int istride, int iw, int ih,
     int resample_type
@@ -224,4 +231,34 @@ void resample(
   dim3 blockdim(boost::math::gcd<unsigned>(ow,16), boost::math::gcd<unsigned>(oh,16), 1);
   dim3 griddim( ow / blockdim.x, oh / blockdim.y);
   resample_kernal<<<griddim,blockdim>>>(out,ostride,ow,oh,in,istride,iw,ih, resample_type);
+}
+
+//////////////////////////////////////////////////////
+// Downsampling
+//////////////////////////////////////////////////////
+
+template<typename To, typename UpType, typename Ti>
+__global__ void KernBoxHalf( Image<To> out, const Image<Ti> in )
+{
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const Ti* tl = &in(2*x,2*y);
+    const Ti* bl = tl + in.stride;
+
+    out(x,y) = (To)((UpType)(*tl + *(tl+1) + *bl + *(bl+1)) / 4.0f);
+}
+
+template<typename To, typename UpType, typename Ti>
+void BoxHalf( Image<To> out, const Image<Ti> in)
+{
+    dim3 blockDim;
+    dim3 gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, out, 16, 16);
+    KernBoxHalf<To,UpType,Ti><<<gridDim,blockDim>>>(out,in);
+}
+
+// Instantiate
+template void BoxHalf<unsigned char,unsigned int,unsigned char>(Image<unsigned char>, const Image<unsigned char>);
+
 }
