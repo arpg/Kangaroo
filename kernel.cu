@@ -535,11 +535,11 @@ __global__ void KernDenseStereo(
 }
 
 void DenseStereo(
-    Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereo<char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp,acceptThresh);
+    KernDenseStereo<unsigned char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp,acceptThresh);
 }
 
 //////////////////////////////////////////////////////
@@ -587,11 +587,11 @@ __global__ void KernDenseStereoSubpixelRefine(
 }
 
 void DenseStereoSubpixelRefine(
-    Image<float> dDispOut, const Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
+    Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereoSubpixelRefine<float,char,unsigned char,3><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
+    KernDenseStereoSubpixelRefine<float,unsigned char,unsigned char,3><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
 }
 
 //////////////////////////////////////////////////////

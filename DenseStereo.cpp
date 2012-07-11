@@ -24,6 +24,16 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
+inline NppiRect GetCenteredAlignedRegion(int w, int h, int blockx, int blocky)
+{
+    NppiRect ret;
+    ret.width = blockx * (w / blockx);
+    ret.height = blocky * (h / blocky);
+    ret.x = (w - ret.width) / 2;
+    ret.y = (h - ret.height) / 2;
+    return ret;
+}
+
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
@@ -31,8 +41,8 @@ int main( int /*argc*/, char* argv[] )
     CameraDevice camera = OpenRpgCamera(
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
@@ -41,10 +51,33 @@ int main( int /*argc*/, char* argv[] )
 //        "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
 //    );
 
+    // Capture first image
+    std::vector<rpg::ImageWrapper> img;
+    camera.Capture(img);
+
+    // native width and height (from camera)
+    const unsigned int nw = img[0].width();
+    const unsigned int nh = img[0].height();
+
+    // Find centered image crop which aligns to 16 pixels
+    const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16,16);
+
+    // Load Camera intrinsics from file
     mvl::CameraModel camModel[] = {
         camera.GetProperty("DataSourceDir") + "/lcmod.xml",
         camera.GetProperty("DataSourceDir") + "/rcmod.xml"
     };
+
+    for(int i=0; i<2; ++i ) {
+        // Adjust to match camera image dimensions
+        CamModelScaleToDimensions(camModel[i], img[i].width(), img[i].height() );
+
+        // Adjust to match cropped aligned image
+        CamModelCropToRegionOfInterest(camModel[i], roi);
+    }
+
+    const unsigned int w = camModel[0].Width();
+    const unsigned int h = camModel[0].Height();
 
 	// OpenGL's Right Down Up coordinate systems
     Eigen::Matrix3d RDFgl;
@@ -67,19 +100,11 @@ int main( int /*argc*/, char* argv[] )
         cout << "Using pre-rectified images" << endl;
     }
 
-    // Capture first image
-    std::vector<rpg::ImageWrapper> img;
-    camera.Capture(img);
-
     // Check we received one or more images
     if(img.empty()) {
         std::cerr << "Failed to capture first image from camera" << std::endl;
         return -1;
     }
-
-    // N cameras, each w*h in dimension, greyscale
-    const unsigned int w = img[0].width();
-    const unsigned int h = img[0].height();
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
@@ -133,12 +158,13 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // Allocate Camera Images on device for processing
+    Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
     Image<unsigned char, TargetDevice, Manage> dCamImgDist[] = {{w,h},{w,h}};
     Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> dCamColor(w,h);
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> d3d(w,h);
-    Image<char, TargetDevice, Manage> dDispInt(w,h);
+    Image<unsigned char, TargetDevice, Manage> dDispInt(w,h);
     Image<float, TargetDevice, Manage>  dDisp(w,h);
 //    Image<float4, TargetDevice, Manage>  dVbo(w,h);
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
@@ -201,11 +227,12 @@ int main( int /*argc*/, char* argv[] )
             /////////////////////////////////////////////////////////////
             // Upload images to device
             for(int i=0; i<2; ++i ) {
+                hCamImg[i].ptr = img[i].Image.data;
                 if(rectify) {
-                    dCamImgDist[i].MemcpyFromHost(img[i].Image.data );
+                    dCamImgDist[i].CopyFrom(hCamImg[i].SubImage(roi));
                     Warp(dCamImg[i],dCamImgDist[i],dLookup[i]);
                 }else{
-                    dCamImg[i].MemcpyFromHost(img[i].Image.data );
+                    dCamImg[i].CopyFrom(hCamImg[i].SubImage(roi));
                 }
             }
         }
@@ -217,7 +244,7 @@ int main( int /*argc*/, char* argv[] )
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
             }else{
-                ConvertImage<float, char>(dDisp, dDispInt);
+                ConvertImage<float, unsigned char>(dDisp, dDispInt);
             }
 
             if(applyBilateralFilter) {

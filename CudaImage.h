@@ -6,7 +6,11 @@
 #include <boost/static_assert.hpp>
 
 #include <cuda_runtime.h>
+
+#define HAVE_NPP
+#ifdef HAVE_NPP
 #include <npp.h>
+#endif // HAVE_NPP
 
 namespace Gpu
 {
@@ -187,20 +191,6 @@ struct Image {
         return ptr[ix];
     }
 
-    inline __host__
-    const NppiSize Size() const
-    {
-        NppiSize ret = {(int)w,(int)h};
-        return ret;
-    }
-
-    inline __host__
-    const NppiRect Rect() const
-    {
-        NppiRect ret = {0,0,w,h};
-        return ret;
-    }
-
     inline  __device__ __host__
     const T& GetWithClampedRange(int x, int y) const
     {
@@ -222,6 +212,46 @@ struct Image {
     {
         MemcpyFromHost(ptr, w*sizeof(T) );
     }
+
+    inline __device__ __host__
+    Image<T,Target,DontManage> SubImage(int x, int y, int width, int height)
+    {
+        return Image<T,Target,DontManage>(&(this->operator ()(x,y)), width, height, stride);
+    }
+
+    inline __device__ __host__
+    Image<T,Target,DontManage> SubImage(int width, int height)
+    {
+        return Image<T,Target,DontManage>(ptr, width, height, stride);
+    }
+
+#ifdef HAVE_NPP
+    inline __device__ __host__
+    Image<T,Target,DontManage> SubImage(const NppiRect& region)
+    {
+        return Image<T,Target,DontManage>(&(this->operator ()(region.x,region.y)), region.width, region.height, stride);
+    }
+
+    inline __device__ __host__
+    Image<T,Target,DontManage> SubImage(const NppiSize& size)
+    {
+        return Image<T,Target,DontManage>(ptr, size.width,size.height, stride);
+    }
+
+    inline __host__
+    const NppiSize Size() const
+    {
+        NppiSize ret = {(int)w,(int)h};
+        return ret;
+    }
+
+    inline __host__
+    const NppiRect Rect() const
+    {
+        NppiRect ret = {0,0,w,h};
+        return ret;
+    }
+#endif
 
     T* ptr;
     size_t pitch;

@@ -45,12 +45,12 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void DenseStereo(
-    Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
 );
 
 //////////////////////////////////////////////////////
 
-void DenseStereoSubpixelRefine(Image<float> dDispOut, const Image<char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
+void DenseStereoSubpixelRefine(Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 );
 
 //////////////////////////////////////////////////////
