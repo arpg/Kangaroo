@@ -6,8 +6,8 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
-#include "RpgCameraOpen.h"
-#include "kernel.h"
+#include "common/RpgCameraOpen.h"
+#include "cu/all.h"
 
 using namespace std;
 using namespace pangolin;

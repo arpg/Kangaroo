@@ -2,7 +2,7 @@
 #define KANGAROO_KERNEL_H
 
 #include "CUDA_SDK/cutil_math.h"
-#include "CudaImage.h"
+#include "Image.h"
 
 namespace Gpu
 {

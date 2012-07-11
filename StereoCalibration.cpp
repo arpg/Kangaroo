@@ -7,15 +7,15 @@
 #include <CVars/CVar.h>
 
 #include <RPG/Devices/Camera/CameraDevice.h>
-#include "RpgCameraOpen.h"
+#include "common/RpgCameraOpen.h"
 
 #include <fiducials/tracker.h>
 #include <fiducials/drawing.h>
 
 #include <pangolin/pangolin.h>
 
-#include "StereoIntrinsicsOptimisation.h"
-#include "DisplayUtils.h"
+#include "common/StereoIntrinsicsOptimisation.h"
+#include "common/DisplayUtils.h"
 
 using namespace std;
 using namespace Eigen;

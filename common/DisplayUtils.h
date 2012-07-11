@@ -3,7 +3,7 @@
 
 #include <pangolin/glcuda.h>
 
-#include "CudaImage.h"
+#include "../cu/Image.h"
 
 template<typename T, typename Owner>
 inline void operator<<(pangolin::GlTextureCudaArray& tex, const Gpu::Image<T,Gpu::TargetDevice,Owner>& dImg)

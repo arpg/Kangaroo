@@ -8,12 +8,11 @@
 
 #include <fiducials/drawing.h>
 
-#include "RpgCameraOpen.h"
-#include "DisplayUtils.h"
-#include "ScanlineRectify.h"
-#include "CudaImage.h"
+#include "common/RpgCameraOpen.h"
+#include "common/DisplayUtils.h"
+#include "common/ScanlineRectify.h"
 
-#include "kernel.h"
+#include "cu/all.h"
 
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>

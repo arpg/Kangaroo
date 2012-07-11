@@ -1,4 +1,8 @@
 CMakeLists.txt.*
 Models
 build
+debug
 stereo.eps
+.DS_Store
+.cvar_history
+.glconsole_settings

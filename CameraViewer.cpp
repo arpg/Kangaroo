@@ -1,7 +1,7 @@
 #include <Eigen/Eigen>
 #include <pangolin/pangolin.h>
 
-#include "RpgCameraOpen.h"
+#include "common/RpgCameraOpen.h"
 
 using namespace std;
 using namespace pangolin;

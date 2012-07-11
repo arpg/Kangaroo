@@ -1,5 +1,5 @@
 #include <pangolin/pangolin.h>
-#include "ViconTracker.h"
+#include "common/ViconTracker.h"
 
 // TODO: Work out why this is required to build in Debug
 #undef GL_VERSION_2_0

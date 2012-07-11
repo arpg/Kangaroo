@@ -6,8 +6,7 @@
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>
 
-#include "CudaImage.h"
-#include "kernel.h"
+#include "../cu/all.h"
 
 inline void CamModelScaleToDimensions(mvl::CameraModel& camModel, int w, int h)
 {
