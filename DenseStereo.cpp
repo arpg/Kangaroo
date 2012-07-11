@@ -24,6 +24,16 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
+inline NppiRect GetTopLeftAlignedRegion(int w, int h, int blockx, int blocky)
+{
+    NppiRect ret;
+    ret.width = blockx * (w / blockx);
+    ret.height = blocky * (h / blocky);
+    ret.x = 0;
+    ret.y = 0;
+    return ret;
+}
+
 inline NppiRect GetCenteredAlignedRegion(int w, int h, int blockx, int blocky)
 {
     NppiRect ret;
@@ -32,6 +42,15 @@ inline NppiRect GetCenteredAlignedRegion(int w, int h, int blockx, int blocky)
     ret.x = (w - ret.width) / 2;
     ret.y = (h - ret.height) / 2;
     return ret;
+}
+
+inline int GetLevelFromMaxPixels(int w, int h, unsigned long maxpixels)
+{
+    int level = 0;
+    while( (w >> level)*(h >> level) > maxpixels ) {
+        ++level;
+    }
+    return level;
 }
 
 int main( int /*argc*/, char* argv[] )
@@ -59,8 +78,11 @@ int main( int /*argc*/, char* argv[] )
     const unsigned int nw = img[0].width();
     const unsigned int nh = img[0].height();
 
+    // Downsample this image to process less pixels
+    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
+
     // Find centered image crop which aligns to 16 pixels
-    const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16,16);
+    const NppiRect roi = GetTopLeftAlignedRegion(nw,nh,16 << level,16 << level);
 
     // Load Camera intrinsics from file
     mvl::CameraModel camModel[] = {
@@ -78,6 +100,13 @@ int main( int /*argc*/, char* argv[] )
 
     const unsigned int w = camModel[0].Width();
     const unsigned int h = camModel[0].Height();
+
+    cout << "Video stream dimensions: " << nw << "x" << nh << endl;
+    cout << "Chosen Level: " << level << endl;
+    cout << "Processing dimensions: " << w << "x" << h << endl;
+    cout << "Offset: " << roi.x << "x" << roi.y << endl;
+
+    // TODO: Apply level
 
 	// OpenGL's Right Down Up coordinate systems
     Eigen::Matrix3d RDFgl;
@@ -137,7 +166,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam;
-    s_cam.Set(ProjectionMatrix(640,480,420,420,320,240,0.1,1000));
+    s_cam.Set(ProjectionMatrix(w,h,420,420,w/2,h/2,0.1,1000));
     s_cam.Set(IdentityMatrix(GlModelViewStack));
     container[3].SetHandler(new Handler3D(s_cam));
 

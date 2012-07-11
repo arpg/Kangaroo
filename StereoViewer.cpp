@@ -59,7 +59,7 @@ int main( int /*argc*/, char* argv[] )
     View& screen = CreateDisplay().SetAspect((double)w/h);
 
     // Texture we will use to display camera images
-    GlTextureCudaArray tex(w,h,GL_LUMINANCE8);
+//    GlTextureCudaArray tex(w,h,GL_LUMINANCE8);
     GlTextureCudaArray texrgb(w,h,GL_RGBA8);
 
     // Allocate Camera Images on device for processing

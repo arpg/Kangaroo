@@ -39,6 +39,8 @@ inline void CamModelCropToRegionOfInterest(mvl::CameraModel& camModel, const Npp
     mvl_camera_t* cam = camModel.GetModel();
     cam->linear.cx -= roi.x;
     cam->linear.cy -= roi.y;
+    cam->linear.width = roi.width;
+    cam->linear.height = roi.height;
 }
 
 inline Eigen::Matrix3d ScaleK(const Eigen::Matrix3d& K, double imageScale)

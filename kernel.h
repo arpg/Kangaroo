@@ -91,9 +91,8 @@ void MedianFilter5x5(
 
 void MakeAnaglyth(
     Image<uchar4> anaglyth,
-    const Image<unsigned char> left, const Image<unsigned char> right
-);
-
+    const Image<unsigned char> left, const Image<unsigned char> right,
+    int shift = 0);
 }
 
 #endif // KANGAROO_KERNEL_H
