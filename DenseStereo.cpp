@@ -52,15 +52,17 @@ inline int GetLevelFromMaxPixels(int w, int h, unsigned long maxpixels)
     return level;
 }
 
+#include <boost/tokenizer.hpp>
+
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
 //    const std::string cam_uri =
     CameraDevice camera = OpenRpgCamera(
-        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
+//        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
@@ -73,12 +75,42 @@ int main( int /*argc*/, char* argv[] )
     std::vector<rpg::ImageWrapper> img;
     camera.Capture(img);
 
+    vector<Sophus::SE3> gtPose;
+
+    // Parse Ground truth
+    ifstream gt(camera.GetProperty("DataSourceDir") + "/../pose_filter_offline.csv");
+    if(gt.is_open()) {
+        Eigen::Matrix<double,1,18> row;
+        string line;
+        unsigned long lines = 0;
+
+        // Eat comment
+        getline(gt,line);
+
+        while (getline(gt,line)  )
+        {
+            lines++;
+            if(lines % 60*10 == 0) {
+                boost::tokenizer< boost::escaped_list_separator<char> > tok(line);
+                int i = 0;
+                for(const string& s: tok) {
+                    std::stringstream iss(s);
+                    iss >> row(i++);
+                }
+                Sophus::SE3 T_rw( mvl::Cart2T(row(1),row(2),row(3),row(7),row(8),row(9)) );
+                gtPose.push_back(T_rw);
+            }
+        }
+
+        gt.close();
+    }
+
     // native width and height (from camera)
     const unsigned int nw = img[0].width();
     const unsigned int nh = img[0].height();
 
     // Downsample this image to process less pixels
-    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 320*240 ); //640*480 );
 
     // Find centered image crop which aligns to 16 pixels
     const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16 << level,16 << level);
@@ -233,6 +265,8 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> domed5x5("ui.median 5x5", true, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
 
+    pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         const bool go = frame==0 || run || Pushed(step);
@@ -328,6 +362,12 @@ int main( int /*argc*/, char* argv[] )
 
         glDrawAxis(1.0);
         glDrawFrustrum(Kinv,w,h,-1.0);
+
+//        for(Sophus::SE3& T_rw : gtPose) {
+        for(int i=0; i < gtPose.size() ; ++i ) {
+            Sophus::SE3& T_rw = gtPose[i];
+            glDrawFrustrum(Kinv,w,h,T_rw, 1E-1);
+        }
 
         // Render Mesh
         glColor3f(1.0,1.0,1.0);

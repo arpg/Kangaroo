@@ -66,31 +66,34 @@ int main( int /*argc*/, char* argv[] )
     Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
     Image<uchar4, TargetDevice, Manage> d3d(w,h);
 
+    int shift = 0;
+    bool run = true;
+
+    pangolin::RegisterKeyPressCallback('=', [&shift](){shift++;} );
+    pangolin::RegisterKeyPressCallback('-', [&shift](){shift--;} );
+    pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        camera.Capture(img);
-        // Perform Processing
-        {
+        if( run || frame == 0 ) {
+            camera.Capture(img);
+
             // Upload images to device
             for(int i=0; i<2; ++i ) {
-                cudaMemcpy2D(
-                    dCamImg[i].ptr, dCamImg[i].pitch,
-                    img[i].Image.data, w*sizeof(uchar1), w*sizeof(uchar1),h, cudaMemcpyHostToDevice
-                );
+                dCamImg[i].CopyFrom( Image<unsigned char,TargetHost>(img[i].Image.data,w,h) );
             }
-            MakeAnaglyth(d3d, dCamImg[0], dCamImg[1]);
         }
 
-        // Perform drawing
-        {
-            // Draw Anaglyph
-            screen.Activate();
-            CopyDevMemtoTex(d3d.ptr, d3d.pitch, texrgb );
-            texrgb.RenderToViewportFlipY();
-        }
+        // Perform Processing
+        MakeAnaglyth(d3d, dCamImg[0], dCamImg[1], shift);
+
+        // Draw Anaglyph
+        screen.Activate();
+        CopyDevMemtoTex(d3d.ptr, d3d.pitch, texrgb );
+        texrgb.RenderToViewportFlipY();
 
         pangolin::FinishGlutFrame();
         usleep(1000000 / 30);
