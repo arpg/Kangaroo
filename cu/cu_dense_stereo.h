@@ -1,5 +1,7 @@
 #pragma once
 
+#include "all.h"
+
 namespace Gpu
 {
 
@@ -140,6 +142,46 @@ void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo)
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dIbo);
     KernGenerateTriangleStripIndexBuffer<<<gridDim,blockDim>>>(dIbo);
+}
+
+//////////////////////////////////////////////////////
+// Plane Fitting
+//////////////////////////////////////////////////////
+
+__global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<LeastSquaresSystem<float,3> > dSum )
+{
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float4 P = dVbo(x,y);
+    const Mat<float,3,1> Qiz = Qinv * zhat;
+
+    const float f = Qiz[0] * P.x + Qiz[1] * P.y + Qiz[2] * P.z; // + 1;
+    Mat<float,1,3> Ji;
+    Ji[0] = zhat[0] * (Qinv(0,0) * P.x + Qinv(1,0) * P.y + Qinv(2,0) * P.z + 1);
+    Ji[1] = zhat[1] * (Qinv(0,1) * P.x + Qinv(1,1) * P.y + Qinv(2,1) * P.z + 1);
+    Ji[2] = zhat[2] * (Qinv(0,2) * P.x + Qinv(1,2) * P.y + Qinv(2,2) * P.z + 1);
+
+    LeastSquaresSystem<float,3>& sum = dSum(x,y);
+    sum.JTJ = OuterProduct(Ji);
+    sum.JTy = Ji * f;
+    sum.f = f;
+}
+
+#include <iostream>
+
+LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<unsigned char> dWorkspace)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dVbo);
+    Image<LeastSquaresSystem<float,3> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,3> >(dVbo.w, dVbo.h);
+
+    KernPlaneFitGN<<<gridDim,blockDim>>>(dVbo, Qinv, zhat, dSum );
+
+    LeastSquaresSystem<float,3> sum;
+    sum.SetZero();
+
+    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,3> >() );
 }
 
 }

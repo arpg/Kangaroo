@@ -140,7 +140,7 @@ int main( int /*argc*/, char* argv[] )
     cout << "Processing dimensions: " << w << "x" << h << endl;
     cout << "Offset: " << roi.x << "x" << roi.y << endl;
 
-	// OpenGL's Right Down Up coordinate systems
+    // OpenGL's Right Down Forward coordinate systems
     Eigen::Matrix3d RDFgl;
     RDFgl << 1,0,0,  0,-1,0,  0,0,-1;
 
@@ -161,11 +161,17 @@ int main( int /*argc*/, char* argv[] )
         cout << "Using pre-rectified images" << endl;
     }
 
-    // Check we received one or more images
-    if(img.empty()) {
-        std::cerr << "Failed to capture first image from camera" << std::endl;
+    // Check we received at least two images
+    if(img.size() < 2) {
+        std::cerr << "Failed to capture first stereo pair from camera" << std::endl;
         return -1;
     }
+
+    // Plane Parameters
+    Eigen::Matrix3d U; U << w, 0, w,  0, h, h,  1, 1, 1;
+    Eigen::Matrix3d Q = -(Kinv * U).transpose();
+    Eigen::Matrix3d Qinv = Q.inverse();
+    Eigen::Vector3d z; z << -1/5.0, -1/5.0, -1/5.0;
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
@@ -226,6 +232,8 @@ int main( int /*argc*/, char* argv[] )
     Image<unsigned char, TargetDevice, Manage> dDispInt(w,h);
     Image<float, TargetDevice, Manage>  dDisp(w,h);
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
+    Image<float4, TargetDevice, Manage>  d3d(w,h);
+    Image<unsigned char, TargetDevice,Manage> dScratch(w*4*11,h);
 
     // Temporary image buffers
     const int num_temp = 3;
@@ -266,6 +274,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> domed3x3("ui.median 3x3", false, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -300,7 +309,6 @@ int main( int /*argc*/, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            ConvertImage<uchar4,unsigned char>(dCamColor, dCamImg[0]);
             DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, acceptThresh);
 
             if(subpix) {
@@ -324,17 +332,38 @@ int main( int /*argc*/, char* argv[] )
                 }
             }
 
-            // Generate VBO
+            // Generate point cloud from disparity image
+            DisparityImageToVbo(d3d, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
+
+            // Fit plane
+            {
+                cout << "-------------------------------------------------" << endl;
+                cout << Qinv << endl;
+                Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch);
+                cout << lss.f << endl;
+                Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
+                Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
+                cout << lss.JTJ << endl << endl;
+                cout << lss.JTy << endl << endl;
+                cout << x.transpose() << endl;
+                for(int i=0; i<3; ++i ) {
+                    z(i) *= exp(x(i));
+                }
+                cout << z.transpose() << endl;
+            }
+
+            // Copy point cloud into VBO
             {
                 CudaScopedMappedPtr var(vbo);
                 Gpu::Image<float4> dVbo((float4*)*var,w,h);
-                DisparityImageToVbo(dVbo, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
+                dVbo.CopyFrom(d3d);
             }
 
             // Generate CBO
             {
                 CudaScopedMappedPtr var(cbo);
-                cudaMemcpy2D(*var, w*sizeof(uchar4), dCamColor.ptr, dCamColor.pitch, w*sizeof(uchar4), h, cudaMemcpyDeviceToDevice);
+                Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
+                ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0]);
             }
 
             // normalise dDisp

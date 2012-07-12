@@ -7,6 +7,11 @@
 
 #include <cuda_runtime.h>
 
+#define HAVE_THRUST
+#ifdef HAVE_THRUST
+#include <thrust/device_vector.h>
+#endif // HAVE_THRUST
+
 #define HAVE_NPP
 #ifdef HAVE_NPP
 #include <npp.h>
@@ -49,6 +54,12 @@ template<> inline cudaMemcpyKind TargetCopyKind<TargetHost,TargetHost>() { retur
 template<> inline cudaMemcpyKind TargetCopyKind<TargetDevice,TargetHost>() { return cudaMemcpyHostToDevice;}
 template<> inline cudaMemcpyKind TargetCopyKind<TargetHost,TargetDevice>() { return cudaMemcpyDeviceToHost;}
 template<> inline cudaMemcpyKind TargetCopyKind<TargetDevice,TargetDevice>() { return cudaMemcpyDeviceToDevice;}
+
+#ifdef HAVE_THRUST
+template<typename T, typename Target> struct ThrustType;
+template<typename T> struct ThrustType<T,TargetHost> { typedef T* Ptr; };
+template<typename T> struct ThrustType<T,TargetDevice> { typedef thrust::device_ptr<T> Ptr; };
+#endif // HAVE_THRUST
 
 struct Manage
 {
@@ -216,13 +227,25 @@ struct Image {
     inline __device__ __host__
     Image<T,Target,DontManage> SubImage(int x, int y, int width, int height)
     {
+        assert( (x+width) <= w && (y+height) <= h);
         return Image<T,Target,DontManage>(&(this->operator ()(x,y)), width, height, stride);
     }
 
     inline __device__ __host__
     Image<T,Target,DontManage> SubImage(int width, int height)
     {
+        assert(width <= w && height <= h);
         return Image<T,Target,DontManage>(ptr, width, height, stride);
+    }
+
+    //! Ignore this images stride - just return new image of
+    //! size w x h which uses this memory
+    template<typename TP>
+    inline __device__ __host__
+    Image<TP,Target,DontManage> PackedImage(int width, int height)
+    {
+        assert(width*height*sizeof(TP) <= w*h*sizeof(T) );
+        return Image<TP,Target,DontManage>((TP*)ptr, width, height, width);
     }
 
 #ifdef HAVE_NPP
@@ -251,6 +274,24 @@ struct Image {
         NppiRect ret = {0,0,w,h};
         return ret;
     }
+#endif
+
+#ifdef HAVE_THRUST
+    inline __device__ __host__
+    typename Gpu::ThrustType<T,Target>::Ptr begin() {
+        return (typename Gpu::ThrustType<T,Target>::Ptr)(ptr);
+    }
+
+    inline __device__ __host__
+    typename Gpu::ThrustType<T,Target>::Ptr end() {
+        return (typename Gpu::ThrustType<T,Target>::Ptr)(ptr + (h*stride) );
+    }
+
+    inline __host__
+    void Fill(T val) {
+        thrust::fill(begin(), end(), val);
+    }
+
 #endif
 
     T* ptr;

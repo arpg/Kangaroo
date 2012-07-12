@@ -1,26 +1,12 @@
 #pragma once
 
 #include "CUDA_SDK/cutil_math.h"
+
 #include "Image.h"
+#include "Mat.h"
 
 namespace Gpu
 {
-
-template<typename T, size_t Size>
-struct Array
-{
-    __host__ __device__
-    inline T& operator[](size_t i) {
-        return arr[i];
-    }
-
-    __host__ __device__
-    inline const T& operator[](size_t i) const {
-        return arr[i];
-    }
-
-    T arr[Size];
-};
 
 template<typename To, typename Ti>
 void ConvertImage(Image<To> dOut, Image<Ti> dIn);
@@ -57,7 +43,7 @@ void CreateMatlabLookupTable(Image<float2> lookup,
 );
 
 void CreateMatlabLookupTable(Image<float2> lookup,
-    float fu, float fv, float u0, float v0, float k1, float k2, Array<float,9> H_no
+    float fu, float fv, float u0, float v0, float k1, float k2, Mat<float,9> H_no
 );
 
 //////////////////////////////////////////////////////
@@ -86,6 +72,10 @@ void DisparityImageToVbo(
 //////////////////////////////////////////////////////
 
 void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo);
+
+//////////////////////////////////////////////////////
+
+LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, Mat<float,3,3> Qinv, Mat<float,3> zhat, Image<unsigned char> dWorkspace);
 
 //////////////////////////////////////////////////////
 

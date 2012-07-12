@@ -116,8 +116,8 @@ Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     const Eigen::Matrix3d Hr_nr = K * (mR_nl * R_lr.matrix()).transpose() * Kinv;
 
     // Copy to simple Array objects to pass to CUDA by Value
-    Gpu::Array<float,9> H_ol_nl;
-    Gpu::Array<float,9> H_or_nr;
+    Gpu::Mat<float,9> H_ol_nl;
+    Gpu::Mat<float,9> H_or_nr;
 
     for(int r=0; r<3; ++r) {
         for(int c=0; c<3; ++c) {

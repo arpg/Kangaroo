@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Mat.h"
+
 namespace Gpu
 {
 
@@ -38,7 +40,7 @@ void CreateMatlabLookupTable(
 //////////////////////////////////////////////////////
 
 __global__ void KernCreateMatlabLookupTable(
-    Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Array<float,9> H_on
+    Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Mat<float,9> H_on
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -70,7 +72,7 @@ __global__ void KernCreateMatlabLookupTable(
 }
 
 void CreateMatlabLookupTable(
-        Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Array<float,9> H_no
+        Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Mat<float,9> H_no
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, lookup);
