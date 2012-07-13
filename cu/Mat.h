@@ -33,13 +33,6 @@ namespace Gpu
 template<typename P, unsigned R, unsigned C = 1>
 struct Mat
 {
-    inline __device__ __host__ Mat() {
-    }
-
-    inline __device__ __host__ Mat(P val) {
-        Fill(val);
-    }
-
     inline __device__ __host__ P operator()(int r, int c) const {
         return m[r*C + c];
     }
@@ -81,6 +74,10 @@ struct Mat
     }
 
 #ifdef USE_EIGEN
+
+    inline __host__ Mat() {
+    }
+
     template<typename PF>
     inline __host__ Mat(const Eigen::Matrix<PF,R,C>& em) {
         for( int r=0; r<R; ++r )
@@ -153,82 +150,6 @@ inline __device__ __host__ Mat<P,R,C> MatFill(P val)
 }
 
 ///////////////////////////////////////////
-// Construct from rows (allow size mismatch)
-///////////////////////////////////////////
-
-template<unsigned R, typename P, unsigned V>
-inline __device__ __host__ Mat<P,R,1> MatFrom(const Mat<P,V,1>& r1)
-{
-    const unsigned RV = (R<V) ? R : V;
-    Mat<P,R,1> ret;
-#pragma unroll
-    for( unsigned i=0; i<RV; ++i )
-        ret(i) = r1(i);
-    return ret;
-}
-
-template<typename P, unsigned R, unsigned C, unsigned V>
-inline __device__ __host__ Mat<P,R,C> MatRows(const Mat<P,V,1>& r0, const Mat<P,V,1>& r1)
-{
-    const unsigned CV = (C<V) ? C : V;
-    Mat<P,R,C> ret;
-#pragma unroll
-    for( unsigned c=0; c<CV; ++c )
-    {
-        ret(0,c) = r0(c);
-        ret(1,c) = r1(c);
-    }
-    return ret;
-}
-
-template<typename P, unsigned R, unsigned C, unsigned V>
-inline __device__ __host__ Mat<P,R,C> MatRows(const Mat<P,V,1>& r0, const Mat<P,V,1>& r1, const Mat<P,V,1>& r2)
-{
-    const unsigned CV = (C<V) ? C : V;
-    Mat<P,R,C> ret;
-#pragma unroll
-    for( unsigned c=0; c<CV; ++c )
-    {
-        ret(0,c) = r0(c);
-        ret(1,c) = r1(c);
-        ret(2,c) = r2(c);
-    }
-    return ret;
-}
-
-template<typename P, unsigned R, unsigned C, unsigned V>
-inline __device__ __host__ Mat<P,R,C> MatRows(const Mat<P,V,1>& r0, const Mat<P,V,1>& r1, const Mat<P,V,1>& r2, const Mat<P,V,1>& r3)
-{
-    const unsigned CV = (C<V) ? C : V;
-    Mat<P,R,C> ret;
-#pragma unroll
-    for( unsigned c=0; c<CV; ++c )
-    {
-        ret(0,c) = r0(c);
-        ret(1,c) = r1(c);
-        ret(2,c) = r2(c);
-        ret(3,c) = r3(c);
-    }
-    return ret;
-}
-
-///////////////////////////////////////////
-// Construct from other types
-///////////////////////////////////////////
-
-#ifdef USE_TOON
-template<typename P, unsigned R, unsigned C, typename TP>
-inline __host__ Mat<P,R,C> MatFrom(const TooN::Matrix<R,C,TP>& m)
-{
-    Mat<P,R,C> ret;
-    for( int r=0; r<R; ++r )
-        for( int c=0; c<C; ++c )
-            ret(r,c) = m(r,c);
-    return ret;
-}
-#endif // USE_TOON
-
-///////////////////////////////////////////
 // Matrix Matrix operations
 ///////////////////////////////////////////
 
@@ -254,6 +175,7 @@ template<typename P, unsigned CR>
 inline __device__ __host__ P operator*(const Mat<P,1,CR>& lhs, const Mat<P,CR,1>& rhs)
 {
     P ret = 0;
+    #pragma unroll
     for( int i=0; i<CR; ++i)
         ret += lhs(i) * rhs(i);
     return ret;
@@ -264,6 +186,7 @@ template<typename P, unsigned R>
 inline __device__ __host__ P operator*(const Mat<P,R,1>& lhs, const Mat<P,R,1>& rhs)
 {
     P ret = 0;
+    #pragma unroll
     for( int i=0; i<R; ++i)
         ret += lhs(i) * rhs(i);
     return ret;
@@ -277,7 +200,7 @@ inline __device__ __host__ Mat<P,R,C> mul_aTb(const Mat<P,CR,R>& a, const Mat<P,
     for( unsigned r=0; r<R; ++r) {
         for( unsigned c=0; c<C; ++c) {
             ret(r,c) = 0;
-#pragma unroll
+            #pragma unroll
             for( unsigned k=0; k<CR; ++k)  {
                 ret(r,c) += a(k,r) * b(k,c);
             }
@@ -430,6 +353,13 @@ struct SymMat
             m[i] += rhs.m[i];
     }
 
+    inline __device__ __host__ void operator*=(const P w)
+    {
+        #pragma unroll
+        for( unsigned i=0; i<unique; ++i )
+            m[i] *= w;
+    }
+
     P m[unique];
 };
 
@@ -466,6 +396,19 @@ inline __device__ __host__ SymMat<P,R*C> OuterProduct(const Mat<P,R,C>& M)
     return ret;
 }
 
+template<typename P, unsigned R, unsigned C>
+inline __device__ __host__ SymMat<P,R*C> OuterProduct(const Mat<P,R,C>& M, const P weight)
+{
+    const unsigned N = R*C;
+    SymMat<P,N> ret;
+    int i=0;
+    for( int r=0; r<N; ++r )
+#pragma unroll
+        for( int c=0; c<=r; ++c )
+            ret.m[i++] = M(r) * M(c) * weight;
+    return ret;
+}
+
 template<typename P, unsigned N>
 inline __device__ __host__ SymMat<P,N> SymMat_zero()
 {
@@ -485,13 +428,13 @@ struct LeastSquaresSystem
 {
   Mat<P,1,N> JTy;
   SymMat<P,N> JTJ;
-  P f;
+  P sqErr;
   unsigned obs;
 
   inline __device__ __host__ void SetZero() {
       JTJ.SetZero();
       JTy.SetZero();
-      f = 0;
+      sqErr = 0;
       obs = 0;
   }
 
@@ -499,7 +442,7 @@ struct LeastSquaresSystem
   {
     JTy += rhs.JTy;
     JTJ += rhs.JTJ;
-    f += rhs.f;
+    sqErr += rhs.sqErr;
     obs += rhs.obs;
   }
 };
@@ -507,7 +450,7 @@ struct LeastSquaresSystem
 template<typename P, unsigned N>
 inline __device__ __host__ LeastSquaresSystem<P,N> operator+(const LeastSquaresSystem<P,N>& lhs, const LeastSquaresSystem<P,N>& rhs)
 {
-  return (LeastSquaresSystem<P,N>){lhs.JTy+rhs.JTy, lhs.JTJ+rhs.JTJ, lhs.f + rhs.f, lhs.obs + rhs.obs };
+  return (LeastSquaresSystem<P,N>){lhs.JTy+rhs.JTy, lhs.JTJ+rhs.JTJ, lhs.sqErr + rhs.sqErr, lhs.obs + rhs.obs };
 }
 
 ///////////////////////////////////////////

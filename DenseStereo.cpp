@@ -60,9 +60,9 @@ int main( int /*argc*/, char* argv[] )
 //    const std::string cam_uri =
     CameraDevice camera = OpenRpgCamera(
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
@@ -168,10 +168,12 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // Plane Parameters
-    Eigen::Matrix3d U; U << w, 0, w,  0, h, h,  1, 1, 1;
+    // These coordinates need to be below the horizon. This could cause trouble!
+    Eigen::Matrix3d U; U << w, 0, w,  h/2, h, h,  1, 1, 1;
     Eigen::Matrix3d Q = -(Kinv * U).transpose();
     Eigen::Matrix3d Qinv = Q.inverse();
     Eigen::Vector3d z; z << -1/5.0, -1/5.0, -1/5.0;
+    Eigen::Vector3d n = Qinv*z;
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
@@ -234,6 +236,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
     Image<float4, TargetDevice, Manage>  d3d(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*4*11,h);
+    Image<float, TargetDevice, Manage>  dErr(w,h);
 
     // Temporary image buffers
     const int num_temp = 3;
@@ -257,7 +260,7 @@ int main( int /*argc*/, char* argv[] )
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
-    Var<int> maxDisp("ui.disp",55, 0, 64);
+    Var<int> maxDisp("ui.disp",70, 0, 64);
     Var<float> acceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
     Var<bool> subpix("ui.subpix", true, true);
@@ -269,9 +272,12 @@ int main( int /*argc*/, char* argv[] )
     Var<float> gs("ui.gs",2, 1E-3, 5);
     Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
-    Var<int> domedits("ui.median its",1, 1, 10);
+    Var<int> domedits("ui.median its",10, 1, 10);
     Var<bool> domed5x5("ui.median 5x5", true, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
+
+    Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
+    Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -336,20 +342,18 @@ int main( int /*argc*/, char* argv[] )
             DisparityImageToVbo(d3d, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
 
             // Fit plane
+            for(int i=0; i<20; ++i )
             {
-                cout << "-------------------------------------------------" << endl;
-                cout << Qinv << endl;
-                Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch);
-                cout << lss.f << endl;
+                Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
                 Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
                 Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
-                cout << lss.JTJ << endl << endl;
-                cout << lss.JTy << endl << endl;
-                cout << x.transpose() << endl;
+                if( x.norm() > 1 ) x = x / x.norm();
                 for(int i=0; i<3; ++i ) {
                     z(i) *= exp(x(i));
                 }
-                cout << z.transpose() << endl;
+                n = Qinv * z;
+//                cout << z.transpose() << endl;
+//                cout << sqrt(lss.sqErr/lss.obs) << endl;
             }
 
             // Copy point cloud into VBO
@@ -376,11 +380,15 @@ int main( int /*argc*/, char* argv[] )
         glColor3f(1,1,1);
 
         // Draw Stereo images
-        for(int i=0; i<2; ++i ) {
+        for(int i=0; i<1; ++i ) {
             container[i].Activate();
             tex8 << dCamImg[i];
             tex8.RenderToViewportFlipY();
         }
+
+        container[1].Activate();
+        texf << dErr;
+        texf.RenderToViewportFlipY();
 
         container[2].Activate();
         texf << dDisp;
@@ -393,9 +401,12 @@ int main( int /*argc*/, char* argv[] )
         glDrawFrustrum(Kinv,w,h,-1.0);
 
 //        for(Sophus::SE3& T_rw : gtPose) {
-        for(int i=0; i < gtPose.size() ; ++i ) {
-            Sophus::SE3& T_rw = gtPose[i];
-            glDrawFrustrum(Kinv,w,h,T_rw, 1E-1);
+//            glDrawFrustrum(Kinv,w,h,T_rw, 1E-1);
+//        }
+
+        {
+            glColor3f(1,0,0);
+            DrawPlane(n,1,100);
         }
 
         // Render Mesh
