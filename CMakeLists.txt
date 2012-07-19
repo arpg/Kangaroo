@@ -20,6 +20,11 @@ include_directories(${Pangolin_INCLUDE_DIRS})
 LINK_DIRECTORIES(${Pangolin_LIBRARY_DIRS})
 LINK_LIBRARIES(${Pangolin_LIBRARIES})
 
+# Find Scenegraph
+FIND_PACKAGE(SceneGraph REQUIRED)
+INCLUDE_DIRECTORIES(${SceneGraph_INCLUDE_DIRS})
+LINK_LIBRARIES(${SceneGraph_LIBRARIES})
+
 find_package( RPG REQUIRED )
 include_directories( ${RPG_INCLUDE_DIRS} )
 LINK_LIBRARIES(${RPG_LIBRARIES})

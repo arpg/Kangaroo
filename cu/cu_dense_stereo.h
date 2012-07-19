@@ -2,6 +2,8 @@
 
 #include "all.h"
 
+#include "cu_patch_score.h"
+
 namespace Gpu
 {
 
@@ -22,7 +24,7 @@ __global__ void KernDenseStereo(
     float sndBestScore = 1E11;
 
     for(int c = 0; c <= maxDisp; ++c ) {
-        const float score = SSNDScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
+        const float score = SSNDPatchScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
         if(score < bestScore) {
             sndBestScore = bestScore;
             bestScore = score;
@@ -67,9 +69,9 @@ __global__ void KernDenseStereoSubpixelRefine(
     const float d1 = bestDisp+1;
     const float d2 = bestDisp;
     const float d3 = bestDisp-1;
-    const float s1 = SSNDScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d1,y);
-    const float s2 = SSNDScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d2,y);
-    const float s3 = SSNDScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d3,y);
+    const float s1 = SSNDPatchScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d1,y);
+    const float s2 = SSNDPatchScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d2,y);
+    const float s3 = SSNDPatchScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d3,y);
 
     // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
     const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
@@ -111,7 +113,7 @@ __global__ void KernDisparityImageToVbo(
     const float z = disp > 0 ? fu * baseline / -disp : -1E10;
 
     // (x,y,1) = kinv * (u,v,1)'
-    const float x = z * (u-u0) / fu;
+    const float x = -z * (u-u0) / fu;
     const float y = z * (v-v0) / fv;
 
     dVbo(u,v) = make_float4(x,y,z,1);
@@ -195,7 +197,6 @@ LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, const Mat<float
     InitDimFromOutputImage(blockDim, gridDim, dVbo);
     Image<LeastSquaresSystem<float,3> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,3> >(dVbo.w, dVbo.h);
 
-    dErr.Fill(1.0);
     KernPlaneFitGN<<<gridDim,blockDim>>>(dVbo, Qinv, zhat, dSum, dErr, within, c );
 
     LeastSquaresSystem<float,3> sum;

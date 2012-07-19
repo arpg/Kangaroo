@@ -52,17 +52,15 @@ inline int GetLevelFromMaxPixels(int w, int h, unsigned long maxpixels)
     return level;
 }
 
-#include <boost/tokenizer.hpp>
-
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
 //    const std::string cam_uri =
     CameraDevice camera = OpenRpgCamera(
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
     );
 
@@ -74,36 +72,6 @@ int main( int /*argc*/, char* argv[] )
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
     camera.Capture(img);
-
-    vector<Sophus::SE3> gtPose;
-
-    // Parse Ground truth
-    ifstream gt(camera.GetProperty("DataSourceDir") + "/../pose_filter_offline.csv");
-    if(gt.is_open()) {
-        Eigen::Matrix<double,1,18> row;
-        string line;
-        unsigned long lines = 0;
-
-        // Eat comment
-        getline(gt,line);
-
-        while (getline(gt,line)  )
-        {
-            lines++;
-            if(lines % 60*10 == 0) {
-                boost::tokenizer< boost::escaped_list_separator<char> > tok(line);
-                int i = 0;
-                for(const string& s: tok) {
-                    std::stringstream iss(s);
-                    iss >> row(i++);
-                }
-                Sophus::SE3 T_rw( mvl::Cart2T(row(1),row(2),row(3),row(7),row(8),row(9)) );
-                gtPose.push_back(T_rw);
-            }
-        }
-
-        gt.close();
-    }
 
     // native width and height (from camera)
     const unsigned int nw = img[0].width();
@@ -141,8 +109,12 @@ int main( int /*argc*/, char* argv[] )
     cout << "Offset: " << roi.x << "x" << roi.y << endl;
 
     // OpenGL's Right Down Forward coordinate systems
-    Eigen::Matrix3d RDFgl;
-    RDFgl << 1,0,0,  0,-1,0,  0,0,-1;
+    Eigen::Matrix3d RDFgl;    RDFgl    << 1,0,0,  0,-1,0,  0,0,-1;
+    Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
+    Eigen::Matrix4d T_gl_ro = Eigen::Matrix4d::Identity();
+    T_gl_ro.block<3,3>(0,0) = RDFgl.transpose() * RDFrobot;
+    Eigen::Matrix4d T_ro_gl = Eigen::Matrix4d::Identity();
+    T_ro_gl.block<3,3>(0,0) = RDFrobot.transpose() * RDFgl;
 
     const Eigen::Matrix3d K = camModel[0].K();
     const Eigen::Matrix3d Kinv = MakeKinv(K);
@@ -167,13 +139,39 @@ int main( int /*argc*/, char* argv[] )
         return -1;
     }
 
+    vector<Sophus::SE3> gtPoseT_wh;
+
+    //T_pw = T_gl_ro * T_rp_rw * I * T_gl_ro^-1
+
+    // Parse Ground truth
+    ifstream gt(camera.GetProperty("DataSourceDir") + "/pose.txt");
+    if(gt.is_open()) {
+        const int startframe = camera.GetProperty("StartFrame",0);
+        Eigen::Matrix<double,1,6> row;
+
+        for(unsigned long lines = 0; lines < 10000;lines++)
+        {
+            for(int i=0; i<6; ++i ) {
+                gt >> row(i);
+            }
+            if(lines >= startframe) {
+                Sophus::SE3 T_wr( T_gl_ro * mvl::Cart2T(row) * T_ro_gl );
+                gtPoseT_wh.push_back(T_wr);
+            }
+        }
+
+        cout << "Imported " << gtPoseT_wh.size() << endl;
+
+        gt.close();
+    }
+
     // Plane Parameters
     // These coordinates need to be below the horizon. This could cause trouble!
     Eigen::Matrix3d U; U << w, 0, w,  h/2, h, h,  1, 1, 1;
     Eigen::Matrix3d Q = -(Kinv * U).transpose();
     Eigen::Matrix3d Qinv = Q.inverse();
     Eigen::Vector3d z; z << -1/5.0, -1/5.0, -1/5.0;
-    Eigen::Vector3d n = Qinv*z;
+    Eigen::Vector3d n_c = Qinv*z;
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
@@ -205,10 +203,14 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // Define Camera Render Object (for view / scene browsing)
-    pangolin::OpenGlRenderState s_cam;
-    s_cam.Set(ProjectionMatrix(w,h,K(0,0),K(1,1),K(0,2),K(1,2),0.1,1000));
-    s_cam.Set(IdentityMatrix(GlModelViewStack));
-    container[3].SetHandler(new Handler3D(s_cam));
+    pangolin::OpenGlRenderState s_cam(
+        ProjectionMatrix(w,h,K(0,0),K(1,1),K(0,2),K(1,2),0.1,1000),
+        IdentityMatrix(GlModelViewStack)
+    );
+    if(!gtPoseT_wh.empty()) {
+        s_cam.SetModelViewMatrix(gtPoseT_wh[0].inverse().matrix());
+    }
+    container[3].SetHandler(new Handler3D(s_cam, AxisY));
 
     // Texture we will use to display camera images
     GlTextureCudaArray tex8(w,h,GL_LUMINANCE8);
@@ -276,11 +278,15 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> domed5x5("ui.median 5x5", true, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
 
+    Var<bool> plane_do("ui.Compute Ground Plane", true, true);
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
     Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+
+    unsigned int videoFrameNum = 0;
+    Sophus::SE3 T_wc;
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -288,6 +294,10 @@ int main( int /*argc*/, char* argv[] )
 
         if(go) {
             camera.Capture(img);
+
+            if(gtPoseT_wh.size() > videoFrameNum) {
+                T_wc = gtPoseT_wh[videoFrameNum++];
+            }
 
             /////////////////////////////////////////////////////////////
             // Upload images to device (Warp / Decimate if necessery)
@@ -341,19 +351,19 @@ int main( int /*argc*/, char* argv[] )
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
 
-            // Fit plane
-            for(int i=0; i<20; ++i )
-            {
-                Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
-                Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
-                Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
-                if( x.norm() > 1 ) x = x / x.norm();
-                for(int i=0; i<3; ++i ) {
-                    z(i) *= exp(x(i));
+            if(plane_do) {
+                // Fit plane
+                for(int i=0; i<20; ++i )
+                {
+                    Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
+                    Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
+                    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
+                    if( x.norm() > 1 ) x = x / x.norm();
+                    for(int i=0; i<3; ++i ) {
+                        z(i) *= exp(x(i));
+                    }
+                    n_c = Qinv * z;
                 }
-                n = Qinv * z;
-//                cout << z.transpose() << endl;
-//                cout << sqrt(lss.sqErr/lss.obs) << endl;
             }
 
             // Copy point cloud into VBO
@@ -397,21 +407,26 @@ int main( int /*argc*/, char* argv[] )
         container[3].ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);
 
-        glDrawAxis(1.0);
-        glDrawFrustrum(Kinv,w,h,-1.0);
-
-//        for(Sophus::SE3& T_rw : gtPose) {
-//            glDrawFrustrum(Kinv,w,h,T_rw, 1E-1);
-//        }
-
-        {
-            glColor3f(1,0,0);
-            DrawPlane(n,1,100);
+        // Draw history
+        for(Sophus::SE3& T_wh : gtPoseT_wh) {
+            glDrawAxis(T_wh);
         }
 
-        // Render Mesh
-        glColor3f(1.0,1.0,1.0);
-        RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+        // Render camera frustum and mesh
+        {
+            glSetFrameOfReferenceF(T_wc);
+            glDrawFrustrum(Kinv,w,h,-1.0);
+
+            if(plane_do) {
+                // Draw ground plane
+                glColor3f(1,0,0);
+                DrawPlane(n_c,1,100);
+            }
+
+            glColor3f(1.0,1.0,1.0);
+            RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+            glUnsetFrameOfReference();
+        }
 
         pangolin::RenderViews();
         pangolin::FinishGlutFrame();

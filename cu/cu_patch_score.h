@@ -24,7 +24,7 @@ float Sum(
 // Mean Absolute Difference
 template<typename To, typename T, int rad>
 __device__ inline
-float MADScore(
+float MADPatchScore(
     Image<T> img1, int x1, int y1,
     Image<T> img2, int x2, int y2
 ) {
@@ -45,7 +45,7 @@ float MADScore(
 // Sum Square Normalised Difference
 template<typename To, typename T, int rad>
 __device__ inline
-To SSNDScore(
+To SSNDPatchScore(
     Image<T> img1, int x1, int y1,
     Image<T> img2, int x2, int y2
 ) {
@@ -74,6 +74,7 @@ To SSNDScore(
     const int n = w*w;
 
     for(int r=-rad; r <=rad; ++r ) {
+        #pragma unroll
         for(int c=-rad; c <=rad; ++c ) {
             To xi = img1.GetWithClampedRange(x1+c,y1+r);
             To yi = img2.GetWithClampedRange(x2+c,y2+r);
@@ -83,6 +84,43 @@ To SSNDScore(
             syi2 += yi*yi;
             sxiyi += xi*yi;
         }
+    }
+
+    const To mx = (float)sxi / (float)n;
+    const To my = (float)syi / (float)n;
+
+    const To score = 0
+            + sxi2 - 2*mx*sxi + n*mx*mx
+            + 2*(-sxiyi + my*sxi + mx*syi - n*mx*my)
+            + syi2 - 2*my*syi + n*my*my;
+    return score;
+}
+
+// Sum Square Normalised Difference
+template<typename To, typename T, int rad>
+__device__ inline
+To SSNDLineScore(
+    Image<T> img1, int x1, int y1,
+    Image<T> img2, int x2, int y2
+) {
+    To sxi = 0;
+    To sxi2 = 0;
+    To syi = 0;
+    To syi2 = 0;
+    To sxiyi = 0;
+
+    const int w = 2*rad+1;
+    const int n = w*w;
+
+    #pragma unroll
+    for(int c=-rad; c <=rad; ++c ) {
+        To xi = img1.GetWithClampedRange(x1+c,y1);
+        To yi = img2.GetWithClampedRange(x2+c,y2);
+        sxi += xi;
+        syi += yi;
+        sxi2 += xi*xi;
+        syi2 += yi*yi;
+        sxiyi += xi*yi;
     }
 
     const To mx = (float)sxi / (float)n;
