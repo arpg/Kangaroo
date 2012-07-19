@@ -160,8 +160,6 @@ int main( int /*argc*/, char* argv[] )
             }
         }
 
-        cout << "Imported " << gtPoseT_wh.size() << endl;
-
         gt.close();
     }
 
@@ -210,7 +208,7 @@ int main( int /*argc*/, char* argv[] )
     if(!gtPoseT_wh.empty()) {
         s_cam.SetModelViewMatrix(gtPoseT_wh[0].inverse().matrix());
     }
-    container[3].SetHandler(new Handler3D(s_cam, AxisY));
+    container[3].SetHandler(new Handler3D(s_cam, AxisNone));
 
     // Texture we will use to display camera images
     GlTextureCudaArray tex8(w,h,GL_LUMINANCE8);
@@ -262,6 +260,7 @@ int main( int /*argc*/, char* argv[] )
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
+    Var<bool> lockToCam("ui.Lock to cam", false, true);
     Var<int> maxDisp("ui.disp",70, 0, 64);
     Var<float> acceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
@@ -283,6 +282,7 @@ int main( int /*argc*/, char* argv[] )
     Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+    pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
     unsigned int videoFrameNum = 0;
@@ -404,12 +404,26 @@ int main( int /*argc*/, char* argv[] )
         texf << dDisp;
         texf.RenderToViewportFlipY();
 
+        static bool lastLockToCam = lockToCam;
+        if( lockToCam != lastLockToCam ) {
+            if(lockToCam) {
+                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wc.matrix();
+                s_cam.SetModelViewMatrix(T_vc);
+            }else{
+                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wc.inverse().matrix();
+                s_cam.SetModelViewMatrix(T_vw);
+            }
+            lastLockToCam = lockToCam;
+        }
+
         container[3].ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);
 
+        if(lockToCam) glSetFrameOfReferenceF(T_wc.inverse());
+
         // Draw history
-        for(Sophus::SE3& T_wh : gtPoseT_wh) {
-            glDrawAxis(T_wh);
+        for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {
+            glDrawAxis(gtPoseT_wh[i]);
         }
 
         // Render camera frustum and mesh
@@ -427,6 +441,8 @@ int main( int /*argc*/, char* argv[] )
             RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
             glUnsetFrameOfReference();
         }
+
+        if(lockToCam) glUnsetFrameOfReference();
 
         pangolin::RenderViews();
         pangolin::FinishGlutFrame();
