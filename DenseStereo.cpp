@@ -6,7 +6,10 @@
 #include <pangolin/glcuda.h>
 #include <npp.h>
 
+#include <SceneGraph/SceneGraph.h>
+
 #include <fiducials/drawing.h>
+#include <fiducials/camera.h>
 
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
@@ -163,6 +166,9 @@ int main( int /*argc*/, char* argv[] )
         gt.close();
     }
 
+    Sophus::SE3 T_wc;
+
+
     // Plane Parameters
     // These coordinates need to be below the horizon. This could cause trouble!
     Eigen::Matrix3d U; U << w, 0, w,  h/2, h, h,  1, 1, 1;
@@ -170,6 +176,7 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Matrix3d Qinv = Q.inverse();
     Eigen::Vector3d z; z << -1/5.0, -1/5.0, -1/5.0;
     Eigen::Vector3d n_c = Qinv*z;
+    Eigen::Vector3d n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
 
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
@@ -179,9 +186,13 @@ int main( int /*argc*/, char* argv[] )
     cudaGLSetGLDevice(0);
 
     // Setup default OpenGL parameters
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
+    glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
+    glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
     glEnable (GL_BLEND);
     glEnable (GL_LINE_SMOOTH);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(1.5);
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
@@ -286,7 +297,6 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
     unsigned int videoFrameNum = 0;
-    Sophus::SE3 T_wc;
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -363,6 +373,7 @@ int main( int /*argc*/, char* argv[] )
                         z(i) *= exp(x(i));
                     }
                     n_c = Qinv * z;
+                    n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
                 }
             }
 
@@ -421,25 +432,23 @@ int main( int /*argc*/, char* argv[] )
 
         if(lockToCam) glSetFrameOfReferenceF(T_wc.inverse());
 
-        // Draw history
-        for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {
-            glDrawAxis(gtPoseT_wh[i]);
-        }
-
         // Render camera frustum and mesh
         {
             glSetFrameOfReferenceF(T_wc);
+            RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+            glColor3f(1.0,1.0,1.0);
             glDrawFrustrum(Kinv,w,h,-1.0);
-
             if(plane_do) {
                 // Draw ground plane
-                glColor3f(1,0,0);
+                glColor4f(0,1,0,1);
                 DrawPlane(n_c,1,100);
             }
-
-            glColor3f(1.0,1.0,1.0);
-            RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
             glUnsetFrameOfReference();
+        }
+
+        // Draw history
+        for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {
+            glDrawAxis(gtPoseT_wh[i]);
         }
 
         if(lockToCam) glUnsetFrameOfReference();
