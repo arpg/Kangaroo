@@ -438,14 +438,10 @@ int main( int /*argc*/, char* argv[] )
                 }
 
                 if(Pushed(resetPlane) && plane_do) {
-                    Eigen::Matrix4d T_wn = PlaneBasis_wp(n_w).matrix();
-                    std::cout << "T_wn: [" << T_wn << "]" << endl;
-                    Eigen::Vector4d Camera_n = (T_wn.inverse() * T_wc.matrix()).block<4,1>(0,3);
-                    std::cout << "Camera_n: [" << Camera_n.transpose() << "]" << endl;
-                    Eigen::Vector4d CameraOffset_w = T_wn*Camera_n;
-                    std::cout << "CameraOffset_w: [" << CameraOffset_w.transpose() << "]" << endl;
-                    T_wn.block<2,1>(0,3) += CameraOffset_w.block<2,1>(0,3);
-                    T_hw = T_wn.inverse();// * (eT_hH * eT_Hw).inve rse();//eT_hH * eT_Hw);
+                    Eigen::Matrix4d T_nw = PlaneBasis_wp(n_w).inverse().matrix();
+                    Eigen::Vector3d c_n = (T_nw * T_wc.matrix()).block<3,1>(0,3);
+                    T_nw.block<2,1>(0,3) -= c_n.block<2,1>(0,0);
+                    T_hw = T_nw;// * (eT_hH * eT_Hw).inve rse();//eT_hH * eT_Hw);
                 }
             }
 
