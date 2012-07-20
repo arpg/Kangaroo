@@ -32,7 +32,7 @@ LINK_LIBRARIES(${RPG_LIBRARIES})
 #FIND_PACKAGE( NODE REQUIRED )
 #find_package( ZeroMQ REQUIRED )
 find_package( Protobuf REQUIRED )
-set(NODE_INCLUDE_DIRS "/Users/slovegrove/code/RpgDev/Hermes1.0")
+set(NODE_INCLUDE_DIRS "~/Code/Dev/Hermes1.0")
 include_directories( ${ZeroMQ_INCLUDE_DIRS} )
 include_directories( ${PROTOBUF_INCLUDE_DIRS} )
 include_directories( ${NODE_INCLUDE_DIRS} )
@@ -94,7 +94,9 @@ FIND_PACKAGE(CUDA QUIET)
 if(CUDA_FOUND)
   set(CUDA_NVCC_FLAGS "-arch=sm_20 --compiler-options \"-std=c++03\"" )
   LIST(APPEND CU_COMMON_SRC cu/cu_all.cu cu/all.h cu/Image.h cu/Mat.h)
-  LIST(APPEND CU_COMMON_SRC cu/cu_anaglyph.h cu/cu_bilateral.h cu/cu_convert.h cu/cu_cutil_math_extra.h cu/cu_dense_stereo.h cu/cu_lookup_warp.h cu/cu_median.h cu/cu_patch_score.h cu/cu_resample.h)
+  LIST(APPEND CU_COMMON_SRC cu/cu_anaglyph.h cu/cu_bilateral.h cu/cu_convert.h
+                            cu/cu_cutil_math_extra.h cu/cu_dense_stereo.h cu/cu_lookup_warp.h
+                            cu/cu_median.h cu/cu_patch_score.h cu/cu_resample.h cu/cu_heightmap.h)
 
   if(NOT CUDA_npp_LIBRARY)
     # Hack for old FindCUDA to locate libnpp.so

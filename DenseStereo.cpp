@@ -168,7 +168,6 @@ int main( int /*argc*/, char* argv[] )
 
     Sophus::SE3 T_wc;
 
-
     // Plane Parameters
     // These coordinates need to be below the horizon. This could cause trouble!
     Eigen::Matrix3d U; U << w, 0, w,  h/2, h, h,  1, 1, 1;
@@ -237,6 +236,8 @@ int main( int /*argc*/, char* argv[] )
         GenerateTriangleStripIndexBuffer(dIbo);
     }
 
+
+
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
     Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
@@ -248,6 +249,51 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  d3d(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*4*11,h);
     Image<float, TargetDevice, Manage>  dErr(w,h);
+
+
+    // heightmap size calculation
+    double dHeightMapWidthMeters = 10;
+    double dHeightMapHeightMeters = 10;
+    double dPixelsPerMeter = 10;
+    double w_hm = dHeightMapWidthMeters*dPixelsPerMeter;
+    double h_hm = dHeightMapHeightMeters*dPixelsPerMeter;
+
+    Eigen::Matrix4d eT_Hw;
+    eT_Hw << 1, 0, 0, (dHeightMapWidthMeters)/2,
+             0, 1, 0, 0,
+             0, 0, 1, (dHeightMapHeightMeters)/2,
+             0, 0, 0, 1;
+
+    //modify to go into openGL frame
+
+    Eigen::Matrix4d eT_hH;
+    eT_hH << dPixelsPerMeter, 0, 0, 0,
+             0, 0, 0, 0,
+             0, 0, dPixelsPerMeter, 0,
+             0, 0, 0, 1;
+
+//    eT_hH << 0, dPixelsPerMeter, 0, 0,
+//             0, 0, -1, 0,
+//             -dPixelsPerMeter, 0, 0, 0,
+//             0, 0, 0, 1;
+
+    Eigen::Matrix4d T_hw;
+
+    Image<float4, TargetDevice,Manage> dHeightMap(w_hm, h_hm);
+    GlBufferCudaPtr vbo_hm(GlArrayBuffer, w_hm*h_hm*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo_hm(GlArrayBuffer, w_hm*h_hm*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, w_hm*h_hm*sizeof(uint2) );
+    GlTextureCudaArray tex_hm(w_hm,h_hm,GL_RGBA8);
+
+    //initialize the heightmap
+    InitHeightMap(dHeightMap);
+
+    //generate index buffer for heightmap
+    {
+        CudaScopedMappedPtr var(ibo_hm);
+        Gpu::Image<uint2> dIbo((uint2*)*var,w_hm,h_hm);
+        GenerateTriangleStripIndexBuffer(dIbo);
+    }
 
     // Temporary image buffers
     const int num_temp = 3;
@@ -276,6 +322,9 @@ int main( int /*argc*/, char* argv[] )
     Var<float> acceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
     Var<bool> subpix("ui.subpix", true, true);
+    Var<bool> fuse("ui.fuse", true, true);
+    Var<bool> resetPlane("ui.resetplane", false, false);
+
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_color("ui.show color", true, true);
 
@@ -337,6 +386,8 @@ int main( int /*argc*/, char* argv[] )
         if(go || GuiVarHasChanged() ) {
             DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, acceptThresh);
 
+
+
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
             }else{
@@ -361,6 +412,44 @@ int main( int /*argc*/, char* argv[] )
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
 
+            // we have 3d point data, use this to calculate the heightmap delta
+
+            //calcualte the camera to heightmap transform
+            if(fuse)
+            {
+
+                Eigen::Matrix4d T_hc = T_hw * T_wc.matrix();
+
+                //UpdateHeightMap(dHeightMap,d3d,dCamImg[0],T_hc.matrix3x4());
+
+                // Copy point cloud into VBO
+                {
+                    CudaScopedMappedPtr var(vbo_hm);
+                    Gpu::Image<float4> dVbo((float4*)*var,w_hm,h_hm);
+                    VboFromHeightMap(dVbo,dHeightMap);
+                }
+
+                // Generate CBO
+                {
+                    CudaScopedMappedPtr var(cbo_hm);
+                    Gpu::Image<uchar4> dCbo((uchar4*)*var,w_hm,h_hm);
+                    ColourHeightMap(dCbo,dHeightMap);
+                    tex_hm << dCbo;
+                }
+
+                if(Pushed(resetPlane) && plane_do) {
+                    Eigen::Matrix4d T_wn = PlaneBasis_wp(n_w).matrix();
+                    std::cout << "T_wn: [" << T_wn << "]" << endl;
+                    Eigen::Vector4d Camera_n = (T_wn.inverse() * T_wc.matrix()).block<4,1>(0,3);
+                    std::cout << "Camera_n: [" << Camera_n.transpose() << "]" << endl;
+                    Eigen::Vector4d CameraOffset_w = T_wn*Camera_n;
+                    std::cout << "CameraOffset_w: [" << CameraOffset_w.transpose() << "]" << endl;
+                    T_wn.block<2,1>(0,3) += CameraOffset_w.block<2,1>(0,3);
+                    T_hw = T_wn.inverse();// * (eT_hH * eT_Hw).inve rse();//eT_hH * eT_Hw);
+                }
+            }
+
+
             if(plane_do) {
                 // Fit plane
                 for(int i=0; i<20; ++i )
@@ -375,6 +464,7 @@ int main( int /*argc*/, char* argv[] )
                     n_c = Qinv * z;
                     n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
                 }
+
             }
 
             // Copy point cloud into VBO
@@ -408,8 +498,9 @@ int main( int /*argc*/, char* argv[] )
         }
 
         container[1].Activate();
-        texf << dErr;
-        texf.RenderToViewportFlipY();
+//        texf << dErr;
+//        texf.RenderToViewportFlipY();
+        tex_hm.RenderToViewportFlipY();
 
         container[2].Activate();
         texf << dDisp;
@@ -432,6 +523,19 @@ int main( int /*argc*/, char* argv[] )
 
         if(lockToCam) glSetFrameOfReferenceF(T_wc.inverse());
 
+        glDrawAxis(10);
+
+        //draw the global heightmap
+        if(fuse)
+        {
+            //transform the mesh into world coordinates from heightmap coordinates
+            glMatrixMode(GL_MODELVIEW);
+            glPushMatrix();
+            glMultMatrix( T_hw.inverse() );
+            RenderMesh(ibo_hm,vbo_hm,cbo_hm, w_hm, h_hm, show_mesh, show_color);
+            glPopMatrix();
+        }
+
         // Render camera frustum and mesh
         {
             glSetFrameOfReferenceF(T_wc);
@@ -445,6 +549,8 @@ int main( int /*argc*/, char* argv[] )
             }
             glUnsetFrameOfReference();
         }
+
+
 
         // Draw history
         for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {

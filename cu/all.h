@@ -109,4 +109,14 @@ void MakeAnaglyth(
     int shift = 0
 );
 
+//////////////////////////////////////////////////////
+
+void VboFromHeightMap(Image<float4> dVbo, const Image<float4> dHeightMap);
+
+void InitHeightMap(Image<float4> dHeightMap);
+
+void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc);
+
+void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap);
+
 }

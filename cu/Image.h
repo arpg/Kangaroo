@@ -210,6 +210,12 @@ struct Image {
         return ptr[y*stride + x];
     }
 
+    inline  __device__ __host__
+    bool InBounds(int x, int y) const
+    {
+        return 0 <= x && x < w && 0 <= y && y < h;
+    }
+
     template <typename DT>
     inline __host__
     void MemcpyFromHost(DT* hptr, size_t hpitch )

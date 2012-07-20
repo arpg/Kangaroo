@@ -13,3 +13,4 @@
 #include "cu_anaglyph.h"
 #include "cu_patch_score.h"
 #include "cu_dense_stereo.h"
+#include "cu_heightmap.h"
