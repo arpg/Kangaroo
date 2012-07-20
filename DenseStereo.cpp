@@ -252,31 +252,20 @@ int main( int /*argc*/, char* argv[] )
 
 
     // heightmap size calculation
-    double dHeightMapWidthMeters = 10;
-    double dHeightMapHeightMeters = 10;
+    double dHeightMapWidthMeters = 50;
+    double dHeightMapHeightMeters = 100;
     double dPixelsPerMeter = 10;
     double w_hm = dHeightMapWidthMeters*dPixelsPerMeter;
     double h_hm = dHeightMapHeightMeters*dPixelsPerMeter;
 
-    Eigen::Matrix4d eT_Hw;
-    eT_Hw << 1, 0, 0, (dHeightMapWidthMeters)/2,
-             0, 1, 0, 0,
-             0, 0, 1, (dHeightMapHeightMeters)/2,
+    // Plane (z=0) to heightmap transform (adjust to pixel units)
+    Eigen::Matrix4d eT_hp;
+    eT_hp << dPixelsPerMeter, 0, 0, 0,
+             0, dPixelsPerMeter, 0, 0,
+             0, 0, 1, 0,
              0, 0, 0, 1;
 
-    //modify to go into openGL frame
-
-    Eigen::Matrix4d eT_hH;
-    eT_hH << dPixelsPerMeter, 0, 0, 0,
-             0, 0, 0, 0,
-             0, 0, dPixelsPerMeter, 0,
-             0, 0, 0, 1;
-
-//    eT_hH << 0, dPixelsPerMeter, 0, 0,
-//             0, 0, -1, 0,
-//             -dPixelsPerMeter, 0, 0, 0,
-//             0, 0, 0, 1;
-
+    // Heightmap to world transform (set once we know the plane)
     Eigen::Matrix4d T_hw;
 
     Image<float4, TargetDevice,Manage> dHeightMap(w_hm, h_hm);
@@ -327,6 +316,8 @@ int main( int /*argc*/, char* argv[] )
 
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_color("ui.show color", true, true);
+    Var<bool> show_history("ui.show history", true, true);
+    Var<bool> show_depthmap("ui.show depthmap", true, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
@@ -337,7 +328,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> domed5x5("ui.median 5x5", true, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
 
-    Var<bool> plane_do("ui.Compute Ground Plane", true, true);
+    Var<bool> plane_do("ui.Compute Ground Plane", false, true);
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
     Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
 
@@ -414,13 +405,29 @@ int main( int /*argc*/, char* argv[] )
 
             // we have 3d point data, use this to calculate the heightmap delta
 
+            if(plane_do || resetPlane) {
+                // Fit plane
+                for(int i=0; i<20; ++i )
+                {
+                    Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
+                    Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
+                    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
+                    if( x.norm() > 1 ) x = x / x.norm();
+                    for(int i=0; i<3; ++i ) {
+                        z(i) *= exp(x(i));
+                    }
+                    n_c = Qinv * z;
+                    n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
+                }
+
+            }
+
             //calcualte the camera to heightmap transform
             if(fuse)
             {
+                Eigen::Matrix<double,3,4> T_hc = (T_hw * T_wc.matrix()).block<3,4>(0,0);
 
-                Eigen::Matrix4d T_hc = T_hw * T_wc.matrix();
-
-                //UpdateHeightMap(dHeightMap,d3d,dCamImg[0],T_hc.matrix3x4());
+                UpdateHeightMap(dHeightMap,d3d,dCamImg[0],T_hc);
 
                 // Copy point cloud into VBO
                 {
@@ -437,30 +444,12 @@ int main( int /*argc*/, char* argv[] )
                     tex_hm << dCbo;
                 }
 
-                if(Pushed(resetPlane) && plane_do) {
-                    Eigen::Matrix4d T_nw = PlaneBasis_wp(n_w).inverse().matrix();
-                    Eigen::Vector3d c_n = (T_nw * T_wc.matrix()).block<3,1>(0,3);
-                    T_nw.block<2,1>(0,3) -= c_n.block<2,1>(0,0);
-                    T_hw = T_nw;// * (eT_hH * eT_Hw).inve rse();//eT_hH * eT_Hw);
+                if(Pushed(resetPlane) ) {
+                    Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
+                    T_nw.block<2,1>(0,3) += Eigen::Vector2d(dHeightMapWidthMeters/2, dHeightMapHeightMeters /*/2*/);
+                    T_hw = eT_hp * T_nw;
+                    InitHeightMap(dHeightMap);
                 }
-            }
-
-
-            if(plane_do) {
-                // Fit plane
-                for(int i=0; i<20; ++i )
-                {
-                    Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
-                    Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
-                    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
-                    if( x.norm() > 1 ) x = x / x.norm();
-                    for(int i=0; i<3; ++i ) {
-                        z(i) *= exp(x(i));
-                    }
-                    n_c = Qinv * z;
-                    n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
-                }
-
             }
 
             // Copy point cloud into VBO
@@ -535,7 +524,9 @@ int main( int /*argc*/, char* argv[] )
         // Render camera frustum and mesh
         {
             glSetFrameOfReferenceF(T_wc);
-            RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+            if(show_depthmap) {
+                RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+            }
             glColor3f(1.0,1.0,1.0);
             glDrawFrustrum(Kinv,w,h,-1.0);
             if(plane_do) {
@@ -546,11 +537,11 @@ int main( int /*argc*/, char* argv[] )
             glUnsetFrameOfReference();
         }
 
-
-
-        // Draw history
-        for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {
-            glDrawAxis(gtPoseT_wh[i]);
+        if(show_history) {
+            // Draw history
+            for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {
+                glDrawAxis(gtPoseT_wh[i]);
+            }
         }
 
         if(lockToCam) glUnsetFrameOfReference();

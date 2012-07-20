@@ -33,6 +33,9 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
                                     (oldVal.y * dImage(u,v) + v_z * oldVal.z)/(oldVal.y+v_z),
                                     0.0);
 
+        // Take new val
+//        float4 newVal = make_float4(p_h.z, 0, dImage(u,v), 0);
+
         dHeightMap(x,y) = newVal;
     }
 }
@@ -43,7 +46,8 @@ __global__ void KernColourHeightmap(Image<uchar4> dCbo, const Image<float4> dHei
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     float v_z = dHeightMap(u,v).z;
-    dCbo(u,v) = make_uchar4(255,0,0,255);
+//    dCbo(u,v) = make_uchar4(255,0,0,255);
+    dCbo(u,v) = make_uchar4(v_z,v_z,v_z,255);
 }
 
 __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHeightMap)
@@ -51,7 +55,7 @@ __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHe
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    dVbo(u,v) = make_float4(u,v,0/*dHeightMap(u,v).z*/,1.0);
+    dVbo(u,v) = make_float4(u,v,dHeightMap(u,v).x,1.0);
 }
 
 
