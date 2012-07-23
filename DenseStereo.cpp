@@ -4,6 +4,7 @@
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
+#include <Pangolin/glsl.h>
 #include <npp.h>
 
 #include <SceneGraph/SceneGraph.h>
@@ -26,55 +27,85 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
-class Handler2dImageSelect : public Handler
+class ImageSelect
 {
 public:
-    Handler2dImageSelect(int w, int h)
-        : img_w(w), img_h(h)
+    ImageSelect(int w, int h)
+        : img_w(w), img_h(h), selected(false), pixel_scale(1.0)
     {
-        selected[0] = 0;
-        selected[1] = 0;
-    }
-
-    virtual void Keyboard(View&, unsigned char key, int x, int y, bool pressed)
-    {
-    }
-
-    virtual void Mouse(View& view, MouseButton button, int x, int y, bool pressed, int button_state)
-    {
-        WindowToImage(view.v, x,y, selected[0], selected[1]);
-    }
-
-    virtual void MouseMotion(View& view, int x, int y, int button_state)
-    {
-        WindowToImage(view.v, x,y, selected[0], selected[1]);
+        topleft[0] = 0;
+        topleft[1] = 0;
     }
 
 #ifdef HAVE_EIGEN
-    Eigen::Vector2d GetSelectedPoint() const
+    Eigen::Vector2d GetSelectedPoint(bool flipy = false) const
     {
-        return Eigen::Vector2d(selected[0], selected[1]);
-    }
-
-    Eigen::Vector2d GetSelectedPointFlipY() const
-    {
-        return Eigen::Vector2d(selected[0], (img_h-1) - selected[1]);
+        return Eigen::Vector2d(topleft[0], flipy ? (img_h-1) - topleft[1] : topleft[1]);
     }
 #endif
 
-protected:
+    bool IsSelected() const {
+        return selected;
+    }
+
     void WindowToImage(const Viewport& v, int wx, int wy, float& ix, float& iy )
     {
-        const float vx = wx - v.l;
-        const float vy = wy - v.b;
-        ix = img_w * vx /(float)v.w;
-        iy = img_h * vy /(float)v.h;
+        ix = img_w * (wx - v.l) /(float)v.w;
+        iy = img_h * (wy - v.b) /(float)v.h;
         ix = std::max(0.0f,std::min(ix, img_w-1.0f));
         iy = std::max(0.0f,std::min(iy, img_h-1.0f));
     }
 
+    void ImageToWindow(const Viewport& v, float ix, float iy, float& wx, float& wy )
+    {
+        wx = v.l + (float)v.w * ix / img_w;
+        wy = v.b + (float)v.h * iy / img_h;
+    }
+
+    float PixelScale()
+    {
+        return pixel_scale;
+    }
+
+protected:
     float img_w, img_h;
-    float selected[2];
+    bool selected;
+    float topleft[2];
+    float pixel_scale;
+};
+
+class Handler2dImageSelect : public Handler, public ImageSelect
+{
+public:
+    Handler2dImageSelect(int w, int h)
+        : ImageSelect(w,h)
+    {
+    }
+
+    virtual void Keyboard(View&, unsigned char key, int x, int y, bool pressed)
+    {
+        if(key == 'r') {
+            selected = false;
+            pixel_scale = 1.0;
+        }
+    }
+
+    virtual void Mouse(View& view, MouseButton button, int x, int y, bool pressed, int button_state)
+    {
+        if(button == MouseWheelUp) {
+            pixel_scale *= 1.01;
+        }else if(button == MouseWheelDown) {
+            pixel_scale *= 0.99;
+        }else{
+            WindowToImage(view.v, x,y, topleft[0], topleft[1]);
+            selected = (button == pangolin::MouseButtonLeft);
+        }
+    }
+
+    virtual void MouseMotion(View& view, int x, int y, int button_state)
+    {
+        WindowToImage(view.v, x,y, topleft[0], topleft[1]);
+    }
 };
 
 class ActivateDrawTexture
@@ -86,12 +117,35 @@ public:
     }
 
     void operator()(pangolin::View& view) {
+        glPushAttrib(GL_ENABLE_BIT);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_LIGHTING);
         view.Activate();
-        if(flipy) {
-            glTex.RenderToViewportFlipY();
+
+        ImageSelect* imageSelect = dynamic_cast<ImageSelect*>(view.handler);
+
+        if(imageSelect) {
+            float pixScale = imageSelect->PixelScale();
+            if(pixScale!=1.0) {
+                GlSlUtilities::Scale(pixScale);
+                glTex.RenderToViewport(flipy);
+                GlSlUtilities::UseNone();
+            }else{
+                glTex.RenderToViewport(flipy);
+            }
+
+            if(imageSelect->IsSelected()) {
+                glColor3f(1,0,0);
+                Eigen::Vector2d p = imageSelect->GetSelectedPoint();
+                p[0] = p[0] * 2.0 / glTex.width - 1;
+                p[1] = p[1] * 2.0 / glTex.height - 1;
+                DrawCross(p);
+                glColor3f(1,1,1);
+            }
         }else{
-            glTex.RenderToViewport();
+            glTex.RenderToViewport(flipy);
         }
+        glPopAttrib();
     }
 
 protected:
@@ -289,19 +343,10 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Vector3d n_c = Qinv*z;
     Eigen::Vector3d n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
 
-    const int N = 5;
-    for(int i=0; i<N; ++i ) {
-        View& v = CreateDisplay();
-        v.SetAspect((double)w/h);
-        container.AddDisplay(v);
-    }
-
-    GlTextureCudaArray tex8LeftImg(w,h,GL_LUMINANCE8);
-    GlTextureCudaArray tex8DispCross(w,h,GL_LUMINANCE8);
-    GlTextureCudaArray texfDisp(w,h,GL_LUMINANCE32F_ARB);
-    texfDisp.SetNearestNeighbour();
-    tex8LeftImg.SetNearestNeighbour();
-    tex8DispCross.SetNearestNeighbour();
+    GlTextureCudaArray tex8LeftImg(w,h,GL_LUMINANCE8, false);
+    GlTextureCudaArray tex8RightImg(w,h,GL_LUMINANCE8, false);
+    GlTextureCudaArray tex8DispCross(w,h,GL_LUMINANCE8, false);
+    GlTextureCudaArray texfDisp(w,h,GL_LUMINANCE32F_ARB, false);
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -424,14 +469,21 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
+    const int N = 5;
+    for(int i=0; i<N; ++i ) {
+        View& v = CreateDisplay();
+        v.SetAspect((double)w/h);
+        container.AddDisplay(v);
+    }
+    View& view3d = CreateDisplay().SetAspect((double)w/h).SetHandler(new Handler3D(s_cam, AxisNone));
+    container.AddDisplay(view3d);
 
     Handler2dImageSelect handler2d(w,h);
-    container[0].SetHandler(&handler2d);
-    container[3].SetHandler(new Handler3D(s_cam, AxisNone));
-    container[0].SetDrawFunction(ActivateDrawTexture(tex8LeftImg, true));
-    container[1].SetDrawFunction(ActivateDrawTexture(tex8DispCross, true));
-    container[2].SetDrawFunction(ActivateDrawTexture(texfDisp, true));
-    container[4].SetDrawFunction(ActivateDrawTexture(tex_hm, true));
+    container[0].SetDrawFunction(ActivateDrawTexture(tex8LeftImg, true)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(ActivateDrawTexture(tex8RightImg, true)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(ActivateDrawTexture(texfDisp, true)).SetHandler(&handler2d);
+    container[3].SetDrawFunction(ActivateDrawTexture(tex8DispCross, true)).SetHandler(new Handler2dImageSelect(w,h));
+    container[4].SetDrawFunction(ActivateDrawTexture(tex_hm, true)).SetHandler(new Handler2dImageSelect(w,h));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -565,10 +617,11 @@ int main( int /*argc*/, char* argv[] )
 
             // Update texture views
             tex8LeftImg << dCamImg[0];
+            tex8RightImg << dCamImg[1];
             texfDisp << dDisp;
         }
 
-        DisparityImageCrossSection(dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPointFlipY()[1]);
+        DisparityImageCrossSection(dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPoint(true)[1]);
         tex8DispCross << dDispInt;
 
         /////////////////////////////////////////////////////////////
@@ -576,7 +629,7 @@ int main( int /*argc*/, char* argv[] )
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        container[3].ActivateAndScissor(s_cam);
+        view3d.ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);
 
         static bool lastLockToCam = lockToCam;
