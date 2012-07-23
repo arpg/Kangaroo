@@ -26,6 +26,79 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
+class Handler2dImageSelect : public Handler
+{
+public:
+    Handler2dImageSelect(int w, int h)
+        : img_w(w), img_h(h)
+    {
+        selected[0] = 0;
+        selected[1] = 0;
+    }
+
+    virtual void Keyboard(View&, unsigned char key, int x, int y, bool pressed)
+    {
+    }
+
+    virtual void Mouse(View& view, MouseButton button, int x, int y, bool pressed, int button_state)
+    {
+        WindowToImage(view.v, x,y, selected[0], selected[1]);
+    }
+
+    virtual void MouseMotion(View& view, int x, int y, int button_state)
+    {
+        WindowToImage(view.v, x,y, selected[0], selected[1]);
+    }
+
+#ifdef HAVE_EIGEN
+    Eigen::Vector2d GetSelectedPoint() const
+    {
+        return Eigen::Vector2d(selected[0], selected[1]);
+    }
+
+    Eigen::Vector2d GetSelectedPointFlipY() const
+    {
+        return Eigen::Vector2d(selected[0], (img_h-1) - selected[1]);
+    }
+#endif
+
+protected:
+    void WindowToImage(const Viewport& v, int wx, int wy, float& ix, float& iy )
+    {
+        const float vx = wx - v.l;
+        const float vy = wy - v.b;
+        ix = img_w * vx /(float)v.w;
+        iy = img_h * vy /(float)v.h;
+        ix = std::max(0.0f,std::min(ix, img_w-1.0f));
+        iy = std::max(0.0f,std::min(iy, img_h-1.0f));
+    }
+
+    float img_w, img_h;
+    float selected[2];
+};
+
+class ActivateDrawTexture
+{
+public:
+    ActivateDrawTexture(const GlTexture& glTex, bool flipy=false)
+        :glTex(glTex), flipy(flipy)
+    {
+    }
+
+    void operator()(pangolin::View& view) {
+        view.Activate();
+        if(flipy) {
+            glTex.RenderToViewportFlipY();
+        }else{
+            glTex.RenderToViewport();
+        }
+    }
+
+protected:
+    const GlTexture& glTex;
+    bool flipy;
+};
+
 inline NppiRect GetTopLeftAlignedRegion(int w, int h, int blockx, int blocky)
 {
     NppiRect ret;
@@ -78,8 +151,45 @@ inline void LoadPoses(
     }
 }
 
+View& SetupPangoGL(int w, int h)
+{
+    // Setup OpenGL Display (based on GLUT)
+    const int UI_WIDTH = 180;
+    pangolin::CreateGlutWindowAndBind(__FILE__,UI_WIDTH+w,h);
+    glewInit();
+
+    // Setup default OpenGL parameters
+    glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
+    glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
+    glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
+    glEnable (GL_BLEND);
+    glEnable (GL_LINE_SMOOTH);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(1.5);
+    glPixelStorei(GL_PACK_ALIGNMENT,1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+
+    // Tell the base view to arrange its children equally
+    pangolin::CreatePanel("ui")
+        .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
+
+    View& container = CreateDisplay()
+            .SetBounds(0,1.0, Attach::Pix(UI_WIDTH), 1.0)
+            .SetLayout(LayoutEqual);
+
+    return container;
+}
+
 int main( int /*argc*/, char* argv[] )
 {
+    // Initialise window
+    View& container = SetupPangoGL(1024, 768);
+
+    // Initialise CUDA, allowing it to use OpenGL context
+    cudaGLSetGLDevice(0);
+    size_t cu_mem_start, cu_mem_end, cu_mem_total;
+    cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
+
     // Open video device
 //    const std::string cam_uri =
     CameraDevice camera = OpenRpgCamera(
@@ -179,44 +289,19 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Vector3d n_c = Qinv*z;
     Eigen::Vector3d n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
 
-    // Setup OpenGL Display (based on GLUT)
-    const int UI_WIDTH = 180;
-    pangolin::CreateGlutWindowAndBind(__FILE__,UI_WIDTH+2*w,2*h);
-    glewInit();
+    const int N = 5;
+    for(int i=0; i<N; ++i ) {
+        View& v = CreateDisplay();
+        v.SetAspect((double)w/h);
+        container.AddDisplay(v);
+    }
 
-    // Initialise CUDA, allowing it to use OpenGL context
-    cudaGLSetGLDevice(0);
-    size_t cu_mem_start, cu_mem_end, cu_mem_total;
-    cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
-
-    // Setup default OpenGL parameters
-    glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
-    glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
-    glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
-    glEnable (GL_BLEND);
-    glEnable (GL_LINE_SMOOTH);
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glLineWidth(1.5);
-    glPixelStorei(GL_PACK_ALIGNMENT,1);
-    glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-
-    // Tell the base view to arrange its children equally
-    pangolin::CreatePanel("ui")
-        .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
-
-    View& container = CreateDisplay()
-            .SetBounds(0,1.0, Attach::Pix(UI_WIDTH), 1.0)
-            .SetLayout(LayoutEqual);
-
-    GlTextureCudaArrayView tex8LeftImg(w,h,GL_LUMINANCE8, true);
-    GlTextureCudaArrayView tex8DispCross(w,h,GL_LUMINANCE8, true);
-    GlTextureCudaArrayView texfDisp(w,h,GL_LUMINANCE32F_ARB, true);
-    View view3d((double)w/h);
-
-    container.AddDisplay(tex8LeftImg)
-            .AddDisplay(tex8DispCross)
-            .AddDisplay(texfDisp)
-            .AddDisplay(view3d);
+    GlTextureCudaArray tex8LeftImg(w,h,GL_LUMINANCE8);
+    GlTextureCudaArray tex8DispCross(w,h,GL_LUMINANCE8);
+    GlTextureCudaArray texfDisp(w,h,GL_LUMINANCE32F_ARB);
+    texfDisp.SetNearestNeighbour();
+    tex8LeftImg.SetNearestNeighbour();
+    tex8DispCross.SetNearestNeighbour();
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -226,7 +311,6 @@ int main( int /*argc*/, char* argv[] )
     if(!gtPoseT_wh.empty()) {
         s_cam.SetModelViewMatrix(gtPoseT_wh[0].inverse().matrix());
     }
-    container[3].SetHandler(new Handler3D(s_cam, AxisNone));
 
     GlBufferCudaPtr vbo(GlArrayBuffer, w*h*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo(GlArrayBuffer, w*h*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -240,11 +324,9 @@ int main( int /*argc*/, char* argv[] )
     }
 
 
-
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
     Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
-    Image<uchar4, TargetDevice, Manage> dCamColor(w,h);
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
     Image<unsigned char, TargetDevice, Manage> dDispInt(w,h);
     Image<float, TargetDevice, Manage>  dDisp(w,h);
@@ -255,9 +337,9 @@ int main( int /*argc*/, char* argv[] )
 
 
     // heightmap size calculation
-    double dHeightMapWidthMeters = 50;
-    double dHeightMapHeightMeters = 100;
-    double dPixelsPerMeter = 15;
+    double dHeightMapWidthMeters = 200;
+    double dHeightMapHeightMeters = 200;
+    double dPixelsPerMeter = 10;
     double w_hm = dHeightMapWidthMeters*dPixelsPerMeter;
     double h_hm = dHeightMapHeightMeters*dPixelsPerMeter;
 
@@ -312,17 +394,18 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
-    Var<int> maxDisp("ui.disp",70, 0, 64);
-    Var<float> acceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
+    Var<int> maxDisp("ui.disp",75, 0, 64);
+    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
     Var<bool> subpix("ui.subpix", true, true);
-    Var<bool> fuse("ui.fuse", true, true);
+    Var<bool> fuse("ui.fuse", false, true);
     Var<bool> resetPlane("ui.resetplane", true, false);
 
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_color("ui.show color", true, true);
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
+    Var<bool> show_heightmap("ui.show heightmap", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
@@ -330,7 +413,7 @@ int main( int /*argc*/, char* argv[] )
     Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
     Var<int> domedits("ui.median its",10, 1, 10);
-    Var<bool> domed5x5("ui.median 5x5", true, true);
+    Var<bool> domed5x5("ui.median 5x5", false, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
 
     Var<bool> plane_do("ui.Compute Ground Plane", false, true);
@@ -340,6 +423,15 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+
+
+    Handler2dImageSelect handler2d(w,h);
+    container[0].SetHandler(&handler2d);
+    container[3].SetHandler(new Handler3D(s_cam, AxisNone));
+    container[0].SetDrawFunction(ActivateDrawTexture(tex8LeftImg, true));
+    container[1].SetDrawFunction(ActivateDrawTexture(tex8DispCross, true));
+    container[2].SetDrawFunction(ActivateDrawTexture(texfDisp, true));
+    container[4].SetDrawFunction(ActivateDrawTexture(tex_hm, true));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -380,7 +472,7 @@ int main( int /*argc*/, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, acceptThresh);
+            DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, stereoAcceptThresh);
 
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
@@ -402,8 +494,6 @@ int main( int /*argc*/, char* argv[] )
                     MedianFilter5x5(dDisp,dDisp);
                 }
             }
-
-            DisparityImageCrossSection(dDispInt, dCamImg[0], dCamImg[1], tex8LeftImg.GetSelectedPoint()[1]);
 
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
@@ -472,19 +562,21 @@ int main( int /*argc*/, char* argv[] )
 
             // normalise dDisp
             nppiDivC_32f_C1IR(maxDisp,dDisp.ptr,dDisp.pitch,dDisp.Size());
+
+            // Update texture views
+            tex8LeftImg << dCamImg[0];
+            texfDisp << dDisp;
         }
+
+        DisparityImageCrossSection(dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPointFlipY()[1]);
+        tex8DispCross << dDispInt;
 
         /////////////////////////////////////////////////////////////
         // Perform drawing
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        // Update texture views
-        tex8LeftImg << dCamImg[0];
-        tex8DispCross << dDispInt;
-        texfDisp << dDisp;
-
-        view3d.ActivateAndScissor(s_cam);
+        container[3].ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);
 
         static bool lastLockToCam = lockToCam;
@@ -502,7 +594,7 @@ int main( int /*argc*/, char* argv[] )
         if(lockToCam) glSetFrameOfReferenceF(T_wc.inverse());
 
         //draw the global heightmap
-        if(fuse)
+        if(show_heightmap)
         {
             //transform the mesh into world coordinates from heightmap coordinates
             glMatrixMode(GL_MODELVIEW);

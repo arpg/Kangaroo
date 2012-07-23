@@ -62,7 +62,7 @@ __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHe
 void InitHeightMap(Image<float4> dHeightMap)
 {
     // initialize the heightmap
-    dHeightMap.Fill(make_float4(0,100.0,128,0.0));
+    dHeightMap.Fill(make_float4(0,10000.0,128,0.0));
 }
 
 void VboFromHeightMap(Image<float4> dVbo, const Image<float4> dHeightMap)

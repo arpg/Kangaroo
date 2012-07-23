@@ -7,11 +7,15 @@
 namespace Gpu
 {
 
+const int DefaultRad = 2;
+typedef SSNDPatchScore<float,DefaultRad,ImgAccessClamped> DefaultSafeScoreType;
+//typedef SinglePixelSqPatchScore<float,ImgAccessRaw> DefaultSafeScoreType;
+
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo
 //////////////////////////////////////////////////////
 
-template<typename TD, typename TI, unsigned int rad>
+template<typename TD, typename TI, typename Score>
 __global__ void KernDenseStereo(
     Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, int maxDisp, double acceptThresh
 ) {
@@ -24,19 +28,22 @@ __global__ void KernDenseStereo(
     float sndBestScore = 1E11;
 
     for(int c = 0; c <= maxDisp; ++c ) {
-        const float score = SSNDPatchScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
-        if(score < bestScore) {
-            sndBestScore = bestScore;
-            bestScore = score;
-            bestDisp = c;
-        }else if( score < sndBestScore) {
-            sndBestScore = score;
+        const int rx = x-c;
+        if(0 <= rx && rx < dCamRight.w) {
+            const float score =  Score::Score(dCamLeft, x,y, dCamRight, rx, y);
+            if(score < bestScore) {
+                sndBestScore = bestScore;
+                bestScore = score;
+                bestDisp = c;
+            }else if( score < sndBestScore) {
+                sndBestScore = score;
+            }
         }
     }
 
     const bool valid = (bestScore * acceptThresh) < sndBestScore;
 
-    dDisp(x,y) = valid ? bestDisp : -1;
+    dDisp(x,y) = valid ? bestDisp : 0;
 }
 
 void DenseStereo(
@@ -44,14 +51,14 @@ void DenseStereo(
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereo<unsigned char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp,acceptThresh);
+    KernDenseStereo<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp,acceptThresh);
 }
 
 //////////////////////////////////////////////////////
 // Visualise cross section of disparity image
 //////////////////////////////////////////////////////
 
-template<typename TD, typename TI, unsigned int rad>
+template<typename TD, typename TI, typename Score>
 __global__ void KernDisparityImageCrossSection(
     Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight
 ) {
@@ -59,8 +66,9 @@ __global__ void KernDisparityImageCrossSection(
     const uint y = 0;
     const uint c = blockIdx.y*blockDim.y + threadIdx.y;
 
-    const float score = SSNDPatchScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
-    dDisp(x,c) = sqrt(score/(rad*rad));
+    const int rx = x-c;
+    const float score = ( 0<= rx && rx < dCamRight.w ) ? Score::Score(dCamLeft, x,y, dCamRight, rx, y) : 0;
+    dDisp(x,c) = min(sqrt(score/Score::area) * 2.0f, 255.0f);
 }
 
 void DisparityImageCrossSection(
@@ -68,14 +76,14 @@ void DisparityImageCrossSection(
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDisparityImageCrossSection<unsigned char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft.Row(y), dCamRight.Row(y));
+    KernDisparityImageCrossSection<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDisp, dCamLeft.Row(y), dCamRight.Row(y));
 }
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo sub-pixel refinement
 //////////////////////////////////////////////////////
 
-template<typename TDo, typename TDi, typename TI, unsigned int rad>
+template<typename TDo, typename TDi, typename TI, typename Score>
 __global__ void KernDenseStereoSubpixelRefine(
     Image<TDo> dDispOut, const Image<TDi> dDisp, const Image<TI> dCamLeft, const Image<TI> dCamRight
 ) {
@@ -84,7 +92,8 @@ __global__ void KernDenseStereoSubpixelRefine(
 
     const int bestDisp = dDisp(x,y);
 
-    if(bestDisp == -1) {
+    // Ignore things at infinity (and outliers marked with 0)
+    if(bestDisp <1) {
         dDispOut(x,y) = -1;
         return;
     }
@@ -93,9 +102,9 @@ __global__ void KernDenseStereoSubpixelRefine(
     const float d1 = bestDisp+1;
     const float d2 = bestDisp;
     const float d3 = bestDisp-1;
-    const float s1 = SSNDPatchScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d1,y);
-    const float s2 = SSNDPatchScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d2,y);
-    const float s3 = SSNDPatchScore<float,unsigned char,rad>(dCamLeft, x,y, dCamRight, x-d3,y);
+    const float s1 = Score::Score(dCamLeft, x,y, dCamRight, x-d1,y);
+    const float s2 = Score::Score(dCamLeft, x,y, dCamRight, x-d2,y);
+    const float s3 = Score::Score(dCamLeft, x,y, dCamRight, x-d3,y);
 
     // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
     const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
@@ -120,7 +129,7 @@ void DenseStereoSubpixelRefine(
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereoSubpixelRefine<float,unsigned char,unsigned char,3><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
+    KernDenseStereoSubpixelRefine<float,unsigned char,unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDispOut, dDisp, dCamLeft, dCamRight);
 }
 
 //////////////////////////////////////////////////////
@@ -132,9 +141,10 @@ __global__ void KernDisparityImageToVbo(
 ) {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const float invalid = 0.0f/0.0f;
 
     const float disp = dDisp(u,v);
-    const float z = disp > 0 ? fu * baseline / -disp : -1E10;
+    const float z = disp > 2 ? fu * baseline / -disp : invalid;
 
     // (x,y,1) = kinv * (u,v,1)'
     const float x = -z * (u-u0) / fu;
