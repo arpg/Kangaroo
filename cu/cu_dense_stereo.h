@@ -48,6 +48,30 @@ void DenseStereo(
 }
 
 //////////////////////////////////////////////////////
+// Visualise cross section of disparity image
+//////////////////////////////////////////////////////
+
+template<typename TD, typename TI, unsigned int rad>
+__global__ void KernDisparityImageCrossSection(
+    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = 0;
+    const uint c = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float score = SSNDPatchScore<float,TI,rad>(dCamLeft, x,y, dCamRight, x-c, y);
+    dDisp(x,c) = sqrt(score/(rad*rad));
+}
+
+void DisparityImageCrossSection(
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int y
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dDisp);
+    KernDisparityImageCrossSection<unsigned char, unsigned char, 3><<<gridDim,blockDim>>>(dDisp, dCamLeft.Row(y), dCamRight.Row(y));
+}
+
+//////////////////////////////////////////////////////
 // Scanline rectified dense stereo sub-pixel refinement
 //////////////////////////////////////////////////////
 

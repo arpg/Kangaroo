@@ -231,10 +231,22 @@ struct Image {
     }
 
     inline __device__ __host__
-    Image<T,Target,DontManage> SubImage(int x, int y, int width, int height)
+    Image<T,Target,DontManage> SubImage(int x, int y, int width, int height) const
     {
         assert( (x+width) <= w && (y+height) <= h);
-        return Image<T,Target,DontManage>(&(this->operator ()(x,y)), width, height, stride);
+        return Image<T,Target,DontManage>(ptr + y*stride + x, width, height, stride);
+    }
+
+    inline __device__ __host__
+    Image<T,Target,DontManage> Row(int y) const
+    {
+        return SubImage(0,y,w,1);
+    }
+
+    inline __device__ __host__
+    Image<T,Target,DontManage> Col(int x) const
+    {
+        return SubImage(x,0,1,h);
     }
 
     inline __device__ __host__

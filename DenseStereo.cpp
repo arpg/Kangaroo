@@ -55,6 +55,29 @@ inline int GetLevelFromMaxPixels(int w, int h, unsigned long maxpixels)
     return level;
 }
 
+inline void LoadPoses(
+    vector<Sophus::SE3>& vecT_wh, const std::string& filename, int startframe,
+    const Eigen::Matrix4d T_hf, const Eigen::Matrix4d T_fh
+) {
+    // Parse Ground truth
+    ifstream ifs(filename);
+    if(ifs.is_open()) {
+        Eigen::Matrix<double,1,6> row;
+        for(unsigned long lines = 0; lines < 10000;lines++)
+        {
+            for(int i=0; i<6; ++i ) {
+                ifs >> row(i);
+            }
+            if(lines >= startframe) {
+                Sophus::SE3 T_wr( T_hf * mvl::Cart2T(row) * T_fh );
+                vecT_wh.push_back(T_wr);
+            }
+        }
+
+        ifs.close();
+    }
+}
+
 int main( int /*argc*/, char* argv[] )
 {
     // Open video device
@@ -142,31 +165,10 @@ int main( int /*argc*/, char* argv[] )
         return -1;
     }
 
-    vector<Sophus::SE3> gtPoseT_wh;
-
-    //T_pw = T_gl_ro * T_rp_rw * I * T_gl_ro^-1
-
-    // Parse Ground truth
-    ifstream gt(camera.GetProperty("DataSourceDir") + "/pose.txt");
-    if(gt.is_open()) {
-        const int startframe = camera.GetProperty("StartFrame",0);
-        Eigen::Matrix<double,1,6> row;
-
-        for(unsigned long lines = 0; lines < 10000;lines++)
-        {
-            for(int i=0; i<6; ++i ) {
-                gt >> row(i);
-            }
-            if(lines >= startframe) {
-                Sophus::SE3 T_wr( T_gl_ro * mvl::Cart2T(row) * T_ro_gl );
-                gtPoseT_wh.push_back(T_wr);
-            }
-        }
-
-        gt.close();
-    }
-
+    // Load history
     Sophus::SE3 T_wc;
+    vector<Sophus::SE3> gtPoseT_wh;
+    LoadPoses(gtPoseT_wh, camera.GetProperty("DataSourceDir") + "/pose.txt", camera.GetProperty("StartFrame",0), T_gl_ro, T_ro_gl);
 
     // Plane Parameters
     // These coordinates need to be below the horizon. This could cause trouble!
@@ -178,11 +180,14 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Vector3d n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
 
     // Setup OpenGL Display (based on GLUT)
-    pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
+    const int UI_WIDTH = 180;
+    pangolin::CreateGlutWindowAndBind(__FILE__,UI_WIDTH+2*w,2*h);
     glewInit();
 
     // Initialise CUDA, allowing it to use OpenGL context
     cudaGLSetGLDevice(0);
+    size_t cu_mem_start, cu_mem_end, cu_mem_total;
+    cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
 
     // Setup default OpenGL parameters
     glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
@@ -196,7 +201,6 @@ int main( int /*argc*/, char* argv[] )
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
     // Tell the base view to arrange its children equally
-    const int UI_WIDTH = 180;
     pangolin::CreatePanel("ui")
         .SetBounds(0.0, 1.0, 0.0, Attach::Pix(UI_WIDTH));
 
@@ -204,11 +208,15 @@ int main( int /*argc*/, char* argv[] )
             .SetBounds(0,1.0, Attach::Pix(UI_WIDTH), 1.0)
             .SetLayout(LayoutEqual);
 
-    const int N = 4;
-    for(int i=0; i<N; ++i ) {
-        View& disp = CreateDisplay().SetAspect((double)w/h);
-        container.AddDisplay(disp);
-    }
+    GlTextureCudaArrayView tex8LeftImg(w,h,GL_LUMINANCE8, true);
+    GlTextureCudaArrayView tex8DispCross(w,h,GL_LUMINANCE8, true);
+    GlTextureCudaArrayView texfDisp(w,h,GL_LUMINANCE32F_ARB, true);
+    View view3d((double)w/h);
+
+    container.AddDisplay(tex8LeftImg)
+            .AddDisplay(tex8DispCross)
+            .AddDisplay(texfDisp)
+            .AddDisplay(view3d);
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -219,11 +227,6 @@ int main( int /*argc*/, char* argv[] )
         s_cam.SetModelViewMatrix(gtPoseT_wh[0].inverse().matrix());
     }
     container[3].SetHandler(new Handler3D(s_cam, AxisNone));
-
-    // Texture we will use to display camera images
-    GlTextureCudaArray tex8(w,h,GL_LUMINANCE8);
-//    GlTextureCudaArray texrgba8(w,h,GL_RGBA8);
-    GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
 
     GlBufferCudaPtr vbo(GlArrayBuffer, w*h*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo(GlArrayBuffer, w*h*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -254,7 +257,7 @@ int main( int /*argc*/, char* argv[] )
     // heightmap size calculation
     double dHeightMapWidthMeters = 50;
     double dHeightMapHeightMeters = 100;
-    double dPixelsPerMeter = 10;
+    double dPixelsPerMeter = 15;
     double w_hm = dHeightMapWidthMeters*dPixelsPerMeter;
     double h_hm = dHeightMapHeightMeters*dPixelsPerMeter;
 
@@ -294,25 +297,27 @@ int main( int /*argc*/, char* argv[] )
     Sophus::SE3 T_rl = T_rl_orig;
 
     // Build camera distortion lookup tables
-    if(rectify)
-    {
-        T_rl = CreateScanlineRectifiedLookupAndT_rl(
-                    dLookup[0], dLookup[1], T_rl_orig,
-                    K, k1, k2, w, h
-                    );
+    if(rectify) {
+        T_rl = CreateScanlineRectifiedLookupAndT_rl(dLookup[0], dLookup[1], T_rl_orig, K, k1, k2, w, h );
     }
 
     const double baseline = T_rl.translation().norm();
 
+    {
+        cudaMemGetInfo( &cu_mem_end, &cu_mem_total );
+        const unsigned bytes_per_mb = 1024*1000;
+        cout << "CuTotal: " << cu_mem_total/bytes_per_mb << ", Available: " << cu_mem_end/bytes_per_mb << ", Used: " << (cu_mem_start-cu_mem_end)/bytes_per_mb << endl;
+    }
+
     Var<bool> step("ui.step", false, false);
-    Var<bool> run("ui.run", true, true);
+    Var<bool> run("ui.run", false, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
     Var<int> maxDisp("ui.disp",70, 0, 64);
     Var<float> acceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> fuse("ui.fuse", true, true);
-    Var<bool> resetPlane("ui.resetplane", false, false);
+    Var<bool> resetPlane("ui.resetplane", true, false);
 
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_color("ui.show color", true, true);
@@ -336,18 +341,18 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
-    unsigned int videoFrameNum = 0;
-
-    for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
+    for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
             camera.Capture(img);
 
-            if(gtPoseT_wh.size() > videoFrameNum) {
-                T_wc = gtPoseT_wh[videoFrameNum++];
+            if(frame < gtPoseT_wh.size()) {
+                T_wc = gtPoseT_wh[frame];
             }
+
+            frame++;
 
             /////////////////////////////////////////////////////////////
             // Upload images to device (Warp / Decimate if necessery)
@@ -377,8 +382,6 @@ int main( int /*argc*/, char* argv[] )
         if(go || GuiVarHasChanged() ) {
             DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, acceptThresh);
 
-
-
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0], dCamImg[1]);
             }else{
@@ -400,6 +403,8 @@ int main( int /*argc*/, char* argv[] )
                 }
             }
 
+            DisparityImageCrossSection(dDispInt, dCamImg[0], dCamImg[1], tex8LeftImg.GetSelectedPoint()[1]);
+
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, K(0,0), K(1,1), K(0,2), K(1,2) );
 
@@ -407,7 +412,7 @@ int main( int /*argc*/, char* argv[] )
 
             if(plane_do || resetPlane) {
                 // Fit plane
-                for(int i=0; i<20; ++i )
+                for(int i=0; i<(resetPlane*100+5); ++i )
                 {
                     Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
                     Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
@@ -419,7 +424,13 @@ int main( int /*argc*/, char* argv[] )
                     n_c = Qinv * z;
                     n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
                 }
+            }
 
+            if(Pushed(resetPlane) ) {
+                Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
+                T_nw.block<2,1>(0,3) += Eigen::Vector2d(dHeightMapWidthMeters/2, dHeightMapHeightMeters /*/2*/);
+                T_hw = eT_hp * T_nw;
+                InitHeightMap(dHeightMap);
             }
 
             //calcualte the camera to heightmap transform
@@ -442,13 +453,6 @@ int main( int /*argc*/, char* argv[] )
                     Gpu::Image<uchar4> dCbo((uchar4*)*var,w_hm,h_hm);
                     ColourHeightMap(dCbo,dHeightMap);
                     tex_hm << dCbo;
-                }
-
-                if(Pushed(resetPlane) ) {
-                    Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
-                    T_nw.block<2,1>(0,3) += Eigen::Vector2d(dHeightMapWidthMeters/2, dHeightMapHeightMeters /*/2*/);
-                    T_hw = eT_hp * T_nw;
-                    InitHeightMap(dHeightMap);
                 }
             }
 
@@ -475,21 +479,13 @@ int main( int /*argc*/, char* argv[] )
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        // Draw Stereo images
-        for(int i=0; i<1; ++i ) {
-            container[i].Activate();
-            tex8 << dCamImg[i];
-            tex8.RenderToViewportFlipY();
-        }
+        // Update texture views
+        tex8LeftImg << dCamImg[0];
+        tex8DispCross << dDispInt;
+        texfDisp << dDisp;
 
-        container[1].Activate();
-//        texf << dErr;
-//        texf.RenderToViewportFlipY();
-        tex_hm.RenderToViewportFlipY();
-
-        container[2].Activate();
-        texf << dDisp;
-        texf.RenderToViewportFlipY();
+        view3d.ActivateAndScissor(s_cam);
+        glEnable(GL_DEPTH_TEST);
 
         static bool lastLockToCam = lockToCam;
         if( lockToCam != lastLockToCam ) {
@@ -503,12 +499,7 @@ int main( int /*argc*/, char* argv[] )
             lastLockToCam = lockToCam;
         }
 
-        container[3].ActivateAndScissor(s_cam);
-        glEnable(GL_DEPTH_TEST);
-
         if(lockToCam) glSetFrameOfReferenceF(T_wc.inverse());
-
-        glDrawAxis(10);
 
         //draw the global heightmap
         if(fuse)
@@ -539,13 +530,14 @@ int main( int /*argc*/, char* argv[] )
 
         if(show_history) {
             // Draw history
-            for(int i=0; i< gtPoseT_wh.size() && i<= videoFrameNum; ++i) {
+            for(int i=0; i< gtPoseT_wh.size() && i< frame; ++i) {
                 glDrawAxis(gtPoseT_wh[i]);
             }
         }
 
         if(lockToCam) glUnsetFrameOfReference();
 
+        glColor4f(1,1,1,1);
         pangolin::RenderViews();
         pangolin::FinishGlutFrame();
     }

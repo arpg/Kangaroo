@@ -65,6 +65,12 @@ void DenseStereoSubpixelRefine(Image<float> dDispOut, const Image<unsigned char>
 
 //////////////////////////////////////////////////////
 
+void DisparityImageCrossSection(
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int y
+);
+
+//////////////////////////////////////////////////////
+
 void DisparityImageToVbo(
     Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
 );

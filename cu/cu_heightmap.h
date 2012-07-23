@@ -21,8 +21,8 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
                              T_hc(1,0)*p_c.x + T_hc(1,1)*p_c.y + T_hc(1,2)*p_c.z + T_hc(1,3)*p_c.w,
                              T_hc(2,0)*p_c.x + T_hc(2,1)*p_c.y + T_hc(2,2)*p_c.z + T_hc(2,3)*p_c.w);
 
-    int x = (int)p_h.x;
-    int y = (int)p_h.y;
+    int x = (int)(p_h.x+0.5);
+    int y = (int)(p_h.y+0.5);
 
     if(dHeightMap.InBounds(x,y) == true) {
         //calculate the variance of the measurement
@@ -62,7 +62,7 @@ __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHe
 void InitHeightMap(Image<float4> dHeightMap)
 {
     // initialize the heightmap
-    dHeightMap.Fill(make_float4(0,1.0,0.0,0.0));
+    dHeightMap.Fill(make_float4(0,100.0,128,0.0));
 }
 
 void VboFromHeightMap(Image<float4> dVbo, const Image<float4> dHeightMap)
