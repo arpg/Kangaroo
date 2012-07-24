@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Image.h"
 #include "Mat.h"
+#include "sampling.h"
 
 namespace Gpu
 {
@@ -90,7 +92,8 @@ __global__ void KernWarp(
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float2 lu = lookup(x,y);
-    out(x,y) = bicubic<float,unsigned char>((unsigned char*)in.ptr, in.stride, lu.x, lu.y);
+    out(x,y) = in.GetBicubic<float>(lu.x, lu.y);
+    //bicubic_continuous<float,unsigned char>((unsigned char*)in.ptr, in.stride, lu.x, lu.y);
 }
 
 void Warp(

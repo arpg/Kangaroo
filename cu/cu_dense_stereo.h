@@ -24,20 +24,20 @@ __global__ void KernDenseStereo(
 
     // Search for best matching pixel
     int bestDisp = 0;
-    float bestScore = 1E10;
-    float sndBestScore = 1E11;
+    float bestScore = 1E+36;
+    float sndBestScore = 1E+37;
+
+    maxDisp = min(maxDisp, x);
 
     for(int c = 0; c <= maxDisp; ++c ) {
         const int rx = x-c;
-        if(0 <= rx && rx < dCamRight.w) {
-            const float score =  Score::Score(dCamLeft, x,y, dCamRight, rx, y);
-            if(score < bestScore) {
-                sndBestScore = bestScore;
-                bestScore = score;
-                bestDisp = c;
-            }else if( score < sndBestScore) {
-                sndBestScore = score;
-            }
+        const float score =  Score::Score(dCamLeft, x,y, dCamRight, rx, y);
+        if(score < bestScore) {
+            sndBestScore = bestScore;
+            bestScore = score;
+            bestDisp = c;
+        }else if( score < sndBestScore) {
+            sndBestScore = score;
         }
     }
 
@@ -60,23 +60,26 @@ void DenseStereo(
 
 template<typename TD, typename TI, typename Score>
 __global__ void KernDisparityImageCrossSection(
-    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight
+    Image<TD> dScore, Image<unsigned char> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, int y
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = 0;
     const uint c = blockIdx.y*blockDim.y + threadIdx.y;
 
     const int rx = x-c;
     const float score = ( 0<= rx && rx < dCamRight.w ) ? Score::Score(dCamLeft, x,y, dCamRight, rx, y) : 0;
-    dDisp(x,c) = min(sqrt(score/Score::area) * 2.0f, 255.0f);
+
+    const unsigned char mindisp = dDisp(x,y);
+    const float show = sqrt(score / Score::area) / 255.0f;
+
+    dScore(x,c) = show * make_float4( 1,1,1,1);
 }
 
 void DisparityImageCrossSection(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int y
+    Image<float4> dScore, Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int y
 ) {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDisparityImageCrossSection<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDisp, dCamLeft.Row(y), dCamRight.Row(y));
+    InitDimFromOutputImage(blockDim,gridDim, dScore);
+    KernDisparityImageCrossSection<float4, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dScore, dDisp, dCamLeft, dCamRight, y);
 }
 
 //////////////////////////////////////////////////////

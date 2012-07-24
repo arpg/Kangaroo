@@ -17,6 +17,8 @@
 #include <npp.h>
 #endif // HAVE_NPP
 
+#include "sampling.h"
+
 namespace Gpu
 {
 
@@ -210,10 +212,37 @@ struct Image {
         return ptr[y*stride + x];
     }
 
+    template<typename TR>
+    inline __device__ __host__
+    const TR GetBicubic(float u, float v) const
+    {
+        return bicubic_discrete<TR,T>(ptr, stride, u, v);
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    const TR GetBilinear(float u, float v) const
+    {
+        return bilinear_discrete<TR,T>(ptr, stride, u, v);
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    const TR GetNearestNeighbour(float u, float v) const
+    {
+        return nearestneighbour_discrete<TR,T>(ptr, stride, u, v);
+    }
+
     inline  __device__ __host__
     bool InBounds(int x, int y) const
     {
         return 0 <= x && x < w && 0 <= y && y < h;
+    }
+
+    inline  __device__ __host__
+    bool InBounds(float x, float y, float border) const
+    {
+        return border <= x && x < (w-border) && border <= y && y < (h-border);
     }
 
     template <typename DT>

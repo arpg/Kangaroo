@@ -73,6 +73,28 @@ struct Mat
         Fill(0);
     }
 
+    template<unsigned NR>
+    inline __device__ __host__ Mat<P,NR,1> Head() {
+        // TODO: static assert NR <= R;
+        Mat<P,NR,1> ret;
+        #pragma unroll
+        for( int i=0; i<R; ++i )
+            ret[i] = m[i];
+        return ret;
+    }
+
+    template<unsigned NR, unsigned NC>
+    inline __device__ __host__ Mat<P,NR,NC> Block(unsigned rs, unsigned cs) {
+        // TODO: static assert NR <= R, NC <= C;
+        Mat<P,NR,NC> ret;
+
+        for( int r=0; r<NR; ++r )
+            #pragma unroll
+            for( int c=0; c<NC; ++c )
+                ret[r*NC + c] = m[(rs+r)*NC + cs+c];
+        return ret;
+    }
+
 #ifdef USE_EIGEN
 
     inline __host__ Mat() {

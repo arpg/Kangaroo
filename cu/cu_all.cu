@@ -14,3 +14,4 @@
 #include "cu_patch_score.h"
 #include "cu_dense_stereo.h"
 #include "cu_heightmap.h"
+#include "cu_model_refinement.h"

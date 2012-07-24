@@ -50,8 +50,8 @@ public:
 
     void WindowToImage(const Viewport& v, int wx, int wy, float& ix, float& iy )
     {
-        ix = img_w * (wx - v.l) /(float)v.w;
-        iy = img_h * (wy - v.b) /(float)v.h;
+        ix = img_w * (wx - v.l) /(float)v.w - 0.5;
+        iy = img_h * (wy - v.b) /(float)v.h - 0.5;
         ix = std::max(0.0f,std::min(ix, img_w-1.0f));
         iy = std::max(0.0f,std::min(iy, img_h-1.0f));
     }
@@ -93,9 +93,9 @@ public:
     virtual void Mouse(View& view, MouseButton button, int x, int y, bool pressed, int button_state)
     {
         if(button == MouseWheelUp) {
-            pixel_scale *= 1.01;
+            pixel_scale *= 1.02;
         }else if(button == MouseWheelDown) {
-            pixel_scale *= 0.99;
+            pixel_scale *= 0.98;
         }else{
             WindowToImage(view.v, x,y, topleft[0], topleft[1]);
             selected = (button == pangolin::MouseButtonLeft);
@@ -137,8 +137,8 @@ public:
             if(imageSelect->IsSelected()) {
                 glColor3f(1,0,0);
                 Eigen::Vector2d p = imageSelect->GetSelectedPoint();
-                p[0] = p[0] * 2.0 / glTex.width - 1;
-                p[1] = p[1] * 2.0 / glTex.height - 1;
+                p[0] = (p[0]+0.5) * 2.0 / glTex.width - 1;
+                p[1] = (p[1]+0.5) * 2.0 / glTex.height - 1;
                 DrawCross(p);
                 glColor3f(1,1,1);
             }
@@ -268,7 +268,8 @@ int main( int /*argc*/, char* argv[] )
     const unsigned int nh = img[0].height();
 
     // Downsample this image to process less pixels
-    const int level = GetLevelFromMaxPixels( nw, nh, 320*240 ); //640*480 );
+//    const int level = GetLevelFromMaxPixels( nw, nh, 320*240 ); //640*480 );
+    const int level = 4;
 
     // Find centered image crop which aligns to 16 pixels
     const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16 << level,16 << level);
@@ -345,8 +346,8 @@ int main( int /*argc*/, char* argv[] )
 
     GlTextureCudaArray tex8LeftImg(w,h,GL_LUMINANCE8, false);
     GlTextureCudaArray tex8RightImg(w,h,GL_LUMINANCE8, false);
-    GlTextureCudaArray tex8DispCross(w,h,GL_LUMINANCE8, false);
     GlTextureCudaArray texfDisp(w,h,GL_LUMINANCE32F_ARB, false);
+    GlTextureCudaArray texf4Debug(w,h,GL_RGBA_FLOAT32_APPLE, false);
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -377,13 +378,14 @@ int main( int /*argc*/, char* argv[] )
     Image<float, TargetDevice, Manage>  dDisp(w,h);
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
     Image<float4, TargetDevice, Manage>  d3d(w,h);
-    Image<unsigned char, TargetDevice,Manage> dScratch(w*4*11,h);
+    Image<unsigned char, TargetDevice,Manage> dScratch(w*4*30,h);
+    Image<float4, TargetDevice, Manage>  dDebugf4(w,h);
     Image<float, TargetDevice, Manage>  dErr(w,h);
 
 
     // heightmap size calculation
-    double dHeightMapWidthMeters = 200;
-    double dHeightMapHeightMeters = 200;
+    double dHeightMapWidthMeters = 100;
+    double dHeightMapHeightMeters = 100;
     double dPixelsPerMeter = 10;
     double w_hm = dHeightMapWidthMeters*dPixelsPerMeter;
     double h_hm = dHeightMapHeightMeters*dPixelsPerMeter;
@@ -451,6 +453,8 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
     Var<bool> show_heightmap("ui.show heightmap", false, true);
+    Var<bool> cross_section("ui.Cross Section", false, true);
+    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
@@ -482,7 +486,7 @@ int main( int /*argc*/, char* argv[] )
     container[0].SetDrawFunction(ActivateDrawTexture(tex8LeftImg, true)).SetHandler(&handler2d);
     container[1].SetDrawFunction(ActivateDrawTexture(tex8RightImg, true)).SetHandler(&handler2d);
     container[2].SetDrawFunction(ActivateDrawTexture(texfDisp, true)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(ActivateDrawTexture(tex8DispCross, true)).SetHandler(new Handler2dImageSelect(w,h));
+    container[3].SetDrawFunction(ActivateDrawTexture(texf4Debug, true)).SetHandler(new Handler2dImageSelect(w,h));
     container[4].SetDrawFunction(ActivateDrawTexture(tex_hm, true)).SetHandler(new Handler2dImageSelect(w,h));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
@@ -524,6 +528,7 @@ int main( int /*argc*/, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
+            // Compute dense stereo
             DenseStereo(dDispInt, dCamImg[0], dCamImg[1], maxDisp, stereoAcceptThresh);
 
             if(subpix) {
@@ -598,6 +603,14 @@ int main( int /*argc*/, char* argv[] )
                 }
             }
 
+            if(pose_refinement) {
+                // attempt to reestimate baseline from depthmap
+                // Compute Pose
+                Eigen::Matrix<double, 3,4> KT_rl = K * T_rl.matrix3x4();
+                LeastSquaresSystem<float,6> sys = PoseRefinementFromDepthmap(dCamImg[1], dCamImg[0], d3d, KT_rl, 1E10, dScratch, dDebugf4);
+                texf4Debug << dDebugf4;
+            }
+
             // Copy point cloud into VBO
             {
                 CudaScopedMappedPtr var(vbo);
@@ -621,8 +634,10 @@ int main( int /*argc*/, char* argv[] )
             texfDisp << dDisp;
         }
 
-        DisparityImageCrossSection(dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPoint(true)[1]);
-        tex8DispCross << dDispInt;
+        if(cross_section) {
+            DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPoint(true)[1] + 0.5);
+            texf4Debug << dDebugf4;
+        }
 
         /////////////////////////////////////////////////////////////
         // Perform drawing

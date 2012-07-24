@@ -66,7 +66,7 @@ void DenseStereoSubpixelRefine(Image<float> dDispOut, const Image<unsigned char>
 //////////////////////////////////////////////////////
 
 void DisparityImageCrossSection(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int y
+    Image<float4> dScore, Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int y
 );
 
 //////////////////////////////////////////////////////
@@ -78,6 +78,15 @@ void DisparityImageToVbo(
 //////////////////////////////////////////////////////
 
 void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo);
+
+//////////////////////////////////////////////////////
+
+LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float4> dPr,
+    const Mat<float,3,4> KT_lr, float c,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug
+);
 
 //////////////////////////////////////////////////////
 
