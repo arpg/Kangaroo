@@ -17,6 +17,7 @@
 #include <npp.h>
 #endif // HAVE_NPP
 
+#include "Mat.h"
 #include "sampling.h"
 
 namespace Gpu
@@ -214,23 +215,67 @@ struct Image {
 
     template<typename TR>
     inline __device__ __host__
-    const TR GetBicubic(float u, float v) const
+    TR GetBicubic(float u, float v) const
     {
         return bicubic_discrete<TR,T>(ptr, stride, u, v);
     }
 
     template<typename TR>
     inline __device__ __host__
-    const TR GetBilinear(float u, float v) const
+    TR GetBilinear(float u, float v) const
     {
         return bilinear_discrete<TR,T>(ptr, stride, u, v);
     }
 
     template<typename TR>
     inline __device__ __host__
-    const TR GetNearestNeighbour(float u, float v) const
+    TR GetNearestNeighbour(float u, float v) const
     {
         return nearestneighbour_discrete<TR,T>(ptr, stride, u, v);
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    TR GetCentralDiffDx(int x, int y) const
+    {
+        const T* ptrl = ptr + y*stride + (x-1);
+        return ((TR)ptrl[2] - (TR)ptrl[0]) / (TR)2;
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    TR GetCentralDiffDy(int x, int y) const
+    {
+        const T* ptrb = ptr + (y-1)*stride + x;
+        return ((TR)ptrb[2*stride] - (TR)ptrb[0]) / (TR)2;
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    Mat<TR,1,2> GetCentralDiff(float px, float py) const
+    {
+        // TODO: Make more efficient by expanding GetCentralDiff calls
+        const int ix = floor(px);
+        const int iy = floor(py);
+        const float fx = px - ix;
+        const float fy = py - iy;
+
+        const int b = py;   const int l = px;
+        const int t = py+1; const int r = px+1;
+
+        TR tldx = GetCentralDiffDx<TR>(l,t);
+        TR trdx = GetCentralDiffDx<TR>(r,t);
+        TR bldx = GetCentralDiffDx<TR>(l,b);
+        TR brdx = GetCentralDiffDx<TR>(r,b);
+        TR tldy = GetCentralDiffDy<TR>(l,t);
+        TR trdy = GetCentralDiffDy<TR>(r,t);
+        TR bldy = GetCentralDiffDy<TR>(l,b);
+        TR brdy = GetCentralDiffDy<TR>(r,b);
+
+        Mat<TR,1,2> res;
+        res(0) = lerp(lerp(bldx,brdx,fx), lerp(tldx,trdx,fx), fy);
+        res(1) = lerp(lerp(bldy,brdy,fx), lerp(tldy,trdy,fx), fy);
+        return res;
     }
 
     inline  __device__ __host__

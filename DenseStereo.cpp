@@ -268,8 +268,8 @@ int main( int /*argc*/, char* argv[] )
     const unsigned int nh = img[0].height();
 
     // Downsample this image to process less pixels
-//    const int level = GetLevelFromMaxPixels( nw, nh, 320*240 ); //640*480 );
-    const int level = 4;
+    const int level = GetLevelFromMaxPixels( nw, nh, 320*240 ); //640*480 );
+//    const int level = 4;
 
     // Find centered image crop which aligns to 16 pixels
     const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16 << level,16 << level);
@@ -607,7 +607,12 @@ int main( int /*argc*/, char* argv[] )
                 // attempt to reestimate baseline from depthmap
                 // Compute Pose
                 Eigen::Matrix<double, 3,4> KT_rl = K * T_rl.matrix3x4();
-                LeastSquaresSystem<float,6> sys = PoseRefinementFromDepthmap(dCamImg[1], dCamImg[0], d3d, KT_rl, 1E10, dScratch, dDebugf4);
+                Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementFromDepthmap(dCamImg[1], dCamImg[0], d3d, KT_rl, 1E10, dScratch, dDebugf4);
+                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
+                cout << x.transpose() << endl;
+//                if( x.norm() > 1 ) x = x / x.norm();
+                T_rl = T_rl * Sophus::SE3::exp(x);
                 texf4Debug << dDebugf4;
             }
 
