@@ -39,7 +39,7 @@ include_directories( ${NODE_INCLUDE_DIRS} )
 PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
-LIST(APPEND COMMON_SRC common/DisplayUtils.h common/RpgCameraOpen.h)
+LIST(APPEND COMMON_SRC common/DisplayUtils.h common/RpgCameraOpen.h common/ImageSelect.h common/LeastSquaresBlockHelpers.h common/ViconTracker.h)
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
   SET(CMAKE_CXX_FLAGS "-std=c++0x -g")
@@ -117,6 +117,12 @@ if(CUDA_FOUND)
   if( BuildDenseStereo )
       cuda_add_executable( DenseStereo ${CU_COMMON_SRC} ${COMMON_SRC} DenseStereo.cpp common/ScanlineRectify.h )
       target_link_libraries( DenseStereo ${CUDA_npp_LIBRARY} )
+  endif()
+
+  set( BuildKinectHeightmap true CACHE "" force )
+  if( BuildKinectHeightmap )
+      cuda_add_executable( KinectHeightmap ${CU_COMMON_SRC} ${COMMON_SRC} KinectHeightmap.cpp common/ScanlineRectify.h )
+      target_link_libraries( KinectHeightmap ${CUDA_npp_LIBRARY} )
   endif()
 
   set( BuildBilateralFilter true CACHE "" force )

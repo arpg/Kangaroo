@@ -39,20 +39,6 @@ inline void glDrawGrid(float num_lines, float line_delta)
     glEnd();
 }
 
-inline void glDrawAxis(float s)
-{
-  glBegin(GL_LINES);
-  glColor3f(1,0,0);
-  glVertex3f(0,0,0);
-  glVertex3f(s,0,0);
-  glColor3f(0,1,0);
-  glVertex3f(0,0,0);
-  glVertex3f(0,s,0);
-  glColor3f(0,0,1);
-  glVertex3f(0,0,0);
-  glVertex3f(0,0,s);
-  glEnd();
-}
 
 int main( int /*argc*/, char* argv[] )
 {

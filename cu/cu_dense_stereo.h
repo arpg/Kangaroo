@@ -164,6 +164,34 @@ void DisparityImageToVbo(Image<float4> dVbo, const Image<float> dDisp, double ba
 }
 
 //////////////////////////////////////////////////////
+// Kinect depthmap to vertex array
+//////////////////////////////////////////////////////
+
+__global__ void KernKinectToVbo(
+    Image<float4> dVbo, const Image<unsigned short> dKinectDepth, double fu, double fv, double u0, double v0
+) {
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const float invalid = 0.0f / 0.0f;
+
+    const float kd = dKinectDepth(u,v);
+    const float z = (kd > 0) ? -kd / 1000.0 : invalid;
+
+    // (x,y,1) = kinv * (u,v,1)'
+    const float x = -z * (u-u0) / fu;
+    const float y = z * (v-v0) / fv;
+
+    dVbo(u,v) = make_float4(x,y,z,1);
+}
+
+void KinectToVbo(Image<float4> dVbo, const Image<unsigned short> dKinectDepth, double fu, double fv, double u0, double v0)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dVbo);
+    KernKinectToVbo<<<gridDim,blockDim>>>(dVbo, dKinectDepth, fu, fv, u0, v0);
+}
+
+//////////////////////////////////////////////////////
 // Make Index Buffer for rendering
 //////////////////////////////////////////////////////
 

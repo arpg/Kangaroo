@@ -71,6 +71,10 @@ void DisparityImageCrossSection(
 
 //////////////////////////////////////////////////////
 
+void KinectToVbo(
+    Image<float4> dVbo, const Image<unsigned short> dKinectDepth, double fu, double fv, double u0, double v0
+);
+
 void DisparityImageToVbo(
     Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
 );

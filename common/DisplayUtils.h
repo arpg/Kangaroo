@@ -14,6 +14,17 @@ inline void operator<<(pangolin::GlTextureCudaArray& tex, const Gpu::Image<T,Gpu
     }
 }
 
+inline void RenderMesh(pangolin::GlBufferCudaPtr& vbo, int w, int h)
+{
+    vbo.Bind();
+    glVertexPointer(4, GL_FLOAT, 0, 0);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glPointSize(2.0);
+    glDrawArrays(GL_POINTS, 0, w * h);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    vbo.Unbind();
+}
+
 inline void RenderMesh(pangolin::GlBufferCudaPtr& ibo, pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& cbo, int w, int h, bool draw_mesh = true, bool draw_color = true)
 {
     if(draw_color) {
