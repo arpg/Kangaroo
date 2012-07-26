@@ -363,8 +363,8 @@ struct Image {
     inline __device__ __host__
     Image<TP,Target,DontManage> PackedImage(int width, int height)
     {
-        assert(width*height*sizeof(TP) <= w*h*sizeof(T) );
-        return Image<TP,Target,DontManage>((TP*)ptr, width, height, width);
+        assert(width*height*sizeof(TP) <= h*pitch );
+        return Image<TP,Target,DontManage>((TP*)ptr, width, height, width*sizeof(TP) );
     }
 
 #ifdef HAVE_NPP
@@ -403,7 +403,7 @@ struct Image {
 
     inline __device__ __host__
     typename Gpu::ThrustType<T,Target>::Ptr end() {
-        return (typename Gpu::ThrustType<T,Target>::Ptr)( RowPtr(h) );
+        return (typename Gpu::ThrustType<T,Target>::Ptr)( RowPtr(h-1) + w );
     }
 
     inline __host__
