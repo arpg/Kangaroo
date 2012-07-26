@@ -5,6 +5,42 @@
 namespace Gpu {
 
 //////////////////////////////////////////////////////
+// Additional lerp definitions for integral vector types
+//////////////////////////////////////////////////////
+
+inline __device__ __host__ float lerp(unsigned char a, unsigned char b, float t)
+{
+    return (float)a + t*((float)b-(float)a);
+}
+
+inline __device__ __host__ float2 lerp(uchar2 a, uchar2 b, float t)
+{
+    return make_float2(
+        a.x + t*(b.x-a.x),
+        a.y + t*(b.y-a.y)
+    );
+}
+
+inline __device__ __host__ float3 lerp(uchar3 a, uchar3 b, float t)
+{
+    return make_float3(
+        a.x + t*(b.x-a.x),
+        a.y + t*(b.y-a.y),
+        a.z + t*(b.z-a.z)
+    );
+}
+
+inline __device__ __host__ float4 lerp(uchar4 a, uchar4 b, float t)
+{
+    return make_float4(
+        a.x + t*(b.x-a.x),
+        a.y + t*(b.y-a.y),
+        a.z + t*(b.z-a.z),
+        a.w + t*(b.w-a.w)
+    );
+}
+
+//////////////////////////////////////////////////////
 // Sampling
 //////////////////////////////////////////////////////
 

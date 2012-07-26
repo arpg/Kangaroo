@@ -79,6 +79,9 @@ void DisparityImageToVbo(
     Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
 );
 
+void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd );
+
+
 //////////////////////////////////////////////////////
 
 void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo);

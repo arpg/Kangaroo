@@ -191,6 +191,36 @@ void KinectToVbo(Image<float4> dVbo, const Image<unsigned short> dKinectDepth, d
     KernKinectToVbo<<<gridDim,blockDim>>>(dVbo, dKinectDepth, fu, fv, u0, v0);
 }
 
+__global__ void KernColourVbo(
+    Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc,
+    Mat<float,3,4> KT_cd
+) {
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float4 Pd4 = dPd(u,v);
+    const Mat<float,4,1> Pd = {-Pd4.x, Pd4.y, Pd4.z, 1};
+    const Mat<float,3,1> KPc = KT_cd * Pd;
+
+    const Mat<float,2,1> pc = { KPc(0) / KPc(2), KPc(1) / KPc(2) };
+
+    uchar4 Id;
+    if( dIc.InBounds(pc(0), pc(1), 1) ) {
+        const float3 v = dIc.GetBilinear<float3>(pc(0), pc(1));
+        Id = make_uchar4(v.z, v.y, v.x, 255);
+    }else{
+        Id = make_uchar4(0,0,0,0);
+    }
+    dId(u,v) = Id;
+}
+
+void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd )
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dId);
+    KernColourVbo<<<gridDim,blockDim>>>(dId, dPd, dIc, KT_cd);
+}
+
 //////////////////////////////////////////////////////
 // Make Index Buffer for rendering
 //////////////////////////////////////////////////////

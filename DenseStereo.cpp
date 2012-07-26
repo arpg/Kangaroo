@@ -457,6 +457,9 @@ int main( int /*argc*/, char* argv[] )
                 Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementFromDepthmap(dCamImg[1], dCamImg[0], d3d, KT_rl, 1E10, dScratch, dDebugf4);
                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
+                cout << "--------------------------------------" << endl;
+                cout << ((Eigen::Matrix<double,6,6>)lss.JTJ).transpose() << endl << endl;
+                cout << ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() << endl << endl;
                 cout << x.transpose() << endl;
 //                if( x.norm() > 1 ) x = x / x.norm();
                 T_rl = T_rl * Sophus::SE3::exp(x);
@@ -520,7 +523,7 @@ int main( int /*argc*/, char* argv[] )
             glMatrixMode(GL_MODELVIEW);
             glPushMatrix();
             glMultMatrix( T_hw.inverse() );
-            RenderMesh(ibo_hm,vbo_hm,cbo_hm, w_hm, h_hm, show_mesh, show_color);
+            RenderVbo(ibo_hm,vbo_hm,cbo_hm, w_hm, h_hm, show_mesh, show_color);
             glPopMatrix();
         }
 
@@ -528,7 +531,7 @@ int main( int /*argc*/, char* argv[] )
         {
             glSetFrameOfReferenceF(T_wc);
             if(show_depthmap) {
-                RenderMesh(ibo,vbo,cbo, w, h, show_mesh, show_color);
+                RenderVbo(ibo,vbo,cbo, w, h, show_mesh, show_color);
             }
             glColor3f(1.0,1.0,1.0);
             DrawFrustrum(Kinv,w,h,-1.0);

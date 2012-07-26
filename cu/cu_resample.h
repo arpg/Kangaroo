@@ -53,7 +53,7 @@ __global__ void KernBoxHalf( Image<To> out, const Image<Ti> in )
     const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const Ti* tl = &in(2*x,2*y);
-    const Ti* bl = tl + in.stride;
+    const Ti* bl = &in(2*x,2*y+1);
 
     out(x,y) = (To)((UpType)(*tl + *(tl+1) + *bl + *(bl+1)) / 4.0f);
 }

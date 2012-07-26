@@ -92,8 +92,7 @@ __global__ void KernWarp(
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float2 lu = lookup(x,y);
-    out(x,y) = in.GetBicubic<float>(lu.x, lu.y);
-    //bicubic_continuous<float,unsigned char>((unsigned char*)in.ptr, in.stride, lu.x, lu.y);
+    out(x,y) = in.GetBilinear<float>(lu.x, lu.y);
 }
 
 void Warp(

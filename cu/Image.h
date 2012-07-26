@@ -116,8 +116,8 @@ inline T clamp(T vmin, T vmax, T v) {
 }
 
 
-//! Simple templated strided image type for use with Cuda
-//! Type encapsulates ptr, pitch, stride, width and height
+//! Simple templated pitched image type for use with Cuda
+//! Type encapsulates ptr, pitch, width and height
 //! Instantiate Image<T,Target,ManagementAllocDealloc> to handle memory allocation
 template<typename T, typename Target = TargetDevice, typename Management = DontManage>
 struct Image {
@@ -130,14 +130,14 @@ struct Image {
 
     template<typename ManagementCopyFrom> inline __host__ __device__
     Image( const Image<T,Target,ManagementCopyFrom>& img )
-        : ptr(img.ptr), pitch(img.pitch), stride(img.stride), w(img.w), h(img.h)
+        : ptr(img.ptr), pitch(img.pitch), w(img.w), h(img.h)
     {
         Management::AssignmentCheck();
     }
 
     inline __host__
     Image()
-        :w(0), h(0), pitch(0), stride(0), ptr(0)
+        :w(0), h(0), pitch(0), ptr(0)
     {
     }
 
@@ -147,30 +147,29 @@ struct Image {
     {
         Management::AllocateCheck();
         Target::template AllocatePitchedMem<T>(&ptr,&pitch,w,h);
-        stride = pitch / sizeof(T);
     }
 
     inline __device__ __host__
     Image(T* ptr)
-        :ptr(ptr), pitch(0), stride(0), w(0), h(0)
+        :ptr(ptr), pitch(0), w(0), h(0)
     {
     }
 
     inline __device__ __host__
     Image(T* ptr, size_t w)
-        :ptr(ptr), pitch(sizeof(T)*w), stride(w), w(w), h(0)
+        :ptr(ptr), pitch(sizeof(T)*w), w(w), h(0)
     {
     }
 
     inline __device__ __host__
     Image(T* ptr, size_t w, size_t h)
-        :ptr(ptr), pitch(sizeof(T)*w), stride(w), w(w), h(h)
+        :ptr(ptr), pitch(sizeof(T)*w), w(w), h(h)
     {
     }
 
     inline __device__ __host__
-    Image(T* ptr, size_t w, size_t h, size_t stride)
-        :ptr(ptr), pitch(sizeof(T)*stride), stride(stride), w(w), h(h)
+    Image(T* ptr, size_t w, size_t h, size_t pitch)
+        :ptr(ptr), pitch(pitch), w(w), h(h)
     {
     }
 
@@ -182,9 +181,27 @@ struct Image {
     }
 
     inline  __device__ __host__
+    T* RowPtr(size_t y)
+    {
+        return (T*)((unsigned char*)(ptr) + y*pitch);
+    }
+
+    inline  __device__ __host__
+    const T* RowPtr(size_t y) const
+    {
+        return (T*)((unsigned char*)(ptr) + y*pitch);
+    }
+
+    inline  __device__ __host__
     T& operator()(size_t x, size_t y)
     {
-        return ptr[y*stride + x];
+        return RowPtr(y)[x];
+    }
+
+    inline  __device__ __host__
+    const T& operator()(size_t x, size_t y) const
+    {
+        return RowPtr(y)[x];
     }
 
     inline  __device__ __host__
@@ -194,15 +211,15 @@ struct Image {
     }
 
     inline  __device__ __host__
-    const T& operator()(size_t x, size_t y) const
-    {
-        return ptr[y*stride + x];
-    }
-
-    inline  __device__ __host__
     const T& operator[](size_t ix) const
     {
         return ptr[ix];
+    }
+
+    inline  __device__ __host__
+    const T& Get(int x, int y) const
+    {
+        return RowPtr(y)[x];
     }
 
     inline  __device__ __host__
@@ -210,44 +227,47 @@ struct Image {
     {
         x = Gpu::clamp<int>(0,w-1,x);
         y = Gpu::clamp<int>(0,h-1,y);
-        return ptr[y*stride + x];
-    }
-
-    template<typename TR>
-    inline __device__ __host__
-    TR GetBicubic(float u, float v) const
-    {
-        return bicubic_discrete<TR,T>(ptr, stride, u, v);
+        return RowPtr(y)[x];
     }
 
     template<typename TR>
     inline __device__ __host__
     TR GetBilinear(float u, float v) const
     {
-        return bilinear_discrete<TR,T>(ptr, stride, u, v);
+        const float ix = floorf(u);
+        const float iy = floorf(v);
+        const float fx = u - ix;
+        const float fy = v - iy;
+
+        const T* bl = RowPtr(iy)  + (size_t)ix;
+        const T* tl = RowPtr(iy+1)+ (size_t)ix;
+
+        return lerp(
+            lerp( bl[0], bl[1], fx ),
+            lerp( tl[0], tl[1], fx ),
+            fy
+        );
     }
 
-    template<typename TR>
     inline __device__ __host__
-    TR GetNearestNeighbour(float u, float v) const
+    T GetNearestNeighbour(float u, float v) const
     {
-        return nearestneighbour_discrete<TR,T>(ptr, stride, u, v);
+        return Get(u+0.5, v+0.5);
     }
 
     template<typename TR>
     inline __device__ __host__
     TR GetCentralDiffDx(int x, int y) const
     {
-        const T* ptrl = ptr + y*stride + (x-1);
-        return ((TR)ptrl[2] - (TR)ptrl[0]) / (TR)2;
+        const T* row = RowPtr(y);
+        return ((TR)row[x+1] - (TR)row[x-1]) / (TR)2;
     }
 
     template<typename TR>
     inline __device__ __host__
     TR GetCentralDiffDy(int x, int y) const
     {
-        const T* ptrb = ptr + (y-1)*stride + x;
-        return ((TR)ptrb[2*stride] - (TR)ptrb[0]) / (TR)2;
+        return ((TR)Get(x,y+1) - (TR)Get(x,y-1)) / (TR)2;
     }
 
     template<typename TR>
@@ -305,10 +325,17 @@ struct Image {
     }
 
     inline __device__ __host__
-    Image<T,Target,DontManage> SubImage(int x, int y, int width, int height) const
+    const Image<T,Target,DontManage> SubImage(int x, int y, int width, int height) const
     {
         assert( (x+width) <= w && (y+height) <= h);
-        return Image<T,Target,DontManage>(ptr + y*stride + x, width, height, stride);
+        return Image<T,Target,DontManage>( RowPtr(y)+x, width, height, pitch);
+    }
+
+    inline __device__ __host__
+    Image<T,Target,DontManage> SubImage(int x, int y, int width, int height)
+    {
+        assert( (x+width) <= w && (y+height) <= h);
+        return Image<T,Target,DontManage>( RowPtr(y)+x, width, height, pitch);
     }
 
     inline __device__ __host__
@@ -327,10 +354,10 @@ struct Image {
     Image<T,Target,DontManage> SubImage(int width, int height)
     {
         assert(width <= w && height <= h);
-        return Image<T,Target,DontManage>(ptr, width, height, stride);
+        return Image<T,Target,DontManage>(ptr, width, height, pitch);
     }
 
-    //! Ignore this images stride - just return new image of
+    //! Ignore this images pitch - just return new image of
     //! size w x h which uses this memory
     template<typename TP>
     inline __device__ __host__
@@ -344,13 +371,13 @@ struct Image {
     inline __device__ __host__
     Image<T,Target,DontManage> SubImage(const NppiRect& region)
     {
-        return Image<T,Target,DontManage>(&(this->operator ()(region.x,region.y)), region.width, region.height, stride);
+        return Image<T,Target,DontManage>(RowPtr(region.y)+region.x, region.width, region.height, pitch);
     }
 
     inline __device__ __host__
     Image<T,Target,DontManage> SubImage(const NppiSize& size)
     {
-        return Image<T,Target,DontManage>(ptr, size.width,size.height, stride);
+        return Image<T,Target,DontManage>(ptr, size.width,size.height, pitch);
     }
 
     inline __host__
@@ -376,7 +403,7 @@ struct Image {
 
     inline __device__ __host__
     typename Gpu::ThrustType<T,Target>::Ptr end() {
-        return (typename Gpu::ThrustType<T,Target>::Ptr)(ptr + (h*stride) );
+        return (typename Gpu::ThrustType<T,Target>::Ptr)( RowPtr(h) );
     }
 
     inline __host__
@@ -388,7 +415,6 @@ struct Image {
 
     T* ptr;
     size_t pitch;
-    size_t stride;
     size_t w;
     size_t h;
 };
