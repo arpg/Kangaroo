@@ -9,7 +9,7 @@ namespace Gpu
 
 template<typename To, typename Ti>
 __global__ void KernRobustBilateralFilter(
-    Image<To> dOut, Image<Ti> dIn, float gs, float gr, float go, int size
+    Image<To> dOut, const Image<Ti> dIn, float gs, float gr, float go, int size
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -69,7 +69,7 @@ __global__ void KernRobustBilateralFilter(
 }
 
 void RobustBilateralFilter(
-    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, float go, uint size
+    Image<float> dOut, const Image<unsigned char> dIn, float gs, float gr, float go, uint size
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dOut);
@@ -82,7 +82,7 @@ void RobustBilateralFilter(
 
 template<typename To, typename Ti>
 __global__ void KernBilateralFilter(
-    Image<To> dOut, Image<Ti> dIn, float gs, float gr, int size
+    Image<To> dOut, const Image<Ti> dIn, float gs, float gr, int size
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -111,7 +111,7 @@ __global__ void KernBilateralFilter(
 }
 
 void BilateralFilter(
-    Image<float> dOut, Image<float> dIn, float gs, float gr, uint size
+    Image<float> dOut, const Image<float> dIn, float gs, float gr, uint size
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dOut);
@@ -119,11 +119,19 @@ void BilateralFilter(
 }
 
 void BilateralFilter(
-    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, uint size
+    Image<float> dOut, const Image<unsigned char> dIn, float gs, float gr, uint size
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dOut);
     KernBilateralFilter<float,unsigned char><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
+}
+
+void BilateralFilter(
+    Image<float> dOut, const Image<unsigned short> dIn, float gs, float gr, uint size
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut);
+    KernBilateralFilter<float,unsigned short><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
 }
 
 }

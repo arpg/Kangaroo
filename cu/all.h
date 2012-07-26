@@ -71,9 +71,8 @@ void DisparityImageCrossSection(
 
 //////////////////////////////////////////////////////
 
-void KinectToVbo(
-    Image<float4> dVbo, const Image<unsigned short> dKinectDepth, double fu, double fv, double u0, double v0
-);
+void KinectToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, double fu, double fv, double u0, double v0);
+void KinectToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, double fu, double fv, double u0, double v0);
 
 void DisparityImageToVbo(
     Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
@@ -102,15 +101,19 @@ LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, Mat<float,3,3> 
 //////////////////////////////////////////////////////
 
 void BilateralFilter(
-    Image<float> dOut, Image<float> dIn, float gs, float gr, uint size
+    Image<float> dOut, const Image<float> dIn, float gs, float gr, uint size
 );
 
 void BilateralFilter(
-    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, uint size
+    Image<float> dOut, const Image<unsigned char> dIn, float gs, float gr, uint size
+);
+
+void BilateralFilter(
+    Image<float> dOut, const Image<unsigned short> dIn, float gs, float gr, uint size
 );
 
 void RobustBilateralFilter(
-    Image<float> dOut, Image<unsigned char> dIn, float gs, float gr, float go, uint size
+    Image<float> dOut, const Image<unsigned char> dIn, float gs, float gr, float go, uint size
 );
 
 //////////////////////////////////////////////////////

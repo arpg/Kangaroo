@@ -62,6 +62,7 @@ int main( int /*argc*/, char* argv[] )
     const int h = img[0].height();
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
+    Image<float, TargetDevice, Manage> dKinectf(w,h);
     Image<uchar3, TargetDevice, Manage> dRgb8(w,h);
     Image<float4, TargetDevice, Manage>  d3d(w,h);
 
@@ -95,6 +96,11 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> run("ui.run", true, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
 
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+    Var<float> gs("ui.gs",2, 1E-3, 5);
+    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -109,7 +115,13 @@ int main( int /*argc*/, char* argv[] )
             dRgb8.CopyFrom(hRgb8);
             dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
 
-            KinectToVbo(d3d, dKinect, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
+            if(applyBilateralFilter) {
+                BilateralFilter(dKinectf,dKinect,gs,gr,bilateralWinSize);
+            }else{
+                ConvertImage<float,unsigned short>(dKinectf, dKinect);
+            }
+
+            KinectToVbo(d3d, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
 
             texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
             texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
@@ -123,7 +135,7 @@ int main( int /*argc*/, char* argv[] )
             {
                 CudaScopedMappedPtr var(cbo);
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_dc.matrix3x4();
+                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_dc.inverse().matrix3x4();
                 ColourVbo(dCbo, d3d, dRgb8, KT_cd);
             }
         }
