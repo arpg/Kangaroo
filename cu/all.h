@@ -80,6 +80,7 @@ void DisparityImageToVbo(
 
 void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd );
 
+void NormalsFromVbo(Image<float4> dN, const Image<float4> dV);
 
 //////////////////////////////////////////////////////
 
@@ -91,6 +92,13 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float4> dPr,
     const Mat<float,3,4> KT_lr, float c,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug
+);
+
+LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
+    const Image<float4> dPl,
+    const Image<float4> dPr, const Image<float4> dNr,
+    const Mat<float,3,4> KT_lr, const Mat<float,3,4> T_rl, float c,
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 

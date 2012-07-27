@@ -110,5 +110,39 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
     return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
 }
 
+__global__ void KernPoseRefinementProjectiveIcpPointPlane(
+    const Image<float4> dPl,
+    const Image<float4> dPr, const Image<float4> dNr,
+    const Mat<float,3,4> KT_lr, const Mat<float,3,4> T_rl, float c,
+    Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug
+) {
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    LeastSquaresSystem<float,6> sum;
+    sum.SetZero();
+
+    dSum(u,v) = sum;
+    dDebug(u,v) = make_float4(u/(float)dPl.w,v/(float)dPl.h,0,1);
+}
+
+
+LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
+    const Image<float4> dPl,
+    const Image<float4> dPr, const Image<float4> dNr,
+    const Mat<float,3,4> KT_lr, const Mat<float,3,4> T_rl, float c,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug
+){
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dPl);
+    Image<LeastSquaresSystem<float,6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,6> >(dPl.w, dPl.h);
+
+    KernPoseRefinementProjectiveIcpPointPlane<<<gridDim,blockDim>>>(dPl, dPr, dNr, KT_lr, T_rl, c, dSum, dDebug );
+
+    LeastSquaresSystem<float,6> sum;
+    sum.SetZero();
+    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
+}
+
 
 }

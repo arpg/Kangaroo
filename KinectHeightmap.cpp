@@ -64,19 +64,24 @@ int main( int /*argc*/, char* argv[] )
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
     Image<float, TargetDevice, Manage> dKinectf(w,h);
     Image<uchar3, TargetDevice, Manage> dRgb8(w,h);
-    Image<float4, TargetDevice, Manage>  d3d(w,h);
+    Image<float4, TargetDevice, Manage>  dV(w,h);
+    Image<float4, TargetDevice, Manage>  dN(w,h);
+    Image<float4, TargetDevice, Manage>  dDebug(w,h);
+    Image<unsigned char, TargetDevice,Manage> dScratch(w*4*30,h);
 
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
     GlTexture texrgb(w,h,GL_RGB8, false);
     GlTextureCudaArray texdepth(w,h,GL_INTENSITY16, false);
+    GlTextureCudaArray texnorm(w,h,GL_RGBA32F_ARB, false);
+    GlTextureCudaArray texdebug(w,h,GL_RGBA32F_ARB, false);
 
     GlBufferCudaPtr vbo(GlArrayBuffer, w*h*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo(GlArrayBuffer, w*h*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
 //    GlBufferCudaPtr ibo(GlElementArrayBuffer, w*h*sizeof(uint2) );
 
     // Create Smart viewports for each camera image that preserve aspect
-    const int N = 3;
+    const int N = 4;
     for(int i=0; i<N; ++i ) {
         container.AddDisplay(CreateDisplay());
         container[i].SetAspect((double)w/h);
@@ -88,18 +93,21 @@ int main( int /*argc*/, char* argv[] )
     View& view3d = CreateDisplay().SetAspect((double)w/h).SetHandler(new Handler3D(s_cam, AxisNone));
     container.AddDisplay(view3d);
 
+    Handler2dImageSelect handler2d(w,h);
+    handler2d.SetPixelScale(10.0f);
     container[0].SetDrawFunction(ActivateDrawTexture(texrgb,true));
     container[1].SetDrawFunction(ActivateDrawTexture(texdepth, true));
-    container[1].SetHandler(new Handler2dImageSelect(w,h));
+    container[1].SetHandler(&handler2d);
+    container[2].SetDrawFunction(ActivateDrawTexture(texdebug, true));
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-    Var<float> gs("ui.gs",2, 1E-3, 5);
-    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+    Var<int> bilateralWinSize("ui.size",3, 1, 20);
+    Var<float> gs("ui.gs",2.5, 1E-3, 10);
+    Var<float> gr("ui.gr",17, 1E-3, 100);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -121,26 +129,50 @@ int main( int /*argc*/, char* argv[] )
                 ConvertImage<float,unsigned short>(dKinectf, dKinect);
             }
 
-            KinectToVbo(d3d, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
+            KinectToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
+            NormalsFromVbo(dN, dV);
+
+            if(true) {
+                Sophus::SE3 T_lr;
+                const Eigen::Matrix<double, 3,4> mKT_lr = Kdepth * T_lr.matrix3x4();
+                const Eigen::Matrix<double, 3,4> mT_rl = T_lr.inverse().matrix3x4();
+                Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementProjectiveIcpPointPlane(
+                    dV, dV, dN, mKT_lr, mT_rl, 1E10, dScratch, dDebug
+                );
+                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
+//                cout << "--------------------------------------" << endl;
+//                cout << ((Eigen::Matrix<double,6,6>)lss.JTJ).transpose() << endl << endl;
+//                cout << ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() << endl << endl;
+//                cout << x.transpose() << endl;
+//                T_rl = T_rl * Sophus::SE3::exp(x);
+                texdebug << dDebug;
+            }
 
             texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
             texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
+            texnorm << dN;
 
             {
                 CudaScopedMappedPtr var(vbo);
                 Gpu::Image<float4> dVbo((float4*)*var,w,h);
-                dVbo.CopyFrom(d3d);
+                dVbo.CopyFrom(dV);
             }
 
             {
                 CudaScopedMappedPtr var(cbo);
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
                 Eigen::Matrix<double,3,4> KT_cd = Krgb * T_dc.inverse().matrix3x4();
-                ColourVbo(dCbo, d3d, dRgb8, KT_cd);
+                ColourVbo(dCbo, dV, dRgb8, KT_cd);
             }
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        container[3].Activate();
+        GlSlUtilities::Scale(0.5,0.5);
+        texnorm.RenderToViewportFlipY();
+        GlSlUtilities::UseNone();
 
         view3d.ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);

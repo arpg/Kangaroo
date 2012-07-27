@@ -53,6 +53,11 @@ public:
         return pixel_scale;
     }
 
+    void SetPixelScale(float scale)
+    {
+        pixel_scale = scale;
+    }
+
 protected:
     float img_w, img_h;
     bool selected;
