@@ -93,7 +93,7 @@ FIND_PACKAGE(CUDA QUIET)
 
 if(CUDA_FOUND)
   set(CUDA_NVCC_FLAGS "-arch=sm_20 --compiler-options \"-std=c++03\"" )
-  LIST(APPEND CU_COMMON_SRC cu/all.h cu/Image.h cu/Mat.h cu/sampling.h cu/cutil_math_extra.h cu/patch_score.h)
+  LIST(APPEND CU_COMMON_SRC cu/all.h cu/Image.h cu/Mat.h cu/sampling.h cu/cutil_math_extra.h cu/patch_score.h cu/reweighting.h)
   LIST(APPEND CU_COMMON_SRC cu/cu_anaglyph.cu cu/cu_bilateral.cu cu/cu_convert.cu cu/cu_index_buffer.cu
                             cu/cu_model_refinement.cu cu/cu_dense_stereo.cu cu/cu_lookup_warp.cu
                             cu/cu_median.cu cu/cu_normals.cu cu/cu_openni.cu cu/cu_plane_fit.cu
