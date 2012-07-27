@@ -39,7 +39,7 @@ __global__ void KernPoseRefinementFromDepthmap(
 
         const Mat<float,1,4> dIldPlKT_lr = dIl * dPl_by_dpl * KT_lr;
 
-        // Sparse Jr_i = dIl * dPl_by_dpl * KT_lr * gen_i * Pr
+        // Sparse Jr_i = dIldPlKT_lr * gen_i * Pr
         const Mat<float,1,6> Jr = {
             dIldPlKT_lr(0),
             dIldPlKT_lr(1),
@@ -93,8 +93,45 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
     LeastSquaresSystem<float,6> sum;
     sum.SetZero();
 
+    const float4 Pr = dPr(u,v);
+    const float4 Nr = dNr(u,v);
+
+    const float3 KPl = KT_lr * Pr;
+    const float2 pl = dn(KPl);
+
+    if( isfinite(Pr.z) && isfinite(Nr.z) && dPl.InBounds(pl, 2) ) {
+        const float4 _Pl = dPl.GetNearestNeighbour(pl);
+        if(isfinite(_Pl.z)) {
+            const float3 _Pr = T_rl * _Pl;
+            const float3 Dr = _Pr - Pr;
+            const float DrDotNr = dot(Dr,Nr);
+            const float y = DrDotNr;
+
+            const Mat<float,1,6> Jr = {
+                dot(-1.0*SE3gen0mul(_Pr), Nr),
+                dot(-1.0*SE3gen1mul(_Pr), Nr),
+                dot(-1.0*SE3gen2mul(_Pr), Nr),
+                dot(-1.0*SE3gen3mul(_Pr), Nr),
+                dot(-1.0*SE3gen4mul(_Pr), Nr),
+                dot(-1.0*SE3gen5mul(_Pr), Nr)
+            };
+
+            const float w = LSReweightTukey(y,c);
+            sum.JTJ = OuterProduct(Jr,w);
+            sum.JTy = Jr * (y*w);
+            sum.obs = 1;
+            sum.sqErr = y*y;
+
+            const float db = abs(y);
+            dDebug(u,v) = make_float4(db,db,db,1);
+        }else{
+            dDebug(u,v) = make_float4(0,0,1,1);
+        }
+    }else{
+        dDebug(u,v) = make_float4(1,0,0,1);
+    }
+
     dSum(u,v) = sum;
-    dDebug(u,v) = make_float4(u/(float)dPl.w,v/(float)dPl.h,0,1);
 }
 
 

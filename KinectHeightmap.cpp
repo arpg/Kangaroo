@@ -44,9 +44,14 @@ int main( int /*argc*/, char* argv[] )
           1.7470421412464927e-02, 1.2275341476520762e-02, 9.9977202419716948e-01;
     Eigen::Vector3d t(1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02);
 
-    Sophus::SE3 T_dc(R,t);
+    // Camera (rgb) to reference (depth)
+    Sophus::SE3 T_rc(R,t);
 
-    Sophus::SE3 T_wd;
+    // Reference (depth) to world
+    Sophus::SE3 T_wr;
+
+    // Reference (depth) to live (depth)
+    Sophus::SE3 T_lr;
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
@@ -66,6 +71,8 @@ int main( int /*argc*/, char* argv[] )
     Image<uchar3, TargetDevice, Manage> dRgb8(w,h);
     Image<float4, TargetDevice, Manage>  dV(w,h);
     Image<float4, TargetDevice, Manage>  dN(w,h);
+    Image<float4, TargetDevice, Manage>  dVr(w,h);
+    Image<float4, TargetDevice, Manage>  dNr(w,h);
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*4*30,h);
 
@@ -93,23 +100,32 @@ int main( int /*argc*/, char* argv[] )
     View& view3d = CreateDisplay().SetAspect((double)w/h).SetHandler(new Handler3D(s_cam, AxisNone));
     container.AddDisplay(view3d);
 
-    Handler2dImageSelect handler2d(w,h);
-    handler2d.SetPixelScale(10.0f);
     container[0].SetDrawFunction(ActivateDrawTexture(texrgb,true));
+
+    Handler2dImageSelect prop_depth(w,h);
+    prop_depth.SetPixelScale(10.0f);
     container[1].SetDrawFunction(ActivateDrawTexture(texdepth, true));
-    container[1].SetHandler(&handler2d);
+    container[1].SetHandler(&prop_depth);
+
+    Handler2dImageSelect prop_debug(w,h);
     container[2].SetDrawFunction(ActivateDrawTexture(texdebug, true));
+    container[2].SetHandler(&prop_debug);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
 
-    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",3, 1, 20);
-    Var<float> gs("ui.gs",2.5, 1E-3, 10);
-    Var<float> gr("ui.gr",17, 1E-3, 100);
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", true, true);
+    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+    Var<float> gs("ui.gs",5, 1E-3, 10);
+    Var<float> gr("ui.gr",100, 1E-3, 100);
 
     Var<bool> pose_refinement("ui.Pose Refinement", false, true);
+    Var<bool> pose_update("ui.Pose Update", false, true);
+    Var<float> c("ui.c",0.5, 1E-3, 1);
+
+    Var<bool> save_ref("ui.Save Reference", true, false);
+
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -135,20 +151,25 @@ int main( int /*argc*/, char* argv[] )
             NormalsFromVbo(dN, dV);
 
             if(pose_refinement) {
-                Sophus::SE3 T_lr;
-                const Eigen::Matrix<double, 3,4> mKT_lr = Kdepth * T_lr.matrix3x4();
-                const Eigen::Matrix<double, 3,4> mT_rl = T_lr.inverse().matrix3x4();
-                Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementProjectiveIcpPointPlane(
-                    dV, dV, dN, mKT_lr, mT_rl, 1E10, dScratch, dDebug
-                );
-                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
-//                cout << "--------------------------------------" << endl;
-//                cout << ((Eigen::Matrix<double,6,6>)lss.JTJ).transpose() << endl << endl;
-//                cout << ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() << endl << endl;
-//                cout << x.transpose() << endl;
-//                T_rl = T_rl * Sophus::SE3::exp(x);
+                for(int i=0; i<2; ++i ) {
+                    const Eigen::Matrix<double, 3,4> mKT_lr = Kdepth * T_lr.matrix3x4();
+                    const Eigen::Matrix<double, 3,4> mT_rl = T_lr.inverse().matrix3x4();
+                    Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementProjectiveIcpPointPlane(
+                        dV, dVr, dNr, mKT_lr, mT_rl, c, dScratch, dDebug
+                    );
+                    Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                    Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
+                    if(pose_update) {
+                        T_lr = T_lr * Sophus::SE3::exp(x);
+                    }
+                }
                 texdebug << dDebug;
+            }
+
+            if(Pushed(save_ref)) {
+                dVr.CopyFrom(dV);
+                dNr.CopyFrom(dN);
+                T_lr = Sophus::SE3();
             }
 
             texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
@@ -164,7 +185,7 @@ int main( int /*argc*/, char* argv[] )
             {
                 CudaScopedMappedPtr var(cbo);
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_dc.inverse().matrix3x4();
+                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_rc.inverse().matrix3x4();
                 ColourVbo(dCbo, dV, dRgb8, KT_cd);
             }
         }
@@ -172,6 +193,7 @@ int main( int /*argc*/, char* argv[] )
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         container[3].Activate();
+        glColor3f(1,1,1);
         GlSlUtilities::Scale(0.5,0.5);
         texnorm.RenderToViewportFlipY();
         GlSlUtilities::UseNone();
@@ -182,33 +204,38 @@ int main( int /*argc*/, char* argv[] )
         static bool lastLockToCam = lockToCam;
         if( lockToCam != lastLockToCam ) {
             if(lockToCam) {
-                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wd.matrix();
+                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wr.matrix();
                 s_cam.SetModelViewMatrix(T_vc);
             }else{
-                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wd.inverse().matrix();
+                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wr.inverse().matrix();
                 s_cam.SetModelViewMatrix(T_vw);
             }
             lastLockToCam = lockToCam;
         }
 
-        if(lockToCam) glSetFrameOfReferenceF(T_wd.inverse());
+        if(lockToCam) glSetFrameOfReferenceF(T_wr.inverse());
 
         {
-            glSetFrameOfReferenceF(T_wd);
+            glSetFrameOfReferenceF(T_wr);
             {
-                glSetFrameOfReferenceF(T_dc);
-                glDrawAxis(0.5);
-                glUnsetFrameOfReference();
-            }
+//                glSetFrameOfReferenceF(T_rc);
+//                glDrawAxis(0.5);
+//                glUnsetFrameOfReference();
 
-            glDrawAxis(1.0);
-            glColor3f(1,1,1);
-            RenderVbo(vbo, cbo, w, h);
+                glSetFrameOfReferenceF(T_lr.inverse());
+                glDrawAxis(0.2);
+                glColor3f(1,1,1);
+                RenderVbo(vbo, cbo, w, h);
+                glUnsetFrameOfReference();
+
+                glDrawAxis(0.2);
+            }
             glUnsetFrameOfReference();
         }
 
         if(lockToCam) glUnsetFrameOfReference();
 
+        glColor3f(1,1,1);
         pangolin::FinishGlutFrame();
     }
 }

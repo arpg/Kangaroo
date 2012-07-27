@@ -73,6 +73,13 @@ struct Mat
         Fill(0);
     }
 
+    inline __device__ __host__ P Length() const {
+        P sum = 0;
+        for( int i=0; i<R*C; ++i )
+            sum += m[i] * m[i];
+        return sqrt(sum);
+    }
+
     template<unsigned NR>
     inline __device__ __host__ Mat<P,NR,1> Head() {
         // TODO: static assert NR <= R;
@@ -525,7 +532,7 @@ inline __device__ __host__ float2 dn( const float3& x )
 
 inline __device__ __host__ float3 dn( const float4& x )
 {
-    return (float3){x.x/x.w, x.y/x.w, x.z/x.z};
+    return (float3){x.x/x.w, x.y/x.w, x.z/x.w};
 }
 
 

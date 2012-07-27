@@ -128,6 +128,10 @@ struct Image {
         Management::template Cleanup<T,Target>(ptr);
     }
 
+    //////////////////////////////////////////////////////
+    // Constructors
+    //////////////////////////////////////////////////////
+
     template<typename ManagementCopyFrom> inline __host__ __device__
     Image( const Image<T,Target,ManagementCopyFrom>& img )
         : ptr(img.ptr), pitch(img.pitch), w(img.w), h(img.h)
@@ -173,12 +177,34 @@ struct Image {
     {
     }
 
+    //////////////////////////////////////////////////////
+    // Image copy
+    //////////////////////////////////////////////////////
+
     template<typename TargetFrom, typename ManagementFrom>
     inline __host__
     void CopyFrom(const Image<T,TargetFrom,ManagementFrom>& img)
     {
         cudaMemcpy2D(ptr,pitch,img.ptr,img.pitch, std::min(img.w,w)*sizeof(T), std::min(img.h,h), TargetCopyKind<Target,TargetFrom>() );
     }
+
+    template <typename DT>
+    inline __host__
+    void MemcpyFromHost(DT* hptr, size_t hpitch )
+    {
+        cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
+    }
+
+    template <typename DT>
+    inline __host__
+    void MemcpyFromHost(DT* ptr )
+    {
+        MemcpyFromHost(ptr, w*sizeof(T) );
+    }
+
+    //////////////////////////////////////////////////////
+    // Direct Pixel Access
+    //////////////////////////////////////////////////////
 
     inline  __device__ __host__
     T* RowPtr(size_t y)
@@ -222,6 +248,26 @@ struct Image {
         return RowPtr(y)[x];
     }
 
+    //////////////////////////////////////////////////////
+    // Bounds Checking
+    //////////////////////////////////////////////////////
+
+    inline  __device__ __host__
+    bool InBounds(int x, int y) const
+    {
+        return 0 <= x && x < w && 0 <= y && y < h;
+    }
+
+    inline  __device__ __host__
+    bool InBounds(float x, float y, float border) const
+    {
+        return border <= x && x < (w-border) && border <= y && y < (h-border);
+    }
+
+    //////////////////////////////////////////////////////
+    // Clamped / Interpolated access
+    //////////////////////////////////////////////////////
+
     inline  __device__ __host__
     const T& GetWithClampedRange(int x, int y) const
     {
@@ -254,6 +300,10 @@ struct Image {
     {
         return Get(u+0.5, v+0.5);
     }
+
+    //////////////////////////////////////////////////////
+    // Image Derivatives
+    //////////////////////////////////////////////////////
 
     template<typename TR>
     inline __device__ __host__
@@ -298,31 +348,9 @@ struct Image {
         return res;
     }
 
-    inline  __device__ __host__
-    bool InBounds(int x, int y) const
-    {
-        return 0 <= x && x < w && 0 <= y && y < h;
-    }
-
-    inline  __device__ __host__
-    bool InBounds(float x, float y, float border) const
-    {
-        return border <= x && x < (w-border) && border <= y && y < (h-border);
-    }
-
-    template <typename DT>
-    inline __host__
-    void MemcpyFromHost(DT* hptr, size_t hpitch )
-    {
-        cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
-    }
-
-    template <typename DT>
-    inline __host__
-    void MemcpyFromHost(DT* ptr )
-    {
-        MemcpyFromHost(ptr, w*sizeof(T) );
-    }
+    //////////////////////////////////////////////////////
+    // Obtain slices / subimages
+    //////////////////////////////////////////////////////
 
     inline __device__ __host__
     const Image<T,Target,DontManage> SubImage(int x, int y, int width, int height) const
@@ -367,6 +395,34 @@ struct Image {
         return Image<TP,Target,DontManage>((TP*)ptr, width, height, width*sizeof(TP) );
     }
 
+    //////////////////////////////////////////////////////
+    // Accessors for cuda vector types
+    //////////////////////////////////////////////////////
+
+    inline __device__ __host__
+    T GetNearestNeighbour(const float2 p) const
+    {
+        return GetNearestNeighbour(p.x,p.y);
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    TR GetBilinear(const float2 p) const
+    {
+        return GetBilinear<TR>(p.x, p.y);
+    }
+
+    inline  __device__ __host__
+    bool InBounds(const float2 p, float border) const
+    {
+        return InBounds(p.x, p.y, border);
+    }
+
+
+    //////////////////////////////////////////////////////
+    // NVidia Performance Primitives convenience methods
+    //////////////////////////////////////////////////////
+
 #ifdef HAVE_NPP
     inline __device__ __host__
     Image<T,Target,DontManage> SubImage(const NppiRect& region)
@@ -395,6 +451,10 @@ struct Image {
     }
 #endif
 
+    //////////////////////////////////////////////////////
+    // Thrust convenience methods
+    //////////////////////////////////////////////////////
+
 #ifdef HAVE_THRUST
     inline __device__ __host__
     typename Gpu::ThrustType<T,Target>::Ptr begin() {
@@ -412,6 +472,10 @@ struct Image {
     }
 
 #endif
+
+    //////////////////////////////////////////////////////
+    // Member variables
+    //////////////////////////////////////////////////////
 
     T* ptr;
     size_t pitch;
