@@ -145,10 +145,10 @@ __global__ void KernDisparityImageToVbo(
     const float invalid = 0.0f/0.0f;
 
     const float disp = dDisp(u,v);
-    const float z = disp > 2 ? fu * baseline / -disp : invalid;
+    const float z = disp > 2 ? fu * baseline / disp : invalid;
 
     // (x,y,1) = kinv * (u,v,1)'
-    const float x = -z * (u-u0) / fu;
+    const float x = z * (u-u0) / fu;
     const float y = z * (v-v0) / fv;
 
     dVbo(u,v) = make_float4(x,y,z,1);
@@ -174,10 +174,9 @@ __global__ void KernKinectToVbo(
     const float kz = dKinectDepth(u,v) / 1000.0f;
 
     // (x,y,1) = kinv * (u,v,1)'
-    // Flip from vision to OpenGL
     const float x = kz * (u-u0) / fu;
-    const float y = -kz * (v-v0) / fv;
-    const float z = (kz > 0) ? -kz : 0.0f/0.0f;
+    const float y = kz * (v-v0) / fv;
+    const float z = (kz > 0) ? kz : 0.0f/0.0f;
 
     dVbo(u,v) = make_float4(x,y,z,1);
 }
@@ -205,8 +204,7 @@ __global__ void KernColourVbo(
 
     const float4 Pd4 = dPd(u,v);
 
-    // Flip from OpenGL to Vision
-    const Mat<float,4,1> Pd = {Pd4.x, -Pd4.y, -Pd4.z, 1};
+    const Mat<float,4,1> Pd = {Pd4.x, Pd4.y, Pd4.z, 1};
     const Mat<float,3,1> KPc = KT_cd * Pd;
 
     const Mat<float,2,1> pc = { KPc(0) / KPc(2), KPc(1) / KPc(2) };

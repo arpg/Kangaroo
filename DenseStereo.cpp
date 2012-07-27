@@ -198,7 +198,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrix(w,h,K(0,0),K(1,1),K(0,2),K(1,2),0.1,1000),
+        ProjectionMatrixRDF_TopLeft(w,h,K(0,0),K(1,1),K(0,2),K(1,2),0.1,1000),
         IdentityMatrix(GlModelViewStack)
     );
     if(!gtPoseT_wh.empty()) {
@@ -534,7 +534,7 @@ int main( int /*argc*/, char* argv[] )
                 RenderVbo(ibo,vbo,cbo, w, h, show_mesh, show_color);
             }
             glColor3f(1.0,1.0,1.0);
-            DrawFrustrum(Kinv,w,h,-1.0);
+            DrawFrustrum(Kinv,w,h,1.0);
             if(plane_do) {
                 // Draw ground plane
                 glColor4f(0,1,0,1);

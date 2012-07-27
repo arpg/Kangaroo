@@ -87,7 +87,7 @@ int main( int /*argc*/, char* argv[] )
         container[i].SetAspect((double)w/h);
     }
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrix(w,h,Kdepth(0,0),Kdepth(1,1),Kdepth(0,2),Kdepth(1,2),1E-2,1E3),
+        ProjectionMatrixRDF_TopLeft(w,h,Kdepth(0,0),Kdepth(1,1),Kdepth(0,2),Kdepth(1,2),1E-2,1E3),
         IdentityMatrix(GlModelViewStack)
     );
     View& view3d = CreateDisplay().SetAspect((double)w/h).SetHandler(new Handler3D(s_cam, AxisNone));
@@ -108,6 +108,8 @@ int main( int /*argc*/, char* argv[] )
     Var<int> bilateralWinSize("ui.size",3, 1, 20);
     Var<float> gs("ui.gs",2.5, 1E-3, 10);
     Var<float> gr("ui.gr",17, 1E-3, 100);
+
+    Var<bool> pose_refinement("ui.Pose Refinement", false, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -132,7 +134,7 @@ int main( int /*argc*/, char* argv[] )
             KinectToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
             NormalsFromVbo(dN, dV);
 
-            if(true) {
+            if(pose_refinement) {
                 Sophus::SE3 T_lr;
                 const Eigen::Matrix<double, 3,4> mKT_lr = Kdepth * T_lr.matrix3x4();
                 const Eigen::Matrix<double, 3,4> mT_rl = T_lr.inverse().matrix3x4();
