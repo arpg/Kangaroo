@@ -1,7 +1,5 @@
-#pragma once
-
-#include "Image.h"
-#include "Mat.h"
+#include "all.h"
+#include "launch_utils.h"
 #include "sampling.h"
 
 namespace Gpu

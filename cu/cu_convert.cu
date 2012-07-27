@@ -1,6 +1,5 @@
-#pragma once
-
-#include <cuda_runtime.h>
+#include "all.h"
+#include "launch_utils.h"
 
 namespace Gpu
 {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cuda_runtime.h>
 #include "CUDA_SDK/cutil_math.h"
 
 #include "Image.h"

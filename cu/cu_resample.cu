@@ -1,5 +1,4 @@
-#pragma once
-
+#include "all.h"
 #include "launch_utils.h"
 #include "sampling.h"
 

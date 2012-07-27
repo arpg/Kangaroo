@@ -1,8 +1,6 @@
-#pragma once
-
 #include "all.h"
-
-#include "cu_patch_score.h"
+#include "launch_utils.h"
+#include "patch_score.h"
 
 namespace Gpu
 {
