@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 
 #include "Image.h"
+#include "Volume.h"
 #include "Mat.h"
 #include "MatUtils.h"
 

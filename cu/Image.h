@@ -119,6 +119,7 @@ inline T clamp(T vmin, T vmax, T v) {
 //! Simple templated pitched image type for use with Cuda
 //! Type encapsulates ptr, pitch, width and height
 //! Instantiate Image<T,Target,ManagementAllocDealloc> to handle memory allocation
+//! This struct is compatible with cudaPitchedPtr
 template<typename T, typename Target = TargetDevice, typename Management = DontManage>
 struct Image {
 
@@ -134,14 +135,14 @@ struct Image {
 
     template<typename ManagementCopyFrom> inline __host__ __device__
     Image( const Image<T,Target,ManagementCopyFrom>& img )
-        : ptr(img.ptr), pitch(img.pitch), w(img.w), h(img.h)
+        : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h)
     {
         Management::AssignmentCheck();
     }
 
     inline __host__
     Image()
-        :w(0), h(0), pitch(0), ptr(0)
+        : pitch(0), ptr(0), w(0), h(0)
     {
     }
 
@@ -155,25 +156,25 @@ struct Image {
 
     inline __device__ __host__
     Image(T* ptr)
-        :ptr(ptr), pitch(0), w(0), h(0)
+        : pitch(0), ptr(ptr), w(0), h(0)
     {
     }
 
     inline __device__ __host__
     Image(T* ptr, size_t w)
-        :ptr(ptr), pitch(sizeof(T)*w), w(w), h(0)
+        : pitch(sizeof(T)*w), ptr(ptr), w(w), h(0)
     {
     }
 
     inline __device__ __host__
     Image(T* ptr, size_t w, size_t h)
-        :ptr(ptr), pitch(sizeof(T)*w), w(w), h(h)
+        : pitch(sizeof(T)*w), ptr(ptr), w(w), h(h)
     {
     }
 
     inline __device__ __host__
     Image(T* ptr, size_t w, size_t h, size_t pitch)
-        :ptr(ptr), pitch(pitch), w(w), h(h)
+        : pitch(pitch), ptr(ptr), w(w), h(h)
     {
     }
 
@@ -477,8 +478,8 @@ struct Image {
     // Member variables
     //////////////////////////////////////////////////////
 
-    T* ptr;
     size_t pitch;
+    T* ptr;
     size_t w;
     size_t h;
 };
