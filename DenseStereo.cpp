@@ -147,16 +147,16 @@ int main( int /*argc*/, char* argv[] )
     cout << "Offset: " << roi.x << "x" << roi.y << endl;
 
     // OpenGL's Right Down Forward coordinate systems
-    Eigen::Matrix3d RDFgl;    RDFgl    << 1,0,0,  0,-1,0,  0,0,-1;
+    Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
-    Eigen::Matrix4d T_gl_ro = Eigen::Matrix4d::Identity();
-    T_gl_ro.block<3,3>(0,0) = RDFgl.transpose() * RDFrobot;
-    Eigen::Matrix4d T_ro_gl = Eigen::Matrix4d::Identity();
-    T_ro_gl.block<3,3>(0,0) = RDFrobot.transpose() * RDFgl;
+    Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();
+    T_vis_ro.block<3,3>(0,0) = RDFvision.transpose() * RDFrobot;
+    Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
+    T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
 
     const Eigen::Matrix3d K = camModel[0].K();
     const Eigen::Matrix3d Kinv = MakeKinv(K);
-    const Sophus::SE3 T_rl_orig = T_rlFromCamModelRDF(camModel[0], camModel[1], RDFgl);
+    const Sophus::SE3 T_rl_orig = T_rlFromCamModelRDF(camModel[0], camModel[1], RDFvision);
     double k1 = 0;
     double k2 = 0;
 
@@ -180,14 +180,14 @@ int main( int /*argc*/, char* argv[] )
     // Load history
     Sophus::SE3 T_wc;
     vector<Sophus::SE3> gtPoseT_wh;
-    LoadPoses(gtPoseT_wh, camera.GetProperty("DataSourceDir") + "/pose.txt", camera.GetProperty("StartFrame",0), T_gl_ro, T_ro_gl);
+    LoadPoses(gtPoseT_wh, camera.GetProperty("DataSourceDir") + "/pose.txt", camera.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
 
     // Plane Parameters
     // These coordinates need to be below the horizon. This could cause trouble!
     Eigen::Matrix3d U; U << w, 0, w,  h/2, h, h,  1, 1, 1;
     Eigen::Matrix3d Q = -(Kinv * U).transpose();
     Eigen::Matrix3d Qinv = Q.inverse();
-    Eigen::Vector3d z; z << -1/5.0, -1/5.0, -1/5.0;
+    Eigen::Vector3d z; z << 1/5.0, 1/5.0, 1/5.0;
     Eigen::Vector3d n_c = Qinv*z;
     Eigen::Vector3d n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
 
@@ -301,7 +301,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> show_depthmap("ui.show depthmap", true, true);
     Var<bool> show_heightmap("ui.show heightmap", false, true);
     Var<bool> cross_section("ui.Cross Section", false, true);
-    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
+    Var<bool> pose_refinement("ui.Pose Refinement", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
@@ -458,7 +458,7 @@ int main( int /*argc*/, char* argv[] )
                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
                 cout << "--------------------------------------" << endl;
-                cout << ((Eigen::Matrix<double,6,6>)lss.JTJ).transpose() << endl << endl;
+                cout << ((Eigen::Matrix<double,6,6>)lss.JTJ) << endl << endl;
                 cout << ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() << endl << endl;
                 cout << x.transpose() << endl;
 //                if( x.norm() > 1 ) x = x / x.norm();
