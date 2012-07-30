@@ -11,7 +11,7 @@ namespace Gpu
 {
 
 template<typename To, typename Ti>
-void ConvertImage(Image<To> dOut, Image<Ti> dIn);
+void ConvertImage(Image<To> dOut, const Image<Ti> dIn);
 
 template<typename To, typename UpType, typename Ti>
 void BoxHalf( Image<To> out, const Image<Ti> in);
@@ -77,7 +77,7 @@ void KinectToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, 
 void KinectToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, double fu, double fv, double u0, double v0);
 
 void DisparityImageToVbo(
-    Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
+    Image<float4> dVbo, const Image<float> dDisp, float baseline, float fu, float fv, float u0, float v0
 );
 
 void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd );
@@ -153,5 +153,16 @@ void InitHeightMap(Image<float4> dHeightMap);
 void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc);
 
 void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap);
+
+//////////////////////////////////////////////////////
+
+void InitCostVolume(Volume<float> costvol );
+
+void AddToCostVolume(Volume<float> vol, const Image<unsigned char> imgv,
+    const Image<unsigned char> imgc, Mat<float,3,4> KT_cv,
+    float fu, float fv, float u0, float v0,
+    float minz, float maxz, int levels
+);
+
 
 }

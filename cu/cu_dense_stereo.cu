@@ -138,7 +138,7 @@ void DenseStereoSubpixelRefine(
 //////////////////////////////////////////////////////
 
 __global__ void KernDisparityImageToVbo(
-    Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0
+    Image<float4> dVbo, const Image<float> dDisp, float baseline, float fu, float fv, float u0, float v0
 ) {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -154,11 +154,56 @@ __global__ void KernDisparityImageToVbo(
     dVbo(u,v) = make_float4(x,y,z,1);
 }
 
-void DisparityImageToVbo(Image<float4> dVbo, const Image<float> dDisp, double baseline, double fu, double fv, double u0, double v0)
+void DisparityImageToVbo(Image<float4> dVbo, const Image<float> dDisp, float baseline, float fu, float fv, float u0, float v0)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dVbo);
     KernDisparityImageToVbo<<<gridDim,blockDim>>>(dVbo, dDisp, baseline, fu, fv, u0, v0);
+}
+
+//////////////////////////////////////////////////////
+// Cost Volume
+//////////////////////////////////////////////////////
+
+void InitCostVolume(Volume<float> costvol )
+{
+    costvol.Fill(0);
+}
+
+
+template<typename TI, typename Score>
+__global__ void KernAddToCostVolume(
+    Volume<float> vol, const Image<TI> imgv,
+    const Image<TI> imgc, Mat<float,3,4> KT_cv,
+    float fu, float fv, float u0, float v0,
+    float minz, float maxz, int /*levels*/
+){
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const int d = blockIdx.z*blockDim.z + threadIdx.z;
+
+    float3 Pv;
+    Pv.z = fu / (minz + maxz*d);
+    Pv.x = Pv.z * (u-u0) / fu;
+    Pv.y = Pv.z * (v-v0) / fv;
+
+    const float2 pc = dn(KT_cv * Pv);
+
+    if( imgc.InBounds(pc,2) ) {
+        const float score =  Score::Score(imgv, u,v, imgc, pc.x, pc.y) / (float)Score::area;
+//        vol(u,v,d) += score;
+        vol(u,v,d) = imgc.template GetBilinear<float>(pc.x, pc.y);
+    }
+}
+
+void AddToCostVolume(Volume<float> vol, const Image<unsigned char> imgv,
+    const Image<unsigned char> imgc, Mat<float,3,4> KT_cv,
+    float fu, float fv, float u0, float v0,
+    float minz, float maxz, int levels
+) {
+    dim3 blockDim(8,8,8);
+    dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
+    KernAddToCostVolume<unsigned char, SinglePixelSqPatchScore<float,ImgAccessRaw> ><<<gridDim,blockDim>>>(vol,imgv,imgc, KT_cv, fu,fv,u0,v0, minz,maxz, levels);
 }
 
 }

@@ -229,6 +229,10 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  dDebugf4(w,h);
     Image<float, TargetDevice, Manage>  dErr(w,h);
 
+    Sophus::SE3 T_wv;
+    Volume<float, TargetDevice, Manage>  dCostVol(w,h,80);
+    Image<unsigned char, TargetDevice, Manage> dImgv(w,h);
+
 
     // heightmap size calculation
     double dHeightMapWidthMeters = 100;
@@ -288,7 +292,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
-    Var<int> maxDisp("ui.disp",75, 0, 64);
+    Var<int> maxDisp("ui.disp",80, 0, 128);
     Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
     Var<bool> subpix("ui.subpix", true, true);
@@ -315,6 +319,9 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> plane_do("ui.Compute Ground Plane", false, true);
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
     Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
+
+    Var<bool> costvol_reset("ui.Set Reference", false, false);
+    Var<bool> costvol_add("ui.Add to Costvol", false, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -466,6 +473,11 @@ int main( int /*argc*/, char* argv[] )
                 texf4Debug << dDebugf4;
             }
 
+            if(costvol_add) {
+                const Eigen::Matrix<double,3,4> KT_cv = K * (T_wc.inverse() * T_wv).matrix3x4();
+                AddToCostVolume(dCostVol,dImgv, dCamImg[0], KT_cv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
+            }
+
             // Copy point cloud into VBO
             {
                 CudaScopedMappedPtr var(vbo);
@@ -490,8 +502,20 @@ int main( int /*argc*/, char* argv[] )
         }
 
         if(cross_section) {
-            DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPoint(true)[1] + 0.5);
-            texf4Debug << dDebugf4;
+            if(0) {
+                DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPoint(true)[1] + 0.5);
+                texf4Debug << dDebugf4;
+            }else{
+                const Image<float> dCrossSection = dCostVol.ImageXZ(handler2d.GetSelectedPoint(true)[1] + 0.5);
+                ConvertImage<float4, float>(dScratch.PackedImage<float4>(w,h), dCrossSection);
+                texf4Debug << dScratch.PackedImage<float4>(w,h);
+            }
+        }
+
+        if(Pushed(costvol_reset)) {
+            T_wv = T_wc;
+            dImgv.CopyFrom(dCamImg[0]);
+            InitCostVolume(dCostVol);
         }
 
         /////////////////////////////////////////////////////////////

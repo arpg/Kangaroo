@@ -73,8 +73,14 @@ struct Volume
     }
 
     //////////////////////////////////////////////////////
-    // Image copy
+    // Volume / set copy
     //////////////////////////////////////////////////////
+
+    inline __host__
+    void Memset(unsigned char v = 0)
+    {
+        cudaMemset(ptr,v,pitch*h*d);
+    }
 
     template<typename TargetFrom, typename ManagementFrom>
     inline __host__
@@ -163,20 +169,39 @@ struct Volume
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
-    const Image<T,Target,DontManage> ImageXY(size_t z) const
+    Image<T,Target,DontManage> ImageXY(size_t z)
     {
         assert( z < d );
         return Image<T,Target,DontManage>( ImagePtr(z), w, h, pitch);
     }
 
     inline __device__ __host__
-    const Image<T,Target,DontManage> ImageXZ(size_t y) const
+    Image<T,Target,DontManage> ImageXZ(size_t y)
     {
         assert( y < h );
         return Image<T,Target,DontManage>( RowPtr(y,0), w, d, img_pitch);
     }
 
+    //////////////////////////////////////////////////////
+    // Thrust convenience methods
+    //////////////////////////////////////////////////////
 
+#ifdef HAVE_THRUST
+    inline __device__ __host__
+    typename Gpu::ThrustType<T,Target>::Ptr begin() {
+        return (typename Gpu::ThrustType<T,Target>::Ptr)(ptr);
+    }
+
+    inline __device__ __host__
+    typename Gpu::ThrustType<T,Target>::Ptr end() {
+        return (typename Gpu::ThrustType<T,Target>::Ptr)( RowPtr(h-1,d-1) + w );
+    }
+
+    inline __host__
+    void Fill(T val) {
+        thrust::fill(begin(), end(), val);
+    }
+#endif
 
     //////////////////////////////////////////////////////
     // Member variables

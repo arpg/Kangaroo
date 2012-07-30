@@ -59,6 +59,13 @@ uchar3 ConvertPixel(uchar4 p)
     return make_uchar3(p.x,p.y,p.z);
 }
 
+template<>
+__host__ __device__
+float4 ConvertPixel(float p)
+{
+    return make_float4(p,p,p,1.0);
+}
+
 template<typename To, typename Ti>
 __global__
 void KernConvertImage(Image<To> dOut, const Image<Ti> dIn)
@@ -86,5 +93,6 @@ template void ConvertImage<uchar3,unsigned char>(Image<uchar3>, const Image<unsi
 template void ConvertImage<uchar4,unsigned char>(Image<uchar4>, const Image<unsigned char>);
 template void ConvertImage<unsigned char, uchar3>(Image<unsigned char>, const Image<uchar3>);
 template void ConvertImage<unsigned char, uchar4>(Image<unsigned char>, const Image<uchar4>);
+template void ConvertImage<float4, float>(Image<float4>, const Image<float>);
 
 }

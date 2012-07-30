@@ -179,8 +179,14 @@ struct Image {
     }
 
     //////////////////////////////////////////////////////
-    // Image copy
+    // Image set / copy
     //////////////////////////////////////////////////////
+
+    inline __host__
+    void Memset(unsigned char v = 0)
+    {
+        cudaMemset(ptr,v,pitch*h);
+    }
 
     template<typename TargetFrom, typename ManagementFrom>
     inline __host__
