@@ -165,16 +165,44 @@ void DisparityImageToVbo(Image<float4> dVbo, const Image<float> dDisp, float bas
 // Cost Volume
 //////////////////////////////////////////////////////
 
-void InitCostVolume(Volume<float> costvol )
+void InitCostVolume(Volume<CostVolElem> costvol )
 {
-    costvol.Fill(0);
+    CostVolElem initial;
+    initial.sum = 0;
+    initial.n = 0;
+    costvol.Fill(initial);
 }
 
+//////////////////////////////////////////////////////
+
+template<typename TD, typename TI, typename Score>
+__global__ void KernInitCostVolumeFromStereo(
+    Volume<CostVolElem> dvol, Image<TI> dimgl, Image<TI> dimgr
+) {
+    const uint u = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint v = blockIdx.y*blockDim.y + threadIdx.y;
+    const uint d = blockIdx.z*blockDim.z + threadIdx.z;
+
+    CostVolElem elem;
+    elem.sum = Score::Score(dimgl, u,v, dimgr, u-d, v) / Score::area;
+    elem.n = 1;
+
+    dvol(u,v,d) = elem;
+}
+
+void InitCostVolume(Volume<CostVolElem> dvol, Image<unsigned char> dimgl, Image<unsigned char> dimgr )
+{
+    dim3 blockDim(8,8,8);
+    dim3 gridDim(dvol.w / blockDim.x, dvol.h / blockDim.y, dvol.d / blockDim.z);
+    KernInitCostVolumeFromStereo<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dvol,dimgl,dimgr);
+}
+
+//////////////////////////////////////////////////////
 
 template<typename TI, typename Score>
 __global__ void KernAddToCostVolume(
-    Volume<float> vol, const Image<TI> imgv,
-    const Image<TI> imgc, Mat<float,3,4> KT_cv,
+    Volume<CostVolElem> dvol, const Image<TI> dimgv,
+    const Image<TI> dimgc, Mat<float,3,4> KT_cv,
     float fu, float fv, float u0, float v0,
     float minz, float maxz, int /*levels*/
 ){
@@ -189,21 +217,51 @@ __global__ void KernAddToCostVolume(
 
     const float2 pc = dn(KT_cv * Pv);
 
-    if( imgc.InBounds(pc,2) ) {
-        const float score =  Score::Score(imgv, u,v, imgc, pc.x, pc.y) / (float)Score::area;
-//        vol(u,v,d) += score;
-        vol(u,v,d) = imgc.template GetBilinear<float>(pc.x, pc.y);
+    if( dimgc.InBounds(pc.x, pc.y,5) ) {
+//        vol(u,v,d) = 1.0f;
+//        const float score =  Score::Score(imgv, u,v, imgc, pc.x, pc.y) / (float)(Score::area);
+        const float score = (dimgv(u,v) - dimgc.template GetBilinear<float>(pc)) / 255.0f;
+        CostVolElem elem = dvol(u,v,d);
+        elem.sum += score;
+        elem.n += 1;
+        dvol(u,v,d) = elem;
     }
 }
 
-void AddToCostVolume(Volume<float> vol, const Image<unsigned char> imgv,
-    const Image<unsigned char> imgc, Mat<float,3,4> KT_cv,
+void AddToCostVolume(Volume<CostVolElem> dvol, const Image<unsigned char> dimgv,
+    const Image<unsigned char> dimgc, Mat<float,3,4> KT_cv,
     float fu, float fv, float u0, float v0,
     float minz, float maxz, int levels
 ) {
     dim3 blockDim(8,8,8);
-    dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-    KernAddToCostVolume<unsigned char, SinglePixelSqPatchScore<float,ImgAccessRaw> ><<<gridDim,blockDim>>>(vol,imgv,imgc, KT_cv, fu,fv,u0,v0, minz,maxz, levels);
+    dim3 gridDim(dvol.w / blockDim.x, dvol.h / blockDim.y, dvol.d / blockDim.z);
+    KernAddToCostVolume<unsigned char, SSNDPatchScore<float,DefaultRad,ImgAccessRaw> ><<<gridDim,blockDim>>>(dvol,dimgv,dimgc, KT_cv, fu,fv,u0,v0, minz,maxz, levels);
+}
+
+//////////////////////////////////////////////////////
+
+__global__ void KernCostVolumeCrossSection(
+    Image<float4> dScore, Image<CostVolElem> dCostVolSlice
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint d = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( dCostVolSlice.InBounds(x,d) )
+    {
+        CostVolElem elem = dCostVolSlice(x,d);
+        const float score = (elem.sum / elem.n) / 255.0f;
+        dScore(x,d) = make_float4(score,score,score,1);
+    }else{
+        dScore(x,d) = make_float4(1,0,0,1);
+    }
+}
+
+void CostVolumeCrossSection(
+    Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dScore);
+    KernCostVolumeCrossSection<<<gridDim,blockDim>>>(dScore, dCostVol.ImageXZ(y));
 }
 
 }

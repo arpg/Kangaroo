@@ -230,7 +230,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float, TargetDevice, Manage>  dErr(w,h);
 
     Sophus::SE3 T_wv;
-    Volume<float, TargetDevice, Manage>  dCostVol(w,h,80);
+    Volume<CostVolElem, TargetDevice, Manage>  dCostVol(w,h,80);
     Image<unsigned char, TargetDevice, Manage> dImgv(w,h);
 
 
@@ -304,7 +304,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
     Var<bool> show_heightmap("ui.show heightmap", false, true);
-    Var<bool> cross_section("ui.Cross Section", false, true);
+    Var<bool> cross_section("ui.Cross Section", true, true);
     Var<bool> pose_refinement("ui.Pose Refinement", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
@@ -320,8 +320,8 @@ int main( int /*argc*/, char* argv[] )
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
     Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
 
-    Var<bool> costvol_reset("ui.Set Reference", false, false);
-    Var<bool> costvol_add("ui.Add to Costvol", false, true);
+    Var<bool> costvol_reset("ui.Set Reference", true, false);
+    Var<bool> costvol_add("ui.Add to Costvol", true, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -474,8 +474,10 @@ int main( int /*argc*/, char* argv[] )
             }
 
             if(costvol_add) {
-                const Eigen::Matrix<double,3,4> KT_cv = K * (T_wc.inverse() * T_wv).matrix3x4();
-                AddToCostVolume(dCostVol,dImgv, dCamImg[0], KT_cv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
+                const Eigen::Matrix<double,3,4> KT_lv = K * (T_wc.inverse() * T_wv).matrix3x4();
+                AddToCostVolume(dCostVol,dImgv, dCamImg[0], KT_lv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
+                const Eigen::Matrix<double,3,4> KT_rv = K * (T_rl*T_wc.inverse() * T_wv).matrix3x4();
+                AddToCostVolume(dCostVol,dImgv, dCamImg[1], KT_rv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
             }
 
             // Copy point cloud into VBO
@@ -504,18 +506,17 @@ int main( int /*argc*/, char* argv[] )
         if(cross_section) {
             if(0) {
                 DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0], dCamImg[1], handler2d.GetSelectedPoint(true)[1] + 0.5);
-                texf4Debug << dDebugf4;
             }else{
-                const Image<float> dCrossSection = dCostVol.ImageXZ(handler2d.GetSelectedPoint(true)[1] + 0.5);
-                ConvertImage<float4, float>(dScratch.PackedImage<float4>(w,h), dCrossSection);
-                texf4Debug << dScratch.PackedImage<float4>(w,h);
+                CostVolumeCrossSection(dDebugf4, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
             }
+            texf4Debug << dDebugf4;
         }
 
         if(Pushed(costvol_reset)) {
             T_wv = T_wc;
             dImgv.CopyFrom(dCamImg[0]);
-            InitCostVolume(dCostVol);
+//            InitCostVolume(dCostVol);
+            InitCostVolume(dCostVol,dCamImg[0], dCamImg[1]);
         }
 
         /////////////////////////////////////////////////////////////

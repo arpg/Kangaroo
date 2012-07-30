@@ -156,13 +156,24 @@ void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap);
 
 //////////////////////////////////////////////////////
 
-void InitCostVolume(Volume<float> costvol );
+struct __align__(8) CostVolElem
+{
+    int n;
+    float sum;
+};
 
-void AddToCostVolume(Volume<float> vol, const Image<unsigned char> imgv,
+void InitCostVolume(Volume<CostVolElem> costvol );
+
+void InitCostVolume(Volume<CostVolElem> dvol, Image<unsigned char> dimgl, Image<unsigned char> dimgr );
+
+void AddToCostVolume(Volume<CostVolElem> vol, const Image<unsigned char> imgv,
     const Image<unsigned char> imgc, Mat<float,3,4> KT_cv,
     float fu, float fv, float u0, float v0,
     float minz, float maxz, int levels
 );
 
+void CostVolumeCrossSection(
+    Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
+);
 
 }
