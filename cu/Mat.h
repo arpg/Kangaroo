@@ -203,20 +203,24 @@ inline __device__ __host__ Mat<P,R,C> operator*(const Mat<P,R,CR>& lhs, const Ma
 template<typename P, unsigned CR>
 inline __device__ __host__ P operator*(const Mat<P,1,CR>& lhs, const Mat<P,CR,1>& rhs)
 {
-    P ret = 0;
-    #pragma unroll
-    for( int i=0; i<CR; ++i)
-        ret += lhs(i) * rhs(i);
-    return ret;
+    return dot(lhs,rhs);
 }
 
 // Specialisation for scalar product
 template<typename P, unsigned R>
 inline __device__ __host__ P operator*(const Mat<P,R,1>& lhs, const Mat<P,R,1>& rhs)
 {
-    P ret = 0;
+    return dot(lhs,rhs);
+}
+
+// Dot Product
+// TODO Check sizes are compatible
+template<typename P, unsigned R1, unsigned C1, unsigned R2, unsigned C2>
+inline __device__ __host__ P dot(const Mat<P,R1,C1>& lhs, const Mat<P,R2,C2>& rhs)
+{
+    P ret = lhs(0) * rhs(0);
     #pragma unroll
-    for( int i=0; i<R; ++i)
+    for( int i=1; i<R1*C1; ++i)
         ret += lhs(i) * rhs(i);
     return ret;
 }
@@ -233,6 +237,20 @@ inline __device__ __host__ Mat<P,R,C> mul_aTb(const Mat<P,CR,R>& a, const Mat<P,
             for( unsigned k=0; k<CR; ++k)  {
                 ret(r,c) += a(k,r) * b(k,c);
             }
+        }
+    }
+    return ret;
+}
+
+template<typename P, unsigned R, unsigned C>
+inline __device__ __host__ Mat<P,R,C> mul_aTb(const Mat<P,C,R>& a, const P b)
+{
+    Mat<P,R,C> ret;
+
+    for( unsigned r=0; r<R; ++r) {
+#pragma unroll
+        for( unsigned c=0; c<C; ++c) {
+            ret(r,c) = a(c,r) * b;
         }
     }
     return ret;
@@ -455,7 +473,7 @@ inline __device__ __host__ SymMat<P,N> SymMat_zero()
 template<typename P, unsigned N>
 struct LeastSquaresSystem
 {
-  Mat<P,1,N> JTy;
+  Mat<P,N,1> JTy;
   SymMat<P,N> JTJ;
   P sqErr;
   unsigned obs;

@@ -225,7 +225,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float, TargetDevice, Manage>  dDisp(w,h);
     Image<float, TargetDevice, Manage>  dDispFilt(w,h);
     Image<float4, TargetDevice, Manage>  d3d(w,h);
-    Image<unsigned char, TargetDevice,Manage> dScratch(w*4*30,h);
+    Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,6>),h);
     Image<float4, TargetDevice, Manage>  dDebugf4(w,h);
     Image<float, TargetDevice, Manage>  dErr(w,h);
 
@@ -417,7 +417,7 @@ int main( int /*argc*/, char* argv[] )
                 {
                     Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
                     Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
-                    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,3>)lss.JTy).transpose() );
+                    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,3,1>)lss.JTy );
                     if( x.norm() > 1 ) x = x / x.norm();
                     for(int i=0; i<3; ++i ) {
                         z(i) *= exp(x(i));
@@ -463,10 +463,10 @@ int main( int /*argc*/, char* argv[] )
                 Eigen::Matrix<double, 3,4> KT_rl = K * T_rl.matrix3x4();
                 Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementFromDepthmap(dCamImg[1], dCamImg[0], d3d, KT_rl, 1E10, dScratch, dDebugf4);
                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
+                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
                 cout << "--------------------------------------" << endl;
                 cout << ((Eigen::Matrix<double,6,6>)lss.JTJ) << endl << endl;
-                cout << ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() << endl << endl;
+                cout << ((Eigen::Matrix<double,6,1>)lss.JTy).transpose() << endl << endl;
                 cout << x.transpose() << endl;
 //                if( x.norm() > 1 ) x = x / x.norm();
                 T_rl = T_rl * Sophus::SE3::exp(x);

@@ -19,6 +19,7 @@
 
 #include "Mat.h"
 #include "sampling.h"
+#include "pixel_convert.h"
 
 namespace Gpu
 {
@@ -317,14 +318,25 @@ struct Image {
     TR GetCentralDiffDx(int x, int y) const
     {
         const T* row = RowPtr(y);
-        return ((TR)row[x+1] - (TR)row[x-1]) / (TR)2;
+//        return ((TR)row[x+1] - (TR)row[x-1]) / (TR)2;
+        return ( ConvertPixel<TR,T>(row[x+1]) - ConvertPixel<TR,T>(row[x-1]) ) / 2;
     }
 
     template<typename TR>
     inline __device__ __host__
     TR GetCentralDiffDy(int x, int y) const
     {
-        return ((TR)Get(x,y+1) - (TR)Get(x,y-1)) / (TR)2;
+        return ( ConvertPixel<TR,T>(Get(x,y+1)) - ConvertPixel<TR,T>(Get(x,y-1)) ) / 2;
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    Mat<TR,1,2> GetCentralDiff(int px, int py) const
+    {
+        Mat<TR,1,2> res;
+        res(0) = GetCentralDiffDx<TR>(px,py);
+        res(1) = GetCentralDiffDy<TR>(px,py);
+        return res;
     }
 
     template<typename TR>

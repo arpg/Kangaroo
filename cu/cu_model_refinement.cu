@@ -4,6 +4,10 @@
 
 namespace Gpu {
 
+//////////////////////////////////////////////////////
+// Pose refinement from depthmap
+//////////////////////////////////////////////////////
+
 template<typename Ti>
 __global__ void KernPoseRefinementFromDepthmap(
     const Image<Ti> dImgl,
@@ -51,7 +55,7 @@ __global__ void KernPoseRefinementFromDepthmap(
 
         const float w = LSReweightTukey(y,c);
         sum.JTJ = OuterProduct(Jr,w);
-        sum.JTy = Jr * (y*w);
+        sum.JTy = mul_aTb(Jr, y*w);
         sum.obs = 1;
         sum.sqErr = y*y;
 
@@ -80,6 +84,10 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
     sum.SetZero();
     return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
 }
+
+//////////////////////////////////////////////////////
+// Projective ICP with Point Plane constraint
+//////////////////////////////////////////////////////
 
 __global__ void KernPoseRefinementProjectiveIcpPointPlane(
     const Image<float4> dPl,
@@ -118,7 +126,7 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
 
             const float w = LSReweightTukey(y,c);
             sum.JTJ = OuterProduct(Jr,w);
-            sum.JTy = Jr * (y*w);
+            sum.JTy = mul_aTb(Jr,y*w);
             sum.obs = 1;
             sum.sqErr = y*y;
 
@@ -152,5 +160,96 @@ LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
 }
 
+//////////////////////////////////////////////////////
+// Kinect Calibration
+//////////////////////////////////////////////////////
+
+template<typename TI>
+__global__ void KernKinectCalibration(
+    const Image<float4> dPl, const Image<TI> dIl,
+    const Image<float4> dPr, const Image<TI> dIr,
+    const Mat<float,3,4> KcT_cd, const Mat<float,3,4> T_lr,
+    float c, Image<LeastSquaresSystem<float,2*6> > dSum, Image<float4> dDebug
+){
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    LeastSquaresSystem<float,2*6> sum;
+    sum.SetZero();
+
+    const float4 Pr = dPr(u,v);
+    const float3 Pl = T_lr * Pr;
+    const float3 _pl = KcT_cd * Pl;
+    const float3 _pr = KcT_cd * Pr;
+    const float2 pl = dn(_pl);
+    const float2 pr = dn(_pr);
+
+    if( dIl.InBounds(pl,2) && dIr.InBounds(pr,2) ) {
+        const float3 y = dIl.template GetBilinear<float3>(pl) - dIr.template GetBilinear<float3>(pr);
+
+        const Mat<float3,1,2> dIldxy = dIl.template GetCentralDiff<float3>(pl.x, pl.y);
+        const Mat<float,2,3> dpld_pl = {
+          1.0/_pl.z, 0, -_pl.x/(_pl.z*_pl.z),
+          0, 1.0/_pl.z, -_pl.y/(_pl.z*_pl.z)
+        };
+        const Mat<float,2,4> dpld_plKcT_cd = dpld_pl * KcT_cd;
+        const Mat<float3,1,4> dIldxydpld_plKcT_cd = dIldxy * dpld_plKcT_cd;
+        const Mat<float3,1,4> dIldxydpld_plKcT_cdT_lr = dIldxy * (dpld_pl * (KcT_cd * T_lr) );
+
+        const Mat<float3,1,2> dIrdxy = dIr.template GetCentralDiff<float3>(pr.x, pr.y);
+        const Mat<float,2,3> dprd_pr = {
+            1.0/_pr.z, 0, -_pr.x/(_pr.z*_pr.z),
+            0, 1.0/_pr.z, -_pr.y/(_pr.z*_pr.z)
+        };
+
+        const Mat<float3,1,4> dIrdxydprd_prKcT_cd = dIrdxy * (dprd_pr * KcT_cd);
+
+        const Mat<float3,1,12> Jr = {
+            dIldxydpld_plKcT_cd * SE3gen0mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen0mul(Pr),
+            dIldxydpld_plKcT_cd * SE3gen1mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen1mul(Pr),
+            dIldxydpld_plKcT_cd * SE3gen2mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen2mul(Pr),
+            dIldxydpld_plKcT_cd * SE3gen3mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen3mul(Pr),
+            dIldxydpld_plKcT_cd * SE3gen4mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen4mul(Pr),
+            dIldxydpld_plKcT_cd * SE3gen5mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen5mul(Pr),
+            dIldxydpld_plKcT_cdT_lr * SE3gen0mul(Pr),
+            dIldxydpld_plKcT_cdT_lr * SE3gen1mul(Pr),
+            dIldxydpld_plKcT_cdT_lr * SE3gen2mul(Pr),
+            dIldxydpld_plKcT_cdT_lr * SE3gen3mul(Pr),
+            dIldxydpld_plKcT_cdT_lr * SE3gen4mul(Pr),
+            dIldxydpld_plKcT_cdT_lr * SE3gen5mul(Pr)
+        };
+
+        const float w = LSReweightTukey(y.x,c)+LSReweightTukey(y.y,c)+LSReweightTukey(y.z,c);
+        sum.JTJ = OuterProduct(Jr,w);
+        sum.JTy = mul_aTb(Jr, y*w);
+        sum.obs = 1;
+        sum.sqErr = dot(y,y);
+
+        const float f = abs(y.x) + abs(y.y) + abs(y.z);
+        const float d = f/(3*255.0f);
+        dDebug(u,v) = make_float4(d,d,d,1);
+    }else{
+        dDebug(u,v) = make_float4(1,0,0,1);
+    }
+    dSum(u,v) = sum;
+}
+
+LeastSquaresSystem<float,2*6> KinectCalibration(
+    const Image<float4> dPl, const Image<uchar3> dIl,
+    const Image<float4> dPr, const Image<uchar3> dIr,
+    const Mat<float,3,4> KcT_cd, const Mat<float,3,4> T_lr,
+    float c, Image<unsigned char> dWorkspace, Image<float4> dDebug
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dPl);
+    Image<LeastSquaresSystem<float,2*6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,2*6> >(dPl.w, dPl.h);
+
+    KernKinectCalibration<uchar3><<<gridDim,blockDim>>>(dPl, dIl, dPr, dIr, KcT_cd, T_lr, c, dSum, dDebug );
+
+    LeastSquaresSystem<float,2*6> sum;
+    sum.SetZero();
+    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,2*6> >() );
+
+}
 
 }

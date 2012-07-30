@@ -34,7 +34,7 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
         Ji[2] = ((-d*d*d*np_p1) * (nhat * dn_dz2)) + d * (dn_dz2[0]*P.x + dn_dz2[1]*P.y + dn_dz2[2]*P.z);
 
         sum.JTJ = OuterProduct(Ji, w);
-        sum.JTy = Ji * (y * w);
+        sum.JTy = mul_aTb(Ji, y*w );
         sum.sqErr = y*y;
         sum.obs = 1;
     }else{

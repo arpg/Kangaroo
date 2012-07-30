@@ -104,6 +104,13 @@ LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 
+LeastSquaresSystem<float,2*6> KinectCalibration(
+    const Image<float4> dPl, const Image<uchar3> dIl,
+    const Image<float4> dPr, const Image<uchar3> dIr,
+    const Mat<float,3,4> KcT_cd, const Mat<float,3,4> T_lr,
+    float c, Image<unsigned char> dWorkspace, Image<float4> dDebug
+);
+
 //////////////////////////////////////////////////////
 
 LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, Mat<float,3,3> Qinv, Mat<float,3> zhat, Image<unsigned char> dWorkspace, Image<float> dErr, float within, float c );

@@ -45,7 +45,7 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Vector3d t(1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02);
 
     // Camera (rgb) to reference (depth)
-    Sophus::SE3 T_rc(R,t);
+    Sophus::SE3 T_cr = Sophus::SE3(R,t).inverse();
 
     // Reference (depth) to world
     Sophus::SE3 T_wr;
@@ -68,13 +68,14 @@ int main( int /*argc*/, char* argv[] )
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
     Image<float, TargetDevice, Manage> dKinectf(w,h);
-    Image<uchar3, TargetDevice, Manage> dRgb8(w,h);
+    Image<uchar3, TargetDevice, Manage>  dI(w,h);
     Image<float4, TargetDevice, Manage>  dV(w,h);
     Image<float4, TargetDevice, Manage>  dN(w,h);
+    Image<uchar3, TargetDevice, Manage>  dIr(w,h);
     Image<float4, TargetDevice, Manage>  dVr(w,h);
     Image<float4, TargetDevice, Manage>  dNr(w,h);
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
-    Image<unsigned char, TargetDevice,Manage> dScratch(w*4*30,h);
+    Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
@@ -120,6 +121,7 @@ int main( int /*argc*/, char* argv[] )
     Var<float> gs("ui.gs",5, 1E-3, 10);
     Var<float> gr("ui.gr",100, 1E-3, 100);
 
+    Var<bool> bundle("ui.Bundle", false, true);
     Var<bool> pose_refinement("ui.Pose Refinement", false, true);
     Var<bool> pose_update("ui.Pose Update", false, true);
     Var<float> c("ui.c",0.5, 1E-3, 1);
@@ -138,7 +140,7 @@ int main( int /*argc*/, char* argv[] )
         if(go) {
             camera.Capture(img);
             Image<uchar3, TargetHost> hRgb8((uchar3*)img[0].Image.data,w,h);
-            dRgb8.CopyFrom(hRgb8);
+            dI.CopyFrom(hRgb8);
             dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
 
             if(applyBilateralFilter) {
@@ -150,6 +152,19 @@ int main( int /*argc*/, char* argv[] )
             KinectToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
             NormalsFromVbo(dN, dV);
 
+            if(bundle) {
+                const Eigen::Matrix<double, 3,4> mKcT_cd = Krgb * T_cr.matrix3x4();
+                const Eigen::Matrix<double, 3,4> mT_lr = T_lr.matrix3x4();
+                Gpu::LeastSquaresSystem<float,2*6> lss = KinectCalibration(dV, dI, dVr, dIr, mKcT_cd, mT_lr, 1E10, dScratch, dDebug);
+                Eigen::FullPivLU<Eigen::Matrix<double,12,12> > lu_JTJ( (Eigen::Matrix<double,12,12>)lss.JTJ );
+                Eigen::Matrix<double,12,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,12,1>)lss.JTy );
+                if(pose_update) {
+                    T_cr = T_cr * Sophus::SE3::exp(x.segment<6>(0));
+                    T_lr = T_lr * Sophus::SE3::exp(x.segment<6>(6));
+                }
+                texdebug << dDebug;
+            }
+
             if(pose_refinement) {
                 for(int i=0; i<2; ++i ) {
                     const Eigen::Matrix<double, 3,4> mKT_lr = Kdepth * T_lr.matrix3x4();
@@ -158,7 +173,7 @@ int main( int /*argc*/, char* argv[] )
                         dV, dVr, dNr, mKT_lr, mT_rl, c, dScratch, dDebug
                     );
                     Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                    Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,1,6>)lss.JTy).transpose() );
+                    Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
                     if(pose_update) {
                         T_lr = T_lr * Sophus::SE3::exp(x);
                     }
@@ -167,6 +182,7 @@ int main( int /*argc*/, char* argv[] )
             }
 
             if(Pushed(save_ref)) {
+                dIr.CopyFrom(dI);
                 dVr.CopyFrom(dV);
                 dNr.CopyFrom(dN);
                 T_lr = Sophus::SE3();
@@ -185,8 +201,8 @@ int main( int /*argc*/, char* argv[] )
             {
                 CudaScopedMappedPtr var(cbo);
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_rc.inverse().matrix3x4();
-                ColourVbo(dCbo, dV, dRgb8, KT_cd);
+                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cr.matrix3x4();
+                ColourVbo(dCbo, dV, dI, KT_cd);
             }
         }
 

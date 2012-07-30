@@ -1,5 +1,6 @@
 #include "all.h"
 #include "launch_utils.h"
+#include "pixel_convert.h"
 
 namespace Gpu
 {
@@ -7,64 +8,6 @@ namespace Gpu
 //////////////////////////////////////////////////////
 // Image Conversion
 //////////////////////////////////////////////////////
-
-template<typename To, typename Ti>
-__host__ __device__
-To ConvertPixel(Ti p)
-{
-    return p;
-}
-
-template<>
-__host__ __device__
-uchar4 ConvertPixel(unsigned char p)
-{
-    return make_uchar4(p,p,p,255);
-}
-
-template<>
-__host__ __device__
-uchar3 ConvertPixel(unsigned char p)
-{
-    return make_uchar3(p,p,p);
-}
-
-template<>
-__host__ __device__
-unsigned char ConvertPixel(uchar3 p)
-{
-    const unsigned sum = p.x + p.y + p.z;
-    return sum / 3;
-}
-
-template<>
-__host__ __device__
-unsigned char ConvertPixel(uchar4 p)
-{
-    const unsigned sum = p.x + p.y + p.z;
-    return sum / 3;
-}
-
-template<>
-__host__ __device__
-uchar4 ConvertPixel(uchar3 p)
-{
-    return make_uchar4(p.x,p.y,p.z,255);
-}
-
-template<>
-__host__ __device__
-uchar3 ConvertPixel(uchar4 p)
-{
-    return make_uchar3(p.x,p.y,p.z);
-}
-
-template<>
-__host__ __device__
-float4 ConvertPixel(float p)
-{
-    return make_float4(p,p,p,1.0);
-}
 
 template<typename To, typename Ti>
 __global__

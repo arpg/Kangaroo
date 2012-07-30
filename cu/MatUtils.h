@@ -79,6 +79,23 @@ Mat<float,3> operator*(const Mat<float,3,4>& T_ba, const Mat<float,4>& p_a)
     return m;
 }
 
+__host__ __device__ inline
+Mat<float,3,4> operator*(const Mat<float,3,4>& T_cb, const Mat<float,3,4>& T_ba)
+{
+    Mat<float,3,4> m;
+    m(0,0)= T_cb(0,0) * T_ba(0,0) + T_cb(0,1) * T_ba(1,0) + T_cb(0,2) * T_ba(2,0) + T_cb(0,3);
+    m(1,0)= T_cb(1,0) * T_ba(0,0) + T_cb(1,1) * T_ba(1,0) + T_cb(1,2) * T_ba(2,0) + T_cb(1,3);
+    m(2,0)= T_cb(2,0) * T_ba(0,0) + T_cb(2,1) * T_ba(1,0) + T_cb(2,2) * T_ba(2,0) + T_cb(2,3);
+    m(0,1)= T_cb(0,0) * T_ba(0,1) + T_cb(0,1) * T_ba(1,1) + T_cb(0,2) * T_ba(2,1) + T_cb(0,3);
+    m(1,1)= T_cb(1,0) * T_ba(0,1) + T_cb(1,1) * T_ba(1,1) + T_cb(1,2) * T_ba(2,1) + T_cb(1,3);
+    m(2,1)= T_cb(2,0) * T_ba(0,1) + T_cb(2,1) * T_ba(1,1) + T_cb(2,2) * T_ba(2,1) + T_cb(2,3);
+    m(0,2)= T_cb(0,0) * T_ba(0,2) + T_cb(0,1) * T_ba(1,2) + T_cb(0,2) * T_ba(2,2) + T_cb(0,3);
+    m(1,2)= T_cb(1,0) * T_ba(0,2) + T_cb(1,1) * T_ba(1,2) + T_cb(1,2) * T_ba(2,2) + T_cb(1,3);
+    m(2,2)= T_cb(2,0) * T_ba(0,2) + T_cb(2,1) * T_ba(1,2) + T_cb(2,2) * T_ba(2,2) + T_cb(2,3);
+    return m;
+}
+
+
 //////////////////////////////////////////////////////
 // Mat homegeneous multiplication with and floatx
 //////////////////////////////////////////////////////
@@ -267,6 +284,69 @@ float3 SE3gen4mul(const float4& p) {
 __host__ __device__ inline
 float3 SE3gen5mul(const float4& p) {
     return make_float3(-p.y,p.x,0);
+}
+
+//////////////////////////////////////////////////////
+// Mat of float3
+//////////////////////////////////////////////////////
+
+template<unsigned CR, unsigned C>
+inline __device__ __host__ Mat<float3,1,C> operator*(const Mat<float3, 1,CR>& lhs, const Mat<float,CR,C>& rhs)
+{
+    Mat<float3,1,C> ret;
+
+    for( unsigned c=0; c<C; ++c) {
+        ret(1,c) = lhs(1,0) * rhs(0,c);
+#pragma unroll
+        for( unsigned k=1; k<CR; ++k)  {
+            ret(1,c) += lhs(1,k) * rhs(k,c);
+        }
+    }
+    return ret;
+}
+
+// Homogeneous multiplication 3x4 * 3x1
+inline __device__ __host__ float3 operator*(const Mat<float3, 1,4>& T_ba, const float3& p_a)
+{
+    return make_float3(
+            T_ba(0).x * p_a.x + T_ba(1).x * p_a.y + T_ba(2).x * p_a.z + T_ba(3).x,
+            T_ba(0).y * p_a.x + T_ba(1).y * p_a.y + T_ba(2).y * p_a.z + T_ba(3).y,
+            T_ba(0).z * p_a.x + T_ba(1).z * p_a.y + T_ba(2).z * p_a.z + T_ba(3).z
+    );
+}
+
+//////////////////////////////////////////////////////
+// Outer Product Mat of float3
+//////////////////////////////////////////////////////
+
+template<unsigned R, unsigned C>
+inline __device__ __host__ SymMat<float,R*C> OuterProduct(const Mat<float3,R,C>& M, const float weight)
+{
+    const unsigned N = R*C;
+    SymMat<float,N> ret;
+    int i=0;
+    for( int r=0; r<N; ++r )
+#pragma unroll
+        for( int c=0; c<=r; ++c ) {
+            ret.m[i++] = weight * (
+                        M(r).x * M(c).x +
+                        M(r).y * M(c).y +
+                        M(r).z * M(c).z
+                    );
+        }
+    return ret;
+}
+
+template<unsigned R>
+inline __device__ __host__ Mat<float,R,1> mul_aTb(const Mat<float3,1,R>& a, const float3 b)
+{
+    Mat<float,R,1> ret;
+
+#pragma unroll
+    for( unsigned r=0; r<R; ++r) {
+        ret(r,1) = dot(a(1,r), b);
+    }
+    return ret;
 }
 
 }
