@@ -4,6 +4,8 @@
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 
+#include "common/ViconTracker.h"
+
 #include <fiducials/drawing.h>
 
 #include "common/RpgCameraOpen.h"
@@ -26,6 +28,9 @@ int main( int /*argc*/, char* argv[] )
 
     // Open video device
     CameraDevice camera = OpenRpgCamera("Kinect://");
+
+    // Open Vicon
+    ViconTracking tracker("KINECT","192.168.10.1");
 
     // http://nicolas.burrus.name/index.php/Research/KinectCalibration
     Eigen::Matrix3d Kdepth;
@@ -96,7 +101,7 @@ int main( int /*argc*/, char* argv[] )
     }
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrixRDF_TopLeft(w,h,Kdepth(0,0),Kdepth(1,1),Kdepth(0,2),Kdepth(1,2),1E-2,1E3),
-        IdentityMatrix(GlModelViewStack)
+        ModelViewLookAtRDF(0,5,5,0,0,0,0,0,1)
     );
     View& view3d = CreateDisplay().SetAspect((double)w/h).SetHandler(new Handler3D(s_cam, AxisNone));
     container.AddDisplay(view3d);
@@ -124,7 +129,9 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> bundle("ui.Bundle", false, true);
     Var<bool> pose_refinement("ui.Pose Refinement", false, true);
     Var<bool> pose_update("ui.Pose Update", false, true);
-    Var<float> c("ui.c",0.5, 1E-3, 1);
+    Var<bool> calib_update("ui.Calib Update", false, true);
+    Var<float> icp_c("ui.icp c",0.5, 1E-3, 1);
+    Var<float> img_c("ui.img c",10, 1, 1E3);
 
     Var<bool> save_ref("ui.Save Reference", true, false);
 
@@ -155,16 +162,19 @@ int main( int /*argc*/, char* argv[] )
             if(bundle) {
                 const Eigen::Matrix<double, 3,4> mKcT_cd = Krgb * T_cr.matrix3x4();
                 const Eigen::Matrix<double, 3,4> mT_lr = T_lr.matrix3x4();
-                Gpu::LeastSquaresSystem<float,2*6> lss = KinectCalibration(dV, dI, dVr, dIr, mKcT_cd, mT_lr, 1E10, dScratch, dDebug);
+                Gpu::LeastSquaresSystem<float,2*6> lss = KinectCalibration(dV, dI, dVr, dIr, mKcT_cd, mT_lr, img_c, dScratch, dDebug);
                 Eigen::FullPivLU<Eigen::Matrix<double,12,12> > lu_JTJ( (Eigen::Matrix<double,12,12>)lss.JTJ );
                 Eigen::Matrix<double,12,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,12,1>)lss.JTy );
-                cout << "-----------------------------------------------" << endl;
-                cout << (Eigen::Matrix<double,12,12>)lss.JTJ << endl;
-                cout << x.transpose() << endl;
-                if(pose_update) {
+//                cout << "-----------------------------------------------" << endl;
+//                cout << (Eigen::Matrix<double,12,12>)lss.JTJ << endl;
+//                cout << x.transpose() << endl;
+                if(calib_update) {
                     T_cr = T_cr * Sophus::SE3::exp(x.segment<6>(0));
+                }
+                if(pose_update) {
                     T_lr = T_lr * Sophus::SE3::exp(x.segment<6>(6));
                 }
+                cout << lss.sqErr / lss.obs << endl;
                 texdebug << dDebug;
             }
 
@@ -173,7 +183,7 @@ int main( int /*argc*/, char* argv[] )
                     const Eigen::Matrix<double, 3,4> mKT_lr = Kdepth * T_lr.matrix3x4();
                     const Eigen::Matrix<double, 3,4> mT_rl = T_lr.inverse().matrix3x4();
                     Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementProjectiveIcpPointPlane(
-                        dV, dVr, dNr, mKT_lr, mT_rl, c, dScratch, dDebug
+                        dV, dVr, dNr, mKT_lr, mT_rl, icp_c, dScratch, dDebug
                     );
                     Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                     Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
@@ -247,6 +257,15 @@ int main( int /*argc*/, char* argv[] )
                 RenderVbo(vbo, cbo, w, h);
                 glUnsetFrameOfReference();
 
+                glDrawAxis(0.2);
+            }
+            glUnsetFrameOfReference();
+
+            glColor3f(0.8,0.8,0.8);
+            glDraw_z0(1.0,5);
+
+            glSetFrameOfReferenceF(tracker.T_wf);
+            {
                 glDrawAxis(0.2);
             }
             glUnsetFrameOfReference();

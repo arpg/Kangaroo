@@ -12,34 +12,6 @@ using namespace std;
 using namespace pangolin;
 using namespace Eigen;
 
-inline void glSetFrameOfReferenceF( const Sophus::SE3& T_wf )
-{
-  glMatrixMode(GL_MODELVIEW);
-  glPushMatrix();
-  glMultMatrix( T_wf.matrix() );
-}
-
-inline void glUnsetFrameOfReference()
-{
-  glPopMatrix();
-}
-
-inline void glDrawGrid(float num_lines, float line_delta)
-{
-    glBegin(GL_LINES);
-
-    for(int i = -num_lines; i < num_lines; i++){
-        glVertex3f( line_delta*num_lines, i*line_delta, 0.0);
-        glVertex3f(-line_delta*num_lines, i*line_delta, 0.0);
-
-        glVertex3f(i*line_delta,  line_delta*num_lines, 0.0);
-        glVertex3f(i*line_delta, -line_delta*num_lines, 0.0);
-    }
-
-    glEnd();
-}
-
-
 int main( int /*argc*/, char* argv[] )
 {
     const int w = 640;
@@ -52,12 +24,12 @@ int main( int /*argc*/, char* argv[] )
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     pangolin::OpenGlRenderState s_cam;
-    s_cam.Set(ProjectionMatrix(640,480,420,420,320,240,0.1,1000));
-    s_cam.Set(IdentityMatrix(GlModelViewStack));
+    s_cam.SetProjectionMatrix(ProjectionMatrix(640,480,420,420,320,240,0.1,1000));
+    s_cam.SetModelViewMatrix(ModelViewLookAt(0,5,5,0,0,0,0,0,1));
 
     View& d_cam = pangolin::CreateDisplay()
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
-      .SetHandler(new Handler3D(s_cam));
+      .SetHandler(new Handler3D(s_cam,AxisZ));
 
     ViconTracking tracker("CAR","192.168.10.1");
 
@@ -65,20 +37,17 @@ int main( int /*argc*/, char* argv[] )
     {
         d_cam.ActivateScissorAndClear(s_cam);
 
-        glColor3f(0.5,0.5,0.5);
-        glDrawGrid(20,0.25);
-
-        glDisable(GL_DEPTH_TEST);
         glColor3f(0.8,0.8,0.8);
-        glDrawGrid(5,1.0);
+        glDraw_z0(1.0,5);
+        glDisable(GL_DEPTH_TEST);
         glDrawAxis(2);
         glEnable(GL_DEPTH_TEST);
 
         // Draw Vicon
-        glSetFrameOfReferenceF(tracker.T_wf);
+        glPushMatrix();
+        glMultMatrix( tracker.T_wf.matrix() );
         glDrawAxis(1);
-        glUnsetFrameOfReference();
-
+        glPopMatrix();
 
         pangolin::FinishGlutFrame();
     }
