@@ -4,6 +4,33 @@
 
 namespace Gpu {
 
+///////////////////////////////////////////
+// IsFinite
+///////////////////////////////////////////
+
+template<unsigned R, unsigned C>
+__device__ inline
+bool IsFinite(const Mat<float,R,C>& mat)
+{
+    for(int i=0; i<R*C; ++i) {
+        if( !isfinite(mat[i]) )
+            return false;
+    }
+    return true;
+}
+
+template<unsigned R, unsigned C>
+__device__ inline
+bool IsFinite(const Mat<float3,R,C>& mat)
+{
+    for(int i=0; i<R*C; ++i) {
+        const float3& el = mat[i];
+        if( !isfinite(el.x) || !isfinite(el.y) || !isfinite(el.z) )
+            return false;
+    }
+    return true;
+}
+
 //////////////////////////////////////////////////////
 // Pose refinement from depthmap
 //////////////////////////////////////////////////////
@@ -184,7 +211,7 @@ __global__ void KernKinectCalibration(
     const float2 pl = dn(_pl);
     const float2 pr = dn(_pr);
 
-    if( dIl.InBounds(pl,2) && dIr.InBounds(pr,2) ) {
+    if( isfinite(Pr.z) && isfinite(Pl.z) && dIl.InBounds(pl,2) && dIr.InBounds(pr,2) ) {
         const float3 y = dIl.template GetBilinear<float3>(pl) - dIr.template GetBilinear<float3>(pr);
 
         const Mat<float3,1,2> dIldxy = dIl.template GetCentralDiff<float3>(pl.x, pl.y);
@@ -227,6 +254,7 @@ __global__ void KernKinectCalibration(
 
         const float f = abs(y.x) + abs(y.y) + abs(y.z);
         const float d = f/(3*255.0f);
+
         dDebug(u,v) = make_float4(d,d,d,1);
     }else{
         dDebug(u,v) = make_float4(1,0,0,1);

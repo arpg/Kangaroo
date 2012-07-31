@@ -553,7 +553,6 @@ inline __device__ __host__ float3 dn( const float4& x )
     return (float3){x.x/x.w, x.y/x.w, x.z/x.w};
 }
 
-
 ///////////////////////////////////////////
 // IO
 ///////////////////////////////////////////

@@ -158,6 +158,9 @@ int main( int /*argc*/, char* argv[] )
                 Gpu::LeastSquaresSystem<float,2*6> lss = KinectCalibration(dV, dI, dVr, dIr, mKcT_cd, mT_lr, 1E10, dScratch, dDebug);
                 Eigen::FullPivLU<Eigen::Matrix<double,12,12> > lu_JTJ( (Eigen::Matrix<double,12,12>)lss.JTJ );
                 Eigen::Matrix<double,12,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,12,1>)lss.JTy );
+                cout << "-----------------------------------------------" << endl;
+                cout << (Eigen::Matrix<double,12,12>)lss.JTJ << endl;
+                cout << x.transpose() << endl;
                 if(pose_update) {
                     T_cr = T_cr * Sophus::SE3::exp(x.segment<6>(0));
                     T_lr = T_lr * Sophus::SE3::exp(x.segment<6>(6));

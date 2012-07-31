@@ -296,10 +296,10 @@ inline __device__ __host__ Mat<float3,1,C> operator*(const Mat<float3, 1,CR>& lh
     Mat<float3,1,C> ret;
 
     for( unsigned c=0; c<C; ++c) {
-        ret(1,c) = lhs(1,0) * rhs(0,c);
+        ret(0,c) = lhs(0,0) * rhs(0,c);
 #pragma unroll
         for( unsigned k=1; k<CR; ++k)  {
-            ret(1,c) += lhs(1,k) * rhs(k,c);
+            ret(0,c) += lhs(0,k) * rhs(k,c);
         }
     }
     return ret;
@@ -344,7 +344,7 @@ inline __device__ __host__ Mat<float,R,1> mul_aTb(const Mat<float3,1,R>& a, cons
 
 #pragma unroll
     for( unsigned r=0; r<R; ++r) {
-        ret(r,1) = dot(a(1,r), b);
+        ret(r,0) = dot(a(0,r), b);
     }
     return ret;
 }
