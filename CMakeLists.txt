@@ -122,13 +122,13 @@ if(CUDA_FOUND)
 
   set( BuildDenseStereo true CACHE "" force )
   if( BuildDenseStereo )
-      cuda_add_executable( DenseStereo ${CU_COMMON_SRC} ${COMMON_SRC} DenseStereo.cpp common/ScanlineRectify.h )
+      cuda_add_executable( DenseStereo ${CU_COMMON_SRC} ${COMMON_SRC} DenseStereo.cpp common/ScanlineRectify.h common/HeightmapFusion.h)
       target_link_libraries( DenseStereo ${CUDA_npp_LIBRARY} )
   endif()
 
   set( BuildKinectHeightmap true CACHE "" force )
   if( BuildKinectHeightmap )
-      cuda_add_executable( KinectHeightmap ${CU_COMMON_SRC} ${COMMON_SRC} KinectHeightmap.cpp common/ScanlineRectify.h )
+      cuda_add_executable( KinectHeightmap ${CU_COMMON_SRC} ${COMMON_SRC} KinectHeightmap.cpp common/ScanlineRectify.h common/HeightmapFusion.h )
       target_link_libraries( KinectHeightmap ${CUDA_npp_LIBRARY} vrpn )
   endif()
 

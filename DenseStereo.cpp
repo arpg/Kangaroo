@@ -17,6 +17,7 @@
 #include "common/ScanlineRectify.h"
 #include "common/ImageSelect.h"
 #include "common/BaseDisplay.h"
+#include "common/HeightmapFusion.h"
 
 #include "cu/all.h"
 
@@ -233,37 +234,16 @@ int main( int /*argc*/, char* argv[] )
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(w,h,80);
     Image<unsigned char, TargetDevice, Manage> dImgv(w,h);
 
+    HeightmapFusion hm(100,100,10);
 
-    // heightmap size calculation
-    double dHeightMapWidthMeters = 100;
-    double dHeightMapHeightMeters = 100;
-    double dPixelsPerMeter = 10;
-    double w_hm = dHeightMapWidthMeters*dPixelsPerMeter;
-    double h_hm = dHeightMapHeightMeters*dPixelsPerMeter;
-
-    // Plane (z=0) to heightmap transform (adjust to pixel units)
-    Eigen::Matrix4d eT_hp;
-    eT_hp << dPixelsPerMeter, 0, 0, 0,
-             0, dPixelsPerMeter, 0, 0,
-             0, 0, 1, 0,
-             0, 0, 0, 1;
-
-    // Heightmap to world transform (set once we know the plane)
-    Eigen::Matrix4d T_hw;
-
-    Image<float4, TargetDevice,Manage> dHeightMap(w_hm, h_hm);
-    GlBufferCudaPtr vbo_hm(GlArrayBuffer, w_hm*h_hm*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo_hm(GlArrayBuffer, w_hm*h_hm*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, w_hm*h_hm*sizeof(uint2) );
-    GlTextureCudaArray tex_hm(w_hm,h_hm,GL_RGBA8);
-
-    //initialize the heightmap
-    InitHeightMap(dHeightMap);
+    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(uint2) );
 
     //generate index buffer for heightmap
     {
         CudaScopedMappedPtr var(ibo_hm);
-        Gpu::Image<uint2> dIbo((uint2*)*var,w_hm,h_hm);
+        Gpu::Image<uint2> dIbo((uint2*)*var,hm.WidthPixels(),hm.HeightPixels());
         GenerateTriangleStripIndexBuffer(dIbo);
     }
 
@@ -327,7 +307,7 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
-    const int N = 5;
+    const int N = 3;
     for(int i=0; i<N; ++i ) {
         View& v = CreateDisplay();
         v.SetAspect((double)w/h);
@@ -338,10 +318,9 @@ int main( int /*argc*/, char* argv[] )
 
     Handler2dImageSelect handler2d(w,h);
     container[0].SetDrawFunction(ActivateDrawTexture(tex8LeftImg, true)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(ActivateDrawTexture(tex8RightImg, true)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(ActivateDrawTexture(texfDisp, true)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(ActivateDrawTexture(texf4Debug, true)).SetHandler(new Handler2dImageSelect(w,h));
-    container[4].SetDrawFunction(ActivateDrawTexture(tex_hm, true)).SetHandler(new Handler2dImageSelect(w,h));
+//    container[1].SetDrawFunction(ActivateDrawTexture(tex8RightImg, true)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(ActivateDrawTexture(texfDisp, true)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(ActivateDrawTexture(texf4Debug, true)).SetHandler(new Handler2dImageSelect(w,h));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -429,32 +408,16 @@ int main( int /*argc*/, char* argv[] )
 
             if(Pushed(resetPlane) ) {
                 Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
-                T_nw.block<2,1>(0,3) += Eigen::Vector2d(dHeightMapWidthMeters/2, dHeightMapHeightMeters /*/2*/);
-                T_hw = eT_hp * T_nw;
-                InitHeightMap(dHeightMap);
+                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
+                hm.Init(T_nw);
             }
 
             //calcualte the camera to heightmap transform
             if(fuse)
             {
-                Eigen::Matrix<double,3,4> T_hc = (T_hw * T_wc.matrix()).block<3,4>(0,0);
-
-                UpdateHeightMap(dHeightMap,d3d,dCamImg[0],T_hc);
-
-                // Copy point cloud into VBO
-                {
-                    CudaScopedMappedPtr var(vbo_hm);
-                    Gpu::Image<float4> dVbo((float4*)*var,w_hm,h_hm);
-                    VboFromHeightMap(dVbo,dHeightMap);
-                }
-
-                // Generate CBO
-                {
-                    CudaScopedMappedPtr var(cbo_hm);
-                    Gpu::Image<uchar4> dCbo((uchar4*)*var,w_hm,h_hm);
-                    ColourHeightMap(dCbo,dHeightMap);
-                    tex_hm << dCbo;
-                }
+                hm.Fuse(d3d, dCamImg[0], T_wc);
+                hm.GenerateVbo(vbo_hm);
+                hm.GenerateCbo(cbo_hm);
             }
 
             if(pose_refinement) {
@@ -547,8 +510,8 @@ int main( int /*argc*/, char* argv[] )
             //transform the mesh into world coordinates from heightmap coordinates
             glMatrixMode(GL_MODELVIEW);
             glPushMatrix();
-            glMultMatrix( T_hw.inverse() );
-            RenderVbo(ibo_hm,vbo_hm,cbo_hm, w_hm, h_hm, show_mesh, show_color);
+            glMultMatrix( hm.T_hw().inverse() );
+            RenderVbo(ibo_hm,vbo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
             glPopMatrix();
         }
 
