@@ -25,10 +25,11 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
     if(dHeightMap.InBounds(x,y) == true) {
         //calculate the variance of the measurement
         float v_z = p_c.z*0.01; //this is the perp. distance from the camera
+        unsigned char colour = dImage.IsValid() ? dImage(u,v) : 0;
         float4 oldVal = dHeightMap(x,y);
         float4 newVal = make_float4((oldVal.y * p_h.z + v_z * oldVal.x)/(oldVal.y+v_z),
                                     oldVal.y*v_z / (oldVal.y+v_z),
-                                    (oldVal.y * dImage(u,v) + v_z * oldVal.z)/(oldVal.y+v_z),
+                                    (oldVal.y * colour + v_z * oldVal.z)/(oldVal.y+v_z),
                                     0.0);
 
         // Take new val

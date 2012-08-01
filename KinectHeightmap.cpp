@@ -12,6 +12,7 @@
 #include "common/ImageSelect.h"
 #include "common/BaseDisplay.h"
 #include "common/DisplayUtils.h"
+#include "common/HeightmapFusion.h"
 
 #include "cu/all.h"
 #include "cu/Image.h"
@@ -82,6 +83,19 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
+    HeightmapFusion hm(100,100,10);
+
+    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(uint2) );
+
+    //generate index buffer for heightmap
+    {
+        CudaScopedMappedPtr var(ibo_hm);
+        Gpu::Image<uint2> dIbo((uint2*)*var,hm.WidthPixels(),hm.HeightPixels());
+        GenerateTriangleStripIndexBuffer(dIbo);
+    }
+
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
     GlTexture texrgb(w,h,GL_RGB8, false);
@@ -134,7 +148,10 @@ int main( int /*argc*/, char* argv[] )
     Var<float> img_c("ui.img c",10, 1, 1E3);
 
     Var<bool> save_ref("ui.Save Reference", true, false);
-
+    Var<bool> fuse("ui.Fuse Heightmap", false, true);
+    Var<bool> resetHeightmap("ui.Reset Heightmap", true, false);
+    Var<bool> show_heightmap("ui.show heightmap", false, true);
+    Var<bool> show_mesh("ui.show mesh", true, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -194,6 +211,20 @@ int main( int /*argc*/, char* argv[] )
                 texdebug << dDebug;
             }
 
+            if(fuse)
+            {
+//                hm.Fuse(d3d, dCamImg[0], T_wc);
+                hm.Fuse(dV, T_wr);
+                hm.GenerateVbo(vbo_hm);
+//                hm.GenerateCbo(cbo_hm);
+            }
+
+            if(Pushed(resetHeightmap) ) {
+                Eigen::Matrix4d T_nw = Eigen::Matrix4d::Identity();
+                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
+                hm.Init(T_nw);
+            }
+
             if(Pushed(save_ref)) {
                 dIr.CopyFrom(dI);
                 dVr.CopyFrom(dV);
@@ -244,6 +275,15 @@ int main( int /*argc*/, char* argv[] )
 
         if(lockToCam) glSetFrameOfReferenceF(T_wr.inverse());
 
+        //draw the global heightmap
+        if(show_heightmap) {
+            glPushMatrix();
+            glMultMatrix( hm.T_hw().inverse() );
+//            RenderVbo(ibo_hm,vbo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
+            RenderVboIbo(vbo_hm,ibo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh);
+            glPopMatrix();
+        }
+
         {
             glSetFrameOfReferenceF(T_wr);
             {
@@ -254,7 +294,7 @@ int main( int /*argc*/, char* argv[] )
                 glSetFrameOfReferenceF(T_lr.inverse());
                 glDrawAxis(0.2);
                 glColor3f(1,1,1);
-                RenderVbo(vbo, cbo, w, h);
+                RenderVboCbo(vbo, cbo, w, h);
                 glUnsetFrameOfReference();
 
                 glDrawAxis(0.2);

@@ -511,7 +511,7 @@ int main( int /*argc*/, char* argv[] )
             glMatrixMode(GL_MODELVIEW);
             glPushMatrix();
             glMultMatrix( hm.T_hw().inverse() );
-            RenderVbo(ibo_hm,vbo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
+            RenderVboIboCbo(vbo_hm,ibo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
             glPopMatrix();
         }
 
@@ -519,7 +519,7 @@ int main( int /*argc*/, char* argv[] )
         {
             glSetFrameOfReferenceF(T_wc);
             if(show_depthmap) {
-                RenderVbo(ibo,vbo,cbo, w, h, show_mesh, show_color);
+                RenderVboIboCbo(vbo,ibo,cbo, w, h, show_mesh, show_color);
             }
             glColor3f(1.0,1.0,1.0);
             DrawFrustrum(Kinv,w,h,1.0);

@@ -32,6 +32,12 @@ public:
         Gpu::InitHeightMap(dHeightMap);
     }
 
+    void Fuse(Gpu::Image<float4> d3d, const Sophus::SE3& T_wc)
+    {
+        Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
+        Gpu::UpdateHeightMap(dHeightMap,d3d,Gpu::Image<unsigned char>(),T_hc);
+    }
+
     void Fuse(Gpu::Image<float4> d3d, Gpu::Image<unsigned char> dImg, const Sophus::SE3& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);

@@ -25,7 +25,7 @@ inline void RenderVbo(pangolin::GlBufferCudaPtr& vbo, int w, int h)
     vbo.Unbind();
 }
 
-inline void RenderVbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& cbo, int w, int h, bool draw_color = true)
+inline void RenderVboCbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& cbo, int w, int h, bool draw_color = true)
 {
     if(draw_color) {
         cbo.Bind();
@@ -49,7 +49,28 @@ inline void RenderVbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr&
     vbo.Unbind();
 }
 
-inline void RenderVbo(pangolin::GlBufferCudaPtr& ibo, pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& cbo, int w, int h, bool draw_mesh = true, bool draw_color = true)
+inline void RenderVboIbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& ibo, int w, int h, bool draw_mesh = true)
+{
+    vbo.Bind();
+    glVertexPointer(4, GL_FLOAT, 0, 0);
+    glEnableClientState(GL_VERTEX_ARRAY);
+
+    if(draw_mesh) {
+        ibo.Bind();
+        for( int r=0; r<h-1; ++r) {
+            glDrawElements(GL_TRIANGLE_STRIP,2*w, GL_UNSIGNED_INT, (unsigned int*)0 + 2*w*r);
+        }
+        ibo.Unbind();
+    }else{
+        glPointSize(2.0);
+        glDrawArrays(GL_POINTS, 0, w * h);
+    }
+
+    glDisableClientState(GL_VERTEX_ARRAY);
+    vbo.Unbind();
+}
+
+inline void RenderVboIboCbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& ibo, pangolin::GlBufferCudaPtr& cbo, int w, int h, bool draw_mesh = true, bool draw_color = true)
 {
     if(draw_color) {
         cbo.Bind();

@@ -214,6 +214,12 @@ struct Image {
     // Direct Pixel Access
     //////////////////////////////////////////////////////
 
+    inline __device__ __host__
+    bool IsValid() const
+    {
+        return ptr != 0;
+    }
+
     inline  __device__ __host__
     T* RowPtr(size_t y)
     {
