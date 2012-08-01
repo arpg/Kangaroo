@@ -9,6 +9,7 @@
 struct ViconTracking
 {
     ViconTracking( std::string objectName, std::string host)
+        : m_connected(false)
     {
         const std::string uri = objectName + "@" + host;
         m_object = new vrpn_Tracker_Remote( uri.c_str() );
@@ -23,6 +24,11 @@ struct ViconTracking
     {
         Stop();
         delete m_object;
+    }
+
+    inline bool IsConnected()
+    {
+        return m_connected;
     }
 
     void EventLoop() {
@@ -46,6 +52,7 @@ struct ViconTracking
         T_wf = Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)),
             Eigen::Vector3d(tData.pos[0], tData.pos[1], tData.pos[2])
         );
+        m_connected = true;
     }
 
     static void VRPN_CALLBACK pose_callback(void* userData, const vrpn_TRACKERCB tData )
@@ -78,6 +85,7 @@ struct ViconTracking
 
     Sophus::SE3 T_wf;
 
+    bool m_connected;
     bool m_run;
     vrpn_Tracker_Remote* m_object;
     boost::thread m_event_thread;

@@ -211,7 +211,11 @@ int main( int /*argc*/, char* argv[] )
 #ifdef USE_VICON
     ViconTracking vicon("KINECT","192.168.10.1");
     std::vector<Observation> vicon_obs;
+
+    // vicon frame to camera transform
     Sophus::SE3 T_cf;
+
+    // Target to World transform
     Sophus::SE3 T_wt;
 #endif
 
@@ -404,12 +408,13 @@ int main( int /*argc*/, char* argv[] )
         if(Pushed(guess)) {
             T_cf = Sophus::SE3();
             T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
-
             cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
         }
 
         if(Pushed(minimise_vicon)) {
             OptimiseTargetVicon(cam,tracker.target,vicon_obs, T_cf, T_wt);
+            cout << "Vicon to camera (T_cv)" << endl;
+            cout << T_cf << endl;
         }
 
         if(Pushed(reset)) {

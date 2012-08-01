@@ -44,14 +44,18 @@ int main( int /*argc*/, char* argv[] )
             0, 5.2556393630057437e+02, 2.6748068171871557e+02,
             0,0,1;
 
-    Eigen::Matrix3d R;
-    R <<  9.9984628826577793e-01, 1.2635359098409581e-03, -1.7487233004436643e-02,
+    // Vicon to Camera
+    Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
+    Eigen::Matrix3d RDFvicon; RDFvicon << 0,-1,0,  0,0,-1,  1,0,0;
+    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
+
+    // Camera (rgb) to depth
+    Eigen::Matrix3d R_dc;
+    R_dc <<  9.9984628826577793e-01, 1.2635359098409581e-03, -1.7487233004436643e-02,
           -1.4779096108364480e-03, 9.9992385683542895e-01, -1.2251380107679535e-02,
           1.7470421412464927e-02, 1.2275341476520762e-02, 9.9977202419716948e-01;
-    Eigen::Vector3d t(1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02);
-
-    // Camera (rgb) to reference (depth)
-    Sophus::SE3 T_cr = Sophus::SE3(R,t).inverse();
+    Eigen::Vector3d c_d(1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02);
+    Sophus::SE3 T_cd = Sophus::SE3(R_dc,c_d).inverse();
 
     // Reference (depth) to world
     Sophus::SE3 T_wr;
@@ -177,7 +181,7 @@ int main( int /*argc*/, char* argv[] )
             NormalsFromVbo(dN, dV);
 
             if(bundle) {
-                const Eigen::Matrix<double, 3,4> mKcT_cd = Krgb * T_cr.matrix3x4();
+                const Eigen::Matrix<double, 3,4> mKcT_cd = Krgb * T_cd.matrix3x4();
                 const Eigen::Matrix<double, 3,4> mT_lr = T_lr.matrix3x4();
                 Gpu::LeastSquaresSystem<float,2*6> lss = KinectCalibration(dV, dI, dVr, dIr, mKcT_cd, mT_lr, img_c, dScratch, dDebug);
                 Eigen::FullPivLU<Eigen::Matrix<double,12,12> > lu_JTJ( (Eigen::Matrix<double,12,12>)lss.JTJ );
@@ -186,13 +190,18 @@ int main( int /*argc*/, char* argv[] )
 //                cout << (Eigen::Matrix<double,12,12>)lss.JTJ << endl;
 //                cout << x.transpose() << endl;
                 if(calib_update) {
-                    T_cr = T_cr * Sophus::SE3::exp(x.segment<6>(0));
+                    T_cd = T_cd * Sophus::SE3::exp(x.segment<6>(0));
                 }
                 if(pose_update) {
                     T_lr = T_lr * Sophus::SE3::exp(x.segment<6>(6));
                 }
                 cout << lss.sqErr / lss.obs << endl;
                 texdebug << dDebug;
+            }
+
+            if(tracker.IsConnected())
+            {
+                T_lr = T_cd.inverse() * T_cv * tracker.T_wf.inverse() * T_wr;
             }
 
             if(pose_refinement) {
@@ -245,7 +254,7 @@ int main( int /*argc*/, char* argv[] )
             {
                 CudaScopedMappedPtr var(cbo);
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cr.matrix3x4();
+                Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
                 ColourVbo(dCbo, dV, dI, KT_cd);
             }
         }
