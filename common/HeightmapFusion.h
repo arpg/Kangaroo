@@ -58,6 +58,36 @@ public:
         Gpu::ColourHeightMap(dCbo,dHeightMap);
     }
 
+    void SaveHeightmap(std::string heightfile, std::string imagefile)
+    {
+        Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(wp,hp);
+        Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> dHeight(wp,hp);
+        Gpu::GenerateHeightAndImageFromHeightmap(dHeight, dImg, dHeightMap);
+
+        Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
+        Gpu::Image<float, Gpu::TargetHost, Gpu::Manage> hHeight(wp,hp);
+        hImg.CopyFrom(dImg);
+        hHeight.CopyFrom(dHeight);
+
+        std::ofstream hof(heightfile);
+        for(unsigned r=0; r < hp; ++r) {
+            for(unsigned c=0; c < wp; ++c) {
+                hof << hHeight(r,c) << " ";
+            }
+            hof << std::endl;
+        }
+        hof.close();
+
+        std::ofstream iof(imagefile);
+        for(unsigned r=0; r < hp; ++r) {
+            for(unsigned c=0; c < wp; ++c) {
+                iof << hImg(r,c) << " ";
+            }
+            iof << std::endl;
+        }
+        iof.close();
+    }
+
     Gpu::Image<float4> GetHeightMap()
     {
         return dHeightMap;

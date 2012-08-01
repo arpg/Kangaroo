@@ -161,6 +161,8 @@ void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Im
 
 void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap);
 
+void GenerateHeightAndImageFromHeightmap(Image<float> dHeight, Image<unsigned char> dImage, const Image<float4> dHeightMap);
+
 //////////////////////////////////////////////////////
 
 struct __align__(8) CostVolElem

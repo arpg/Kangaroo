@@ -46,8 +46,10 @@ int main( int /*argc*/, char* argv[] )
 
     // Vicon to Camera
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
-    Eigen::Matrix3d RDFvicon; RDFvicon << 0,-1,0,  0,0,-1,  1,0,0;
-    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
+    Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1, 0,-1,0;
+//    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
+    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.0417093,0.0215285,0.657274,-0.752188)), Eigen::Vector3d(-0.0166842,-0.0226804,-0.136051) );
+
 
     // Camera (rgb) to depth
     Eigen::Matrix3d R_dc;
@@ -79,6 +81,7 @@ int main( int /*argc*/, char* argv[] )
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
     Image<float, TargetDevice, Manage> dKinectf(w,h);
     Image<uchar3, TargetDevice, Manage>  dI(w,h);
+    Image<unsigned char, TargetDevice, Manage>  dIgrey(w,h);
     Image<float4, TargetDevice, Manage>  dV(w,h);
     Image<float4, TargetDevice, Manage>  dN(w,h);
     Image<uchar3, TargetDevice, Manage>  dIr(w,h);
@@ -87,7 +90,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
-    HeightmapFusion hm(100,100,10);
+    HeightmapFusion hm(10,10,100);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -154,12 +157,17 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> save_ref("ui.Save Reference", true, false);
     Var<bool> fuse("ui.Fuse Heightmap", false, true);
     Var<bool> resetHeightmap("ui.Reset Heightmap", true, false);
-    Var<bool> show_heightmap("ui.show heightmap", false, true);
+    Var<bool> show_heightmap("ui.show heightmap", true, true);
     Var<bool> show_mesh("ui.show mesh", true, true);
+    Var<bool> show_colour("ui.show colour", true, true);
+    Var<bool> save_map("ui.save_map", false, false);
 
-    pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+    pangolin::RegisterKeyPressCallback(' ', [&fuse](){fuse = !fuse;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback('r', [&resetHeightmap](){resetHeightmap = true;} );
+
+    bool tracking_good = true;
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {        
@@ -167,9 +175,14 @@ int main( int /*argc*/, char* argv[] )
 
         if(go) {
             camera.Capture(img);
-            Image<uchar3, TargetHost> hRgb8((uchar3*)img[0].Image.data,w,h);
-            dI.CopyFrom(hRgb8);
+            dI.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
             dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+
+            if(tracker.IsConnected())
+            {
+                tracking_good = tracker.IsNewData();
+                T_lr = T_cd.inverse() * T_cv * tracker.T_wf().inverse() * T_wr;
+            }
 
             if(applyBilateralFilter) {
                 BilateralFilter(dKinectf,dKinect,gs,gr,bilateralWinSize);
@@ -199,10 +212,6 @@ int main( int /*argc*/, char* argv[] )
                 texdebug << dDebug;
             }
 
-            if(tracker.IsConnected())
-            {
-                T_lr = T_cd.inverse() * T_cv * tracker.T_wf.inverse() * T_wr;
-            }
 
             if(pose_refinement) {
                 for(int i=0; i<2; ++i ) {
@@ -220,31 +229,6 @@ int main( int /*argc*/, char* argv[] )
                 texdebug << dDebug;
             }
 
-            if(fuse)
-            {
-//                hm.Fuse(d3d, dCamImg[0], T_wc);
-                hm.Fuse(dV, T_wr);
-                hm.GenerateVbo(vbo_hm);
-//                hm.GenerateCbo(cbo_hm);
-            }
-
-            if(Pushed(resetHeightmap) ) {
-                Eigen::Matrix4d T_nw = Eigen::Matrix4d::Identity();
-                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
-                hm.Init(T_nw);
-            }
-
-            if(Pushed(save_ref)) {
-                dIr.CopyFrom(dI);
-                dVr.CopyFrom(dV);
-                dNr.CopyFrom(dN);
-                T_lr = Sophus::SE3();
-            }
-
-            texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
-            texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
-            texnorm << dN;
-
             {
                 CudaScopedMappedPtr var(vbo);
                 Gpu::Image<float4> dVbo((float4*)*var,w,h);
@@ -256,7 +240,37 @@ int main( int /*argc*/, char* argv[] )
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
                 Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
                 ColourVbo(dCbo, dV, dI, KT_cd);
+                Gpu::ConvertImage<unsigned char, uchar4>(dIgrey, dCbo);
             }
+
+            if(fuse && tracking_good)
+            {
+                hm.Fuse(dV, dIgrey, T_wr * T_lr.inverse());
+                hm.GenerateVbo(vbo_hm);
+                hm.GenerateCbo(cbo_hm);
+            }
+
+            if(Pushed(resetHeightmap) ) {
+                Eigen::Matrix4d T_nw = Eigen::Matrix4d::Identity();
+                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /2);
+                hm.Init(T_nw);
+            }
+
+            if(Pushed(save_ref)) {
+                dIr.CopyFrom(dI);
+                dVr.CopyFrom(dV);
+                dNr.CopyFrom(dN);
+                T_lr = Sophus::SE3();
+            }
+
+            if(Pushed(save_map)) {
+                hm.SaveHeightmap("heightmap.eigen", "image.dat");
+            }
+
+            texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
+            texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
+            texnorm << dN;
+
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -288,8 +302,7 @@ int main( int /*argc*/, char* argv[] )
         if(show_heightmap) {
             glPushMatrix();
             glMultMatrix( hm.T_hw().inverse() );
-//            RenderVbo(ibo_hm,vbo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
-            RenderVboIbo(vbo_hm,ibo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh);
+            RenderVboIboCbo(vbo_hm,ibo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_colour);
             glPopMatrix();
         }
 
@@ -300,11 +313,13 @@ int main( int /*argc*/, char* argv[] )
 //                glDrawAxis(0.5);
 //                glUnsetFrameOfReference();
 
-                glSetFrameOfReferenceF(T_lr.inverse());
-                glDrawAxis(0.2);
-                glColor3f(1,1,1);
-                RenderVboCbo(vbo, cbo, w, h);
-                glUnsetFrameOfReference();
+                if(tracking_good) {
+                    glSetFrameOfReferenceF(T_lr.inverse());
+                    glDrawAxis(0.2);
+                    glColor3f(1,1,1);
+                    RenderVboCbo(vbo, cbo, w, h);
+                    glUnsetFrameOfReference();
+                }
 
                 glDrawAxis(0.2);
             }
@@ -312,12 +327,6 @@ int main( int /*argc*/, char* argv[] )
 
             glColor3f(0.8,0.8,0.8);
             glDraw_z0(1.0,5);
-
-            glSetFrameOfReferenceF(tracker.T_wf);
-            {
-                glDrawAxis(0.2);
-            }
-            glUnsetFrameOfReference();
         }
 
         if(lockToCam) glUnsetFrameOfReference();

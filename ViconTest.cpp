@@ -45,7 +45,7 @@ int main( int /*argc*/, char* argv[] )
 
         // Draw Vicon
         glPushMatrix();
-        glMultMatrix( tracker.T_wf.matrix() );
+        glMultMatrix( tracker.T_wf().matrix() );
         glDrawAxis(1);
         glPopMatrix();
 

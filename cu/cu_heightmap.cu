@@ -8,6 +8,14 @@ namespace Gpu
 // Plane Fitting
 //////////////////////////////////////////////////////
 
+void InitHeightMap(Image<float4> dHeightMap)
+{
+    // initialize the heightmap
+    dHeightMap.Fill(make_float4(0,10000.0,128,0.0));
+}
+
+//////////////////////////////////////////////////////
+
 __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage,  const Mat<float,3,4> T_hc)
 {
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
@@ -22,7 +30,7 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
     int x = (int)(p_h.x+0.5);
     int y = (int)(p_h.y+0.5);
 
-    if(dHeightMap.InBounds(x,y) == true) {
+    if(dHeightMap.InBounds(x,y) && isfinite(p_h.z) ) {
         //calculate the variance of the measurement
         float v_z = p_c.z*0.01; //this is the perp. distance from the camera
         unsigned char colour = dImage.IsValid() ? dImage(u,v) : 0;
@@ -39,15 +47,14 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
     }
 }
 
-__global__ void KernColourHeightmap(Image<uchar4> dCbo, const Image<float4> dHeightMap)
+void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc)
 {
-    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
-
-    float v_z = dHeightMap(u,v).z;
-//    dCbo(u,v) = make_uchar4(255,0,0,255);
-    dCbo(u,v) = make_uchar4(v_z,v_z,v_z,255);
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, d3d);
+    KernUpdateHeightmap<<<gridDim,blockDim>>>(dHeightMap,d3d,dImage,T_hc);
 }
+
+//////////////////////////////////////////////////////
 
 __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHeightMap)
 {
@@ -58,17 +65,23 @@ __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHe
 }
 
 
-void InitHeightMap(Image<float4> dHeightMap)
-{
-    // initialize the heightmap
-    dHeightMap.Fill(make_float4(0,10000.0,128,0.0));
-}
-
 void VboFromHeightMap(Image<float4> dVbo, const Image<float4> dHeightMap)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dVbo);
     KernVboFromHeightmap<<<gridDim,blockDim>>>(dVbo,dHeightMap);
+}
+
+//////////////////////////////////////////////////////
+
+__global__ void KernColourHeightmap(Image<uchar4> dCbo, const Image<float4> dHeightMap)
+{
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    float v_z = dHeightMap(u,v).z;
+//    dCbo(u,v) = make_uchar4(255,0,0,255);
+    dCbo(u,v) = make_uchar4(v_z,v_z,v_z,255);
 }
 
 void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap)
@@ -78,10 +91,22 @@ void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap)
     KernColourHeightmap<<<gridDim,blockDim>>>(dCbo,dHeightMap);
 }
 
-void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc)
+//////////////////////////////////////////////////////
+
+__global__ void KernGenerateHeightAndImageFromHeightmap(Image<float> dHeight, Image<unsigned char> dImage, const Image<float4> dHeightMap)
+{
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    dHeight(u,v) = dHeightMap(u,v).x;
+    dImage(u,v) = dHeightMap(u,v).z;
+}
+
+void GenerateHeightAndImageFromHeightmap(Image<float> dHeight, Image<unsigned char> dImage, const Image<float4> dHeightMap)
 {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim,gridDim, d3d);
-    KernUpdateHeightmap<<<gridDim,blockDim>>>(dHeightMap,d3d,dImage,T_hc);
+    InitDimFromOutputImage(blockDim,gridDim, dHeight);
+    KernGenerateHeightAndImageFromHeightmap<<<gridDim,blockDim>>>(dHeight,dImage,dHeightMap);
 }
+
 }

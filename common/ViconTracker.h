@@ -6,10 +6,11 @@
 #include <Eigen/Geometry>
 #include <boost/thread.hpp>
 
-struct ViconTracking
+class ViconTracking
 {
+public:
     ViconTracking( std::string objectName, std::string host)
-        : m_connected(false)
+        : m_connected(false), m_newdata(false)
     {
         const std::string uri = objectName + "@" + host;
         m_object = new vrpn_Tracker_Remote( uri.c_str() );
@@ -26,9 +27,20 @@ struct ViconTracking
         delete m_object;
     }
 
+    inline const Sophus::SE3& T_wf()
+    {
+        m_newdata = false;
+        return m_T_wf;
+    }
+
     inline bool IsConnected()
     {
         return m_connected;
+    }
+
+    inline bool IsNewData()
+    {
+        return m_newdata;
     }
 
     void EventLoop() {
@@ -49,10 +61,11 @@ struct ViconTracking
 
     inline void TrackingEvent(const vrpn_TRACKERCB tData )
     {
-        T_wf = Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)),
+        m_T_wf = Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)),
             Eigen::Vector3d(tData.pos[0], tData.pos[1], tData.pos[2])
         );
         m_connected = true;
+        m_newdata = true;
     }
 
     static void VRPN_CALLBACK pose_callback(void* userData, const vrpn_TRACKERCB tData )
@@ -83,9 +96,12 @@ struct ViconTracking
 //        self->TrackingEvent(tData);
 //    }
 
-    Sophus::SE3 T_wf;
+
+protected:
+    Sophus::SE3 m_T_wf;
 
     bool m_connected;
+    bool m_newdata;
     bool m_run;
     vrpn_Tracker_Remote* m_object;
     boost::thread m_event_thread;

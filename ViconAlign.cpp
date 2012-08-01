@@ -234,9 +234,17 @@ int main( int /*argc*/, char* argv[] )
     Tracker tracker(w,h);
 
     // Create Target in Meters
-    const Eigen::Vector2d targetSizeMeters = Eigen::Vector2d(11,8.5) * 0.0254;
-    const double trad = targetSizeMeters[0]/40;
-    tracker.target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);
+//    const Eigen::Vector2d targetSizeMeters = Eigen::Vector2d(11,8.5) * 0.0254;
+//    const double trad = targetSizeMeters[0]/40;
+//    tracker.target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);
+
+    const double ppi = 72; // Points Per Inch
+    const double USwp = 11 * ppi;
+    const double UShp = 8.5 * ppi;
+    const double mpi = 0.0254; // meters per inch
+    const double mpp = mpi / ppi; // meters per point
+    const double unit = mpp;
+    tracker.target.GenerateRandom(60,unit*USwp*25/(842.0),unit*USwp*75/(842.0),unit*USwp*40/(842.0),Eigen::Vector2d(unit*USwp,unit*UShp));
 
     // Save Target in points
     tracker.target.SaveRotatedEPS("target.eps",72/0.0254);
@@ -308,9 +316,8 @@ int main( int /*argc*/, char* argv[] )
 
     Var<Sophus::SE3> vicon_T_wf("vicon.T_wf");
 
-    Eigen::MatrixXd pattern = tracker.TargetPattern3D();
-
 #ifdef HAVE_FPL
+    Eigen::MatrixXd pattern = tracker.TargetPattern3D();
     GridCalibrator calibrator(
                 //      "Arctan", size.x, size.y, pattern
                 "PinholeRadTan", size.x, size.y, pattern
@@ -336,7 +343,7 @@ int main( int /*argc*/, char* argv[] )
         input.SetIndex(video.FrameId());
 
         if(!video.IsPlaying()) {
-            vicon_T_wf = vicon.T_wf;
+            vicon_T_wf = vicon.T_wf();
             input.UpdateVariable(vicon_T_wf);
         }
 
@@ -360,6 +367,15 @@ int main( int /*argc*/, char* argv[] )
             input.SaveBuffer(ui_file);
         }
 
+        if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
+            Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
+            Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1,   0,-1,0;
+            T_cf = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
+//            T_cf = Sophus::SE3();
+            T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
+            cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
+        }
+
         if( Pushed(add_image) ) {
             if( tracker.NumVisibleFeatures() > tracker.target.NumCircles() - 10 )
             {
@@ -379,10 +395,6 @@ int main( int /*argc*/, char* argv[] )
 
 #ifdef USE_VICON
               vicon_obs.push_back((Observation){obs,((Sophus::SE3)vicon_T_wf).inverse() });
-              if(vicon_obs.size() == 1 ) {
-                  T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
-                  T_cf = Sophus::SE3();
-              }
               cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
 #endif // USE_VICON
             }
@@ -404,12 +416,6 @@ int main( int /*argc*/, char* argv[] )
                     calibrator.get_camera_copy()->get<double>("p2") << " 0.0" << endl;
         }
 #endif
-
-        if(Pushed(guess)) {
-            T_cf = Sophus::SE3();
-            T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
-            cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
-        }
 
         if(Pushed(minimise_vicon)) {
             OptimiseTargetVicon(cam,tracker.target,vicon_obs, T_cf, T_wt);
