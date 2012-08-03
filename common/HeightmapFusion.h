@@ -17,7 +17,7 @@ public:
     )
         : wm(HeightMapWidthMeters), hm(HeightMapHeightMeters),
           wp(wm*PixelsPerMeter), hp(hm*PixelsPerMeter),
-          max_height(2.0f),
+          min_height(0.02f), max_height(2.0f),
           dHeightMap(wp, hp)
     {
         eT_hp << PixelsPerMeter, 0, 0, 0,
@@ -36,13 +36,13 @@ public:
     void Fuse(Gpu::Image<float4> d3d, const Sophus::SE3& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
-        Gpu::UpdateHeightMap(dHeightMap,d3d,Gpu::Image<unsigned char>(),T_hc, max_height);
+        Gpu::UpdateHeightMap(dHeightMap,d3d,Gpu::Image<unsigned char>(),T_hc, min_height, max_height);
     }
 
     void Fuse(Gpu::Image<float4> d3d, Gpu::Image<unsigned char> dImg, const Sophus::SE3& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
-        Gpu::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc,max_height);
+        Gpu::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc, min_height, max_height);
     }
 
     void GenerateVbo(pangolin::GlBufferCudaPtr& vbo)
@@ -140,6 +140,7 @@ protected:
     int wp;
     int hp;
 
+    float min_height;
     float max_height;
 
     // Plane (z=0) to heightmap transform (adjust to pixel units)

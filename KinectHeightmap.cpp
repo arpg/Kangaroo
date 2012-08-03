@@ -48,7 +48,8 @@ int main( int /*argc*/, char* argv[] )
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
     Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1, 0,-1,0;
 //    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
-    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.0417093,0.0215285,0.657274,-0.752188)), Eigen::Vector3d(-0.0166842,-0.0226804,-0.136051) );
+//    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.0417093,0.0215285,0.657274,-0.752188)), Eigen::Vector3d(-0.0166842,-0.0226804,-0.136051) );
+    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
 
 
     // Camera (rgb) to depth
@@ -80,6 +81,7 @@ int main( int /*argc*/, char* argv[] )
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
     Image<float, TargetDevice, Manage> dKinectf(w,h);
+    Image<float, TargetDevice, Manage> dKinectf2(w,h);
     Image<uchar3, TargetDevice, Manage>  dI(w,h);
     Image<unsigned char, TargetDevice, Manage>  dIgrey(w,h);
     Image<float4, TargetDevice, Manage>  dV(w,h);
@@ -115,7 +117,7 @@ int main( int /*argc*/, char* argv[] )
 //    GlBufferCudaPtr ibo(GlElementArrayBuffer, w*h*sizeof(uint2) );
 
     // Create Smart viewports for each camera image that preserve aspect
-    const int N = 4;
+    const int N = 3;
     for(int i=0; i<N; ++i ) {
         container.AddDisplay(CreateDisplay());
         container[i].SetAspect((double)w/h);
@@ -134,9 +136,9 @@ int main( int /*argc*/, char* argv[] )
     container[1].SetDrawFunction(ActivateDrawTexture(texdepth, true));
     container[1].SetHandler(&prop_depth);
 
-    Handler2dImageSelect prop_debug(w,h);
-    container[2].SetDrawFunction(ActivateDrawTexture(texdebug, true));
-    container[2].SetHandler(&prop_debug);
+//    Handler2dImageSelect prop_debug(w,h);
+//    container[2].SetDrawFunction(ActivateDrawTexture(texdebug, true));
+//    container[2].SetHandler(&prop_debug);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
@@ -145,7 +147,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", true, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
     Var<float> gs("ui.gs",5, 1E-3, 10);
-    Var<float> gr("ui.gr",100, 1E-3, 100);
+    Var<float> gr("ui.gr",300, 1E-3, 500);
 
     Var<bool> bundle("ui.Bundle", false, true);
     Var<bool> pose_refinement("ui.Pose Refinement", false, true);
@@ -182,13 +184,14 @@ int main( int /*argc*/, char* argv[] )
             if(tracker.IsConnected())
             {
                 tracking_good = tracker.IsNewData();
-                T_lr = T_cd.inverse() * T_cv * tracker.T_wf().inverse() * T_wr;
+                T_lr = /*T_cd.inverse() **/ T_cv * tracker.T_wf().inverse() * T_wr;
             }
 
             if(applyBilateralFilter) {
-                BilateralFilter(dKinectf,dKinect,gs,gr,bilateralWinSize);
+                FilterBadKinectData(dKinectf2,dKinect);
+                BilateralFilter(dKinectf,dKinectf2,gs,gr,bilateralWinSize);
             }else{
-                ConvertImage<float,unsigned short>(dKinectf, dKinect);
+                FilterBadKinectData(dKinectf,dKinect);
             }
 
             KinectToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
@@ -276,7 +279,7 @@ int main( int /*argc*/, char* argv[] )
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        container[3].Activate();
+        container[2].Activate();
         glColor3f(1,1,1);
         GlSlUtilities::Scale(0.5,0.5);
         texnorm.RenderToViewportFlipY();

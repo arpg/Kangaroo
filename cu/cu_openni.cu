@@ -5,6 +5,22 @@
 namespace Gpu
 {
 
+__global__ void KernFilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth)
+{
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const float z_mm = dKinectDepth(u,v);
+
+    dFiltered(u,v) = z_mm >= 200 ? z_mm : NAN;
+}
+
+void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dFiltered);
+    KernFilterBadKinectData<<<gridDim,blockDim>>>(dFiltered, dKinectDepth);
+}
+
 //////////////////////////////////////////////////////
 // Kinect depthmap to vertex array
 //////////////////////////////////////////////////////

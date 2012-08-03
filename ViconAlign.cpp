@@ -369,7 +369,7 @@ int main( int /*argc*/, char* argv[] )
 
         if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
             Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
-            Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1,   0,-1,0;
+            Eigen::Matrix3d RDFvicon; RDFvicon << 1,0,0,  0,0,-1,   0,1,0;
             T_cf = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
 //            T_cf = Sophus::SE3();
             T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;

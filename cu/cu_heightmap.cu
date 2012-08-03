@@ -16,20 +16,22 @@ void InitHeightMap(Image<float4> dHeightMap)
 
 //////////////////////////////////////////////////////
 
-__global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage,  const Mat<float,3,4> T_hc, float max_height)
+__global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage,  const Mat<float,3,4> T_hc, float min_height, float max_height)
 {
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     // Calculate the position in heightmap coordinates
     const float4 p_c = d3d(u,v);
-    const float3 p_h = T_hc * p_c;
+    float3 p_h = T_hc * p_c;
+
+    if(p_h.z < min_height) p_h.z = min_height;
 
     // Find bin on z=0 grid.
     int x = (int)(p_h.x+0.5);
     int y = (int)(p_h.y+0.5);
 
-    if(dHeightMap.InBounds(x,y) && isfinite(p_c.z) && p_h.z < max_height ) {
+    if(dHeightMap.InBounds(x,y) && isfinite(p_c.z) && min_height <= p_h.z && p_h.z <= max_height ) {
         //calculate the variance of the measurement
         float v_z = p_c.z*1; //this is the perp. distance from the camera
         unsigned char colour = dImage.IsValid() ? dImage(u,v) : 0;
@@ -47,11 +49,11 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
     }
 }
 
-void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc, float max_height)
+void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc, float min_height, float max_height)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, d3d);
-    KernUpdateHeightmap<<<gridDim,blockDim>>>(dHeightMap,d3d,dImage,T_hc, max_height);
+    KernUpdateHeightmap<<<gridDim,blockDim>>>(dHeightMap,d3d,dImage,T_hc, min_height, max_height);
 }
 
 //////////////////////////////////////////////////////
