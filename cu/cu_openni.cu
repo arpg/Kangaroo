@@ -18,7 +18,7 @@ __global__ void KernKinectToVbo(
     const float kz = dKinectDepth(u,v) / 1000.0f;
 
     // (x,y,1) = kinv * (u,v,1)'
-    const float z = (kz > 0) ? kz : 0.0f/0.0f;
+    const float z = (kz > 0.1) ? kz : NAN;
     const float x = z * (u-u0) / fu;
     const float y = z * (v-v0) / fv;
 

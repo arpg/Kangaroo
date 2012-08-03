@@ -17,6 +17,7 @@ public:
     )
         : wm(HeightMapWidthMeters), hm(HeightMapHeightMeters),
           wp(wm*PixelsPerMeter), hp(hm*PixelsPerMeter),
+          max_height(2.0f),
           dHeightMap(wp, hp)
     {
         eT_hp << PixelsPerMeter, 0, 0, 0,
@@ -35,13 +36,13 @@ public:
     void Fuse(Gpu::Image<float4> d3d, const Sophus::SE3& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
-        Gpu::UpdateHeightMap(dHeightMap,d3d,Gpu::Image<unsigned char>(),T_hc);
+        Gpu::UpdateHeightMap(dHeightMap,d3d,Gpu::Image<unsigned char>(),T_hc, max_height);
     }
 
     void Fuse(Gpu::Image<float4> d3d, Gpu::Image<unsigned char> dImg, const Sophus::SE3& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
-        Gpu::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc);
+        Gpu::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc,max_height);
     }
 
     void GenerateVbo(pangolin::GlBufferCudaPtr& vbo)
@@ -58,34 +59,58 @@ public:
         Gpu::ColourHeightMap(dCbo,dHeightMap);
     }
 
+    template<typename T>
+    static T noNans(T in, T nanval = 0)
+    {
+        return std::isfinite(in) ? in : nanval;
+    }
+
+    static float4 noNans(float4 in)
+    {
+        return make_float4(noNans(in.x),noNans(in.y),noNans(in.z),noNans(in.w));
+    }
+
     void SaveHeightmap(std::string heightfile, std::string imagefile)
     {
+        Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> dVbo(wp,hp);
         Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(wp,hp);
-        Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> dHeight(wp,hp);
-        Gpu::GenerateHeightAndImageFromHeightmap(dHeight, dImg, dHeightMap);
 
+        Eigen::Matrix<double,3,4> eT_wh = eT_hw.inverse().block<3,4>(0,0);
+        Gpu::GenerateWorldVboAndImageFromHeightmap(dVbo, dImg, dHeightMap, eT_wh );
+
+        const int32_t width = wp;
+        const int32_t height = hp;
+        Gpu::Image<float4, Gpu::TargetHost, Gpu::Manage> hVbo(wp,hp);
         Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
-        Gpu::Image<float, Gpu::TargetHost, Gpu::Manage> hHeight(wp,hp);
         hImg.CopyFrom(dImg);
-        hHeight.CopyFrom(dHeight);
+        hVbo.CopyFrom(dVbo);
 
-        std::ofstream hof(heightfile);
+        std::cout << "Saving to file (" << width << "x" << height << ")" << std::endl;
+
+        std::ofstream hof(heightfile, std::ios::binary);
+        hof.write((char*)&width,  sizeof(int32_t));
+        hof.write((char*)&height, sizeof(int32_t));
         for(unsigned r=0; r < hp; ++r) {
             for(unsigned c=0; c < wp; ++c) {
-                hof << hHeight(r,c) << " ";
+                const float4 P = noNans(hVbo(r,c));
+                hof.write((char*)&P, sizeof(float)*3);
             }
-            hof << std::endl;
         }
         hof.close();
 
-        std::ofstream iof(imagefile);
+        std::ofstream iof(imagefile, std::ios::binary);
+        iof.write((char*)&width,  sizeof(int32_t));
+        iof.write((char*)&height, sizeof(int32_t));
         for(unsigned r=0; r < hp; ++r) {
             for(unsigned c=0; c < wp; ++c) {
-                iof << hImg(r,c) << " ";
+                const float p = hImg(r,c);
+                const uchar3 pc = make_uchar3(p,p,p);
+                iof.write((char*)& pc, sizeof(uchar3));
             }
-            iof << std::endl;
         }
         iof.close();
+
+        std::cout << "Done" << std::endl;
     }
 
     Gpu::Image<float4> GetHeightMap()
@@ -98,10 +123,12 @@ public:
         return eT_hw;
     }
 
-    size_t WidthPixels() { return wp; }
-    size_t HeightPixels() { return hp; }
-    size_t WidthMeters() { return wm; }
-    size_t HeightMeters() { return hm; }
+    int WidthPixels() { return wp; }
+    int HeightPixels() { return hp; }
+
+    double WidthMeters() { return wm; }
+    double HeightMeters() { return hm; }
+
     unsigned long Pixels() { return wp * hp; }
 
 protected:
@@ -110,8 +137,10 @@ protected:
     double hm;
 
     // Width / Height in pixels
-    double wp;
-    double hp;
+    int wp;
+    int hp;
+
+    float max_height;
 
     // Plane (z=0) to heightmap transform (adjust to pixel units)
     Eigen::Matrix4d eT_hp;

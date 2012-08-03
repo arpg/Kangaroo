@@ -90,7 +90,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
-    HeightmapFusion hm(10,10,100);
+    HeightmapFusion hm(10,10,50);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -157,6 +157,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> save_ref("ui.Save Reference", true, false);
     Var<bool> fuse("ui.Fuse Heightmap", false, true);
     Var<bool> resetHeightmap("ui.Reset Heightmap", true, false);
+    Var<bool> show_kinect("ui.show kinect", true, true);
     Var<bool> show_heightmap("ui.show heightmap", true, true);
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_colour("ui.show colour", true, true);
@@ -264,7 +265,7 @@ int main( int /*argc*/, char* argv[] )
             }
 
             if(Pushed(save_map)) {
-                hm.SaveHeightmap("heightmap.eigen", "image.dat");
+                hm.SaveHeightmap("room.heightmap", "room.image");
             }
 
             texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
@@ -284,19 +285,21 @@ int main( int /*argc*/, char* argv[] )
         view3d.ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);
 
+        const Sophus::SE3 T_wl = T_wr * T_lr.inverse();
+
         static bool lastLockToCam = lockToCam;
         if( lockToCam != lastLockToCam ) {
             if(lockToCam) {
-                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wr.matrix();
+                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wl.matrix();
                 s_cam.SetModelViewMatrix(T_vc);
             }else{
-                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wr.inverse().matrix();
+                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wl.inverse().matrix();
                 s_cam.SetModelViewMatrix(T_vw);
             }
             lastLockToCam = lockToCam;
         }
 
-        if(lockToCam) glSetFrameOfReferenceF(T_wr.inverse());
+        if(lockToCam) glSetFrameOfReferenceF(T_wl.inverse());
 
         //draw the global heightmap
         if(show_heightmap) {
@@ -307,23 +310,13 @@ int main( int /*argc*/, char* argv[] )
         }
 
         {
-            glSetFrameOfReferenceF(T_wr);
-            {
-//                glSetFrameOfReferenceF(T_rc);
-//                glDrawAxis(0.5);
-//                glUnsetFrameOfReference();
-
-                if(tracking_good) {
-                    glSetFrameOfReferenceF(T_lr.inverse());
-                    glDrawAxis(0.2);
-                    glColor3f(1,1,1);
-                    RenderVboCbo(vbo, cbo, w, h);
-                    glUnsetFrameOfReference();
-                }
-
+            if(tracking_good && show_kinect) {
+                glSetFrameOfReferenceF(T_wl);
                 glDrawAxis(0.2);
+                glColor3f(1,1,1);
+                RenderVboCbo(vbo, cbo, w, h);
+                glUnsetFrameOfReference();
             }
-            glUnsetFrameOfReference();
 
             glColor3f(0.8,0.8,0.8);
             glDraw_z0(1.0,5);
