@@ -45,6 +45,17 @@ public:
         Gpu::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc, min_height, max_height);
     }
 
+    void GenerateVboNbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& nbo)
+    {
+        pangolin::CudaScopedMappedPtr varvbo(vbo);
+        pangolin::CudaScopedMappedPtr varnbo(nbo);
+        Gpu::Image<float4> dVbo((float4*)*varvbo,wp,hp);
+        Gpu::Image<float4> dNbo((float4*)*varnbo,wp,hp);
+        const Eigen::Matrix<double,3,4> eT_wh = eT_hw.inverse().block<3,4>(0,0);
+        Gpu::VboWorldFromHeightMap(dVbo,dHeightMap, eT_wh );
+        Gpu::NormalsFromVbo(dNbo,dVbo);
+    }
+
     void GenerateVbo(pangolin::GlBufferCudaPtr& vbo)
     {
         pangolin::CudaScopedMappedPtr var(vbo);

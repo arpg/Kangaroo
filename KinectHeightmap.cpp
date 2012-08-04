@@ -4,6 +4,8 @@
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 
+#include <SceneGraph/SceneGraph.h>
+
 #include "common/ViconTracker.h"
 
 #include <fiducials/drawing.h>
@@ -21,14 +23,40 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
+bool SetupDrawing(bool showNormals)
+{
+    if(showNormals) {
+        glEnable( GL_LIGHTING );
+        glEnable( GL_LIGHT0 );
+        glEnable(GL_NORMALIZE);
+
+        glColorMaterial( GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE );
+        glEnable( GL_COLOR_MATERIAL );
+    }else{
+        glDisable( GL_LIGHTING );
+        glDisable( GL_COLOR_MATERIAL );
+    }
+}
+
 int main( int /*argc*/, char* argv[] )
 {
     // Initialise window
     View& container = SetupPangoGL(1024, 768);
     cudaGLSetGLDevice(0);
 
+//    // Light at camera center
+//    GLfloat light_pos[] = {0,0,0.01};
+//    glLightfv(GL_LIGHT0, GL_POSITION, light_pos );
+
+    SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
+
     // Open video device
-    CameraDevice camera = OpenRpgCamera("Kinect://");
+    CameraDevice camera;
+    try {
+        OpenRpgCamera("Kinect://");
+    }catch(pangolin::VideoException)
+    {
+    }
 
     // Open Vicon
     ViconTracking tracker("KINECT","192.168.10.1");
@@ -73,11 +101,11 @@ int main( int /*argc*/, char* argv[] )
     // Check we received one or more images
     if(img.empty()) {
         std::cerr << "Failed to capture first image from camera" << std::endl;
-        return -1;
+//        return -1;
     }
 
-    const int w = img[0].width();
-    const int h = img[0].height();
+    const int w = img.empty() ? 64 : img[0].width();
+    const int h = img.empty() ? 48 : img[0].height();
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
     Image<float, TargetDevice, Manage> dKinectf(w,h);
@@ -96,6 +124,7 @@ int main( int /*argc*/, char* argv[] )
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr nbo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(uint2) );
 
     //generate index buffer for heightmap
@@ -163,6 +192,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> show_heightmap("ui.show heightmap", true, true);
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_colour("ui.show colour", true, true);
+    Var<bool> show_normals("ui.show normals", false, true);
     Var<bool> save_map("ui.save_map", false, false);
 
     pangolin::RegisterKeyPressCallback(' ', [&fuse](){fuse = !fuse;} );
@@ -177,9 +207,10 @@ int main( int /*argc*/, char* argv[] )
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
-            camera.Capture(img);
-            dI.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
-            dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+            if(camera.Capture(img)) {
+                dI.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
+                dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+            }
 
             if(tracker.IsConnected())
             {
@@ -250,7 +281,7 @@ int main( int /*argc*/, char* argv[] )
             if(fuse && tracking_good)
             {
                 hm.Fuse(dV, dIgrey, T_wr * T_lr.inverse());
-                hm.GenerateVbo(vbo_hm);
+                hm.GenerateVboNbo(vbo_hm, nbo_hm);
                 hm.GenerateCbo(cbo_hm);
             }
 
@@ -271,8 +302,10 @@ int main( int /*argc*/, char* argv[] )
                 hm.SaveHeightmap("room.heightmap", "room.image");
             }
 
-            texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
-            texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
+            if(!img.empty()) {
+                texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
+                texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
+            }
             texnorm << dN;
 
         }
@@ -304,12 +337,11 @@ int main( int /*argc*/, char* argv[] )
 
         if(lockToCam) glSetFrameOfReferenceF(T_wl.inverse());
 
+//        SetupDrawing(show_normals);
+
         //draw the global heightmap
         if(show_heightmap) {
-            glPushMatrix();
-            glMultMatrix( hm.T_hw().inverse() );
-            RenderVboIboCbo(vbo_hm,ibo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_colour);
-            glPopMatrix();
+            RenderVboIboCboNbo(vbo_hm,ibo_hm,cbo_hm,nbo_hm,hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_colour, show_normals);
         }
 
         {
