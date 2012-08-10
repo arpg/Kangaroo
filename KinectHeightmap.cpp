@@ -44,19 +44,12 @@ int main( int /*argc*/, char* argv[] )
     View& container = SetupPangoGL(1024, 768);
     cudaGLSetGLDevice(0);
 
-//    // Light at camera center
-//    GLfloat light_pos[] = {0,0,0.01};
-//    glLightfv(GL_LIGHT0, GL_POSITION, light_pos );
-
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
+    GLfloat light_pos[] = {0,0,-0.01};
+    glLightfv(GL_LIGHT0, GL_POSITION, light_pos );
 
     // Open video device
-    CameraDevice camera;
-    try {
-        OpenRpgCamera("Kinect://");
-    }catch(pangolin::VideoException)
-    {
-    }
+    CameraDevice camera = OpenRpgCamera("Kinect://");
 
     // Open Vicon
     ViconTracking tracker("KINECT","192.168.10.1");
@@ -75,10 +68,8 @@ int main( int /*argc*/, char* argv[] )
     // Vicon to Camera
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
     Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1, 0,-1,0;
-//    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
-//    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.0417093,0.0215285,0.657274,-0.752188)), Eigen::Vector3d(-0.0166842,-0.0226804,-0.136051) );
-    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
-
+//    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
+    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.705949,0.707893,0.0214006,-0.00803969)), Eigen::Vector3d(0.0579258,0.00239071,-0.31165) );
 
     // Camera (rgb) to depth
     Eigen::Matrix3d R_dc;
@@ -120,7 +111,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
-    HeightmapFusion hm(10,10,50);
+    HeightmapFusion hm(10,10,50,0.02,2.0);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );

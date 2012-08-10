@@ -278,6 +278,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> resetPlane("ui.resetplane", true, false);
+    Var<bool> save_hm("ui.save heightmap", false, false);
 
     Var<bool> show_mesh("ui.show mesh", true, true);
     Var<bool> show_color("ui.show color", true, true);
@@ -438,9 +439,9 @@ int main( int /*argc*/, char* argv[] )
 
             if(costvol_add) {
                 const Eigen::Matrix<double,3,4> KT_lv = K * (T_wc.inverse() * T_wv).matrix3x4();
-                AddToCostVolume(dCostVol,dImgv, dCamImg[0], KT_lv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
-                const Eigen::Matrix<double,3,4> KT_rv = K * (T_rl*T_wc.inverse() * T_wv).matrix3x4();
-                AddToCostVolume(dCostVol,dImgv, dCamImg[1], KT_rv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
+                AddToCostVolume(dCostVol,dImgv, dCamImg[0], KT_lv, K(0,0), K(1,1), K(0,2), K(1,2), 1.0f / baseline, 0, maxDisp);
+//                const Eigen::Matrix<double,3,4> KT_rv = K * (T_rl*T_wc.inverse() * T_wv).matrix3x4();
+//                AddToCostVolume(dCostVol,dImgv, dCamImg[1], KT_rv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
             }
 
             // Copy point cloud into VBO
@@ -478,8 +479,12 @@ int main( int /*argc*/, char* argv[] )
         if(Pushed(costvol_reset)) {
             T_wv = T_wc;
             dImgv.CopyFrom(dCamImg[0]);
-//            InitCostVolume(dCostVol);
-            InitCostVolume(dCostVol,dCamImg[0], dCamImg[1]);
+            InitCostVolume(dCostVol);
+//            InitCostVolume(dCostVol,dCamImg[0], dCamImg[1]);
+        }
+
+        if(Pushed(save_hm)) {
+            hm.SaveModel("test");
         }
 
         /////////////////////////////////////////////////////////////

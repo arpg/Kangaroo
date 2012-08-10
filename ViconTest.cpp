@@ -32,6 +32,12 @@ int main( int /*argc*/, char* argv[] )
       .SetHandler(new Handler3D(s_cam,AxisZ));
 
     ViconTracking tracker("CAR","192.168.10.1");
+    int subsample = 1;
+
+    pangolin::RegisterKeyPressCallback(' ', [&tracker](){tracker.ToggleRecordHistory();} );
+    pangolin::RegisterKeyPressCallback('r', [&tracker](){tracker.ClearHistory();} );
+    pangolin::RegisterKeyPressCallback('=', [&subsample](){subsample++;} );
+    pangolin::RegisterKeyPressCallback('-', [&subsample](){subsample--; subsample=max(subsample,1);} );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -42,6 +48,16 @@ int main( int /*argc*/, char* argv[] )
         glDisable(GL_DEPTH_TEST);
         glDrawAxis(2);
         glEnable(GL_DEPTH_TEST);
+
+        // Draw History
+        const std::vector<Sophus::SE3>& history = tracker.History();
+        const int N = history.size();
+        for(int i=0; i<N; i+= subsample) {
+            glPushMatrix();
+            glMultMatrix( history[i].matrix() );
+            glDrawAxis(0.5);
+            glPopMatrix();
+        }
 
         // Draw Vicon
         glPushMatrix();

@@ -39,7 +39,11 @@ include_directories( ${NODE_INCLUDE_DIRS} )
 PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
-LIST(APPEND COMMON_SRC common/DisplayUtils.h common/RpgCameraOpen.h common/ImageSelect.h common/LeastSquaresBlockHelpers.h common/ViconTracker.h)
+LIST(APPEND COMMON_SRC
+    common/DisplayUtils.h common/RpgCameraOpen.h common/ImageSelect.h
+    common/LeastSquaresBlockHelpers.h common/ViconTracker.h
+    common/AssimpVboExport.h
+)
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
   SET(CMAKE_CXX_FLAGS "-std=c++0x -g")
@@ -107,7 +111,11 @@ if(CUDA_FOUND)
 
   if(NOT CUDA_npp_LIBRARY)
     # Hack for old FindCUDA to locate libnpp.so
-    set(CUDA_npp_LIBRARY "/usr/local/cuda/lib64/libnpp.so")
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      set(CUDA_npp_LIBRARY "/usr/local/cuda/lib/libnpp.dylib")
+    else()
+      set(CUDA_npp_LIBRARY "/usr/local/cuda/lib64/libnpp.so")
+    endif()
   endif()
 
   set( BuildCheckMemory true CACHE "" force )

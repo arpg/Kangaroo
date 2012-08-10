@@ -5,6 +5,8 @@
 #include <Eigen/Eigen>
 #include <Sophus/se3.h>
 
+#include "AssimpVboExport.h"
+
 #include "../cu/Image.h"
 #include "../cu/all.h"
 
@@ -13,11 +15,11 @@ class HeightmapFusion
 public:
     HeightmapFusion(
         double HeightMapWidthMeters, double HeightMapHeightMeters,
-        double PixelsPerMeter
+        double PixelsPerMeter, double min_height=-1E20, double max_height=1E20
     )
         : wm(HeightMapWidthMeters), hm(HeightMapHeightMeters),
           wp(wm*PixelsPerMeter), hp(hm*PixelsPerMeter),
-          min_height(0.02f), max_height(2.0f),
+          min_height(min_height), max_height(max_height),
           dHeightMap(wp, hp)
     {
         eT_hp << PixelsPerMeter, 0, 0, 0,
@@ -81,7 +83,47 @@ public:
         return make_float4(noNans(in.x),noNans(in.y),noNans(in.z),noNans(in.w));
     }
 
-    void SaveHeightmap(std::string heightfile, std::string imagefile)
+    void SaveModel(const std::string filename)
+    {
+        // Generate VBO / img
+        Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> dVbo(wp,hp);
+        Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(wp,hp);
+
+        Eigen::Matrix<double,3,4> eT_wh = eT_hw.inverse().block<3,4>(0,0);
+        Gpu::GenerateWorldVboAndImageFromHeightmap(dVbo, dImg, dHeightMap, eT_wh );
+
+        // Copy to host
+        Gpu::Image<float4, Gpu::TargetHost, Gpu::Manage> hVbo(wp,hp);
+        Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
+        hImg.CopyFrom(dImg);
+        hVbo.CopyFrom(dVbo);
+
+        aiMesh* mesh = MakeAssimpMeshFromVboCbo(hVbo,hImg);
+
+        // Create root node which indexes first mesh
+        aiNode* root = new aiNode();
+        root->mNumMeshes = 1;
+        root->mMeshes = new unsigned int[root->mNumMeshes];
+        root->mMeshes[0] = 0;
+        root->mName = "root";
+
+        aiMaterial* material = new aiMaterial();
+
+        // Create scene to contain root node and mesh
+        aiScene scene;
+        scene.mRootNode = root;
+        scene.mNumMeshes = 1;
+        scene.mMeshes = new aiMesh*[scene.mNumMeshes];
+        scene.mMeshes[0] = mesh;
+        scene.mNumMaterials = 1;
+        scene.mMaterials = new aiMaterial*[scene.mNumMaterials];
+        scene.mMaterials[0] = material;
+
+        aiReturn res = aiExportScene(&scene, "ply", (filename + ".ply").c_str(), 0);
+        std::cout << "Mesh export result: " << res << std::endl;
+    }
+
+    void SaveHeightmap(const std::string heightfile, const std::string imagefile)
     {
         Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> dVbo(wp,hp);
         Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(wp,hp);

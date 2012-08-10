@@ -10,7 +10,7 @@ class ViconTracking
 {
 public:
     ViconTracking( std::string objectName, std::string host)
-        : m_connected(false), m_newdata(false)
+        : m_connected(false), m_newdata(false), m_recordHistory(false)
     {
         const std::string uri = objectName + "@" + host;
         m_object = new vrpn_Tracker_Remote( uri.c_str() );
@@ -59,6 +59,26 @@ public:
         m_event_thread.join();
     }
 
+    inline void RecordHistory(bool record = true)
+    {
+        m_recordHistory = record;
+    }
+
+    inline void ToggleRecordHistory()
+    {
+        m_recordHistory = !m_recordHistory;
+    }
+
+    inline void ClearHistory()
+    {
+        m_vecT_wf.clear();
+    }
+
+    inline const std::vector<Sophus::SE3>& History()
+    {
+        return m_vecT_wf;
+    }
+
     inline void TrackingEvent(const vrpn_TRACKERCB tData )
     {
         m_T_wf = Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)),
@@ -66,6 +86,9 @@ public:
         );
         m_connected = true;
         m_newdata = true;
+        if(m_recordHistory) {
+            m_vecT_wf.push_back(m_T_wf);
+        }
     }
 
     static void VRPN_CALLBACK pose_callback(void* userData, const vrpn_TRACKERCB tData )
@@ -99,10 +122,13 @@ public:
 
 protected:
     Sophus::SE3 m_T_wf;
+    std::vector<Sophus::SE3> m_vecT_wf;
 
     bool m_connected;
     bool m_newdata;
     bool m_run;
+    bool m_recordHistory;
+
     vrpn_Tracker_Remote* m_object;
     boost::thread m_event_thread;
 };

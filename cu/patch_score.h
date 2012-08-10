@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Image.h"
+
 namespace Gpu
 {
 
 //////////////////////////////////////////////////////
-// Patch Scores
+// Image Access
 //////////////////////////////////////////////////////
 
 struct ImgAccessRaw
@@ -24,6 +26,34 @@ struct ImgAccessClamped
         return img.GetWithClampedRange(x,y);
     }
 };
+
+template<typename Tinterp>
+struct ImgAccessBilinear
+{
+    template<typename T>
+    __host__ __device__ inline static
+    T Get(const Image<T>& img, float x, float y) {
+        return img.template GetBilinear<Tinterp>(x,y);
+    }
+};
+
+template<typename Tinterp>
+struct ImgAccessBilinearClamped
+{
+    template<typename T>
+    __host__ __device__ inline static
+    T Get(const Image<T>& img, float x, float y) {
+        if(x<0) x=0;
+        if(x > img.w-1) x = img.w-1;
+        if(y<0) y=0;
+        if(y > img.h-1) y = img.h-1;
+        return img.template GetBilinear<Tinterp>(x,y);
+    }
+};
+
+//////////////////////////////////////////////////////
+// Patch Scores
+//////////////////////////////////////////////////////
 
 template<typename To, typename T, int rad, typename ImgAccess>
 __host__ __device__ inline

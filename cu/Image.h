@@ -180,6 +180,28 @@ struct Image {
     }
 
     //////////////////////////////////////////////////////
+    // Query dimensions
+    //////////////////////////////////////////////////////
+
+    inline __device__ __host__
+    size_t Width() const
+    {
+        return w;
+    }
+
+    inline __device__ __host__
+    size_t Height() const
+    {
+        return h;
+    }
+
+    inline __device__ __host__
+    size_t Area() const
+    {
+        return w*h;
+    }
+
+    //////////////////////////////////////////////////////
     // Image set / copy
     //////////////////////////////////////////////////////
 

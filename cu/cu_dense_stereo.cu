@@ -211,7 +211,8 @@ __global__ void KernAddToCostVolume(
     const int d = blockIdx.z*blockDim.z + threadIdx.z;
 
     float3 Pv;
-    Pv.z = fu / (minz + maxz*d);
+//    fu * baseline / d;
+    Pv.z = fu / (minz * d);
     Pv.x = Pv.z * (u-u0) / fu;
     Pv.y = Pv.z * (v-v0) / fv;
 
@@ -219,8 +220,8 @@ __global__ void KernAddToCostVolume(
 
     if( dimgc.InBounds(pc.x, pc.y,5) ) {
 //        vol(u,v,d) = 1.0f;
-//        const float score =  Score::Score(imgv, u,v, imgc, pc.x, pc.y) / (float)(Score::area);
-        const float score = (dimgv(u,v) - dimgc.template GetBilinear<float>(pc)) / 255.0f;
+        const float score =  Score::Score(dimgv, u,v, dimgc, pc.x, pc.y) / (float)(Score::area);
+//        const float score = (dimgv(u,v) - dimgc.template GetBilinear<float>(pc)) / 255.0f;
         CostVolElem elem = dvol(u,v,d);
         elem.sum += score;
         elem.n += 1;
@@ -235,7 +236,7 @@ void AddToCostVolume(Volume<CostVolElem> dvol, const Image<unsigned char> dimgv,
 ) {
     dim3 blockDim(8,8,8);
     dim3 gridDim(dvol.w / blockDim.x, dvol.h / blockDim.y, dvol.d / blockDim.z);
-    KernAddToCostVolume<unsigned char, SSNDPatchScore<float,DefaultRad,ImgAccessRaw> ><<<gridDim,blockDim>>>(dvol,dimgv,dimgc, KT_cv, fu,fv,u0,v0, minz,maxz, levels);
+    KernAddToCostVolume<unsigned char, SSNDPatchScore<float,DefaultRad,ImgAccessBilinearClamped<float> > ><<<gridDim,blockDim>>>(dvol,dimgv,dimgc, KT_cv, fu,fv,u0,v0, minz,maxz, levels);
 }
 
 //////////////////////////////////////////////////////
