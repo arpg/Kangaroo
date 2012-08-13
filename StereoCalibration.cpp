@@ -1,7 +1,5 @@
-#include <thread>
-#include <mutex>
-
 #include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
 
 #include <CVars/CVar.h>
@@ -165,7 +163,7 @@ public:
         boost::thread trackerThreads[2];
 
         // Run Optimisation Loop
-        boost::thread optThread( std::bind( &Application::OptimiseRun, this ) );
+        boost::thread optThread( boost::bind( &Application::OptimiseRun, this ) );
 
         Var<bool> run("ui.Run", true, true);
         Var<bool> step("ui.Step", false, false);
@@ -268,7 +266,7 @@ public:
     std::vector<rpg::ImageWrapper> img;
     GLuint m_glTex[2];
     int width, height;
-    std::mutex kfMutex;
+    boost::mutex kfMutex;
 
     MatlabCamera camParams;
     Tracker* tracker[2];

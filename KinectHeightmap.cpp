@@ -111,7 +111,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float4, TargetDevice, Manage>  dDebug(w,h);
     Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
-    HeightmapFusion hm(10,10,50,0.02,2.0);
+    HeightmapFusion hm(10,10,50,-0.02,2.0);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -291,6 +291,7 @@ int main( int /*argc*/, char* argv[] )
 
             if(Pushed(save_map)) {
                 hm.SaveHeightmap("room.heightmap", "room.image");
+                hm.SaveModel("room");
             }
 
             if(!img.empty()) {
@@ -328,7 +329,7 @@ int main( int /*argc*/, char* argv[] )
 
         if(lockToCam) glSetFrameOfReferenceF(T_wl.inverse());
 
-//        SetupDrawing(show_normals);
+        SetupDrawing(show_normals);
 
         //draw the global heightmap
         if(show_heightmap) {

@@ -83,6 +83,15 @@ public:
         return make_float4(noNans(in.x),noNans(in.y),noNans(in.z),noNans(in.w));
     }
 
+    void LoadModel(const std::string filename)
+    {
+        Gpu::Image<float4, Gpu::TargetHost, Gpu::Manage> hVbo(wp,hp);
+        Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
+
+        // TODO: Load data
+
+    }
+
     void SaveModel(const std::string filename)
     {
         // Generate VBO / img
