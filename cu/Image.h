@@ -134,6 +134,13 @@ struct Image {
     // Constructors
     //////////////////////////////////////////////////////
 
+    inline __host__ __device__
+    Image( const Image<T,Target,Management>& img )
+        : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h)
+    {
+        Management::AssignmentCheck();
+    }
+
     template<typename ManagementCopyFrom> inline __host__ __device__
     Image( const Image<T,Target,ManagementCopyFrom>& img )
         : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h)
@@ -178,6 +185,31 @@ struct Image {
         : pitch(pitch), ptr(ptr), w(w), h(h)
     {
     }
+
+#if __cplusplus > 199711L
+    //////////////////////////////////////////////////////
+    // R-Value Move assignment
+    //////////////////////////////////////////////////////
+
+    inline __host__
+    Image(Image<T,Target,Management>&& img)
+        : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h)
+    {
+        // This object will take over managing data (if Management = Manage)
+        img.ptr = 0;
+    }
+
+    inline __host__
+    void operator=(Image<T,Target,Management>&& img)
+    {
+        assert(ptr==0);
+        pitch = img.pitch;
+        ptr = img.ptr;
+        w = img.w;
+        h = img.h;
+        img.ptr = 0;
+    }
+#endif
 
     //////////////////////////////////////////////////////
     // Query dimensions

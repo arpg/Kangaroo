@@ -5,55 +5,8 @@
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>
 
+#include "CameraModelPyramid.h"
 #include "../cu/all.h"
-
-inline void CamModelScale(mvl::CameraModel& camModel, double scale)
-{
-    if(scale != 1.0) {
-        mvl_camera_t* cam = camModel.GetModel();
-
-        cam->linear.width  *= scale;
-        cam->linear.height *= scale;
-
-        cam->linear.fx *= scale;
-        cam->linear.fy *= scale;
-        cam->linear.cx = scale*(cam->linear.cx+0.5) - 0.5;
-        cam->linear.cy = scale*(cam->linear.cy+0.5) - 0.5;
-
-        if(camModel.Type() == MVL_CAMERA_WARPED ) {
-            // MV_CAMERA_WARPED specific params still apply
-        }else if(camModel.Type() == MVL_CAMERA_LUT ) {
-            std::cerr << "Can't Modify LUT to match image size" << std::endl;
-            // Can't update the camera params easily
-            exit(1);
-        }
-    }
-}
-
-inline void CamModelScaleToDimensions(mvl::CameraModel& camModel, int w, int h)
-{
-    const double scale = w / camModel.Width();
-    CamModelScale(camModel, scale);
-}
-
-inline void CamModelCropToRegionOfInterest(mvl::CameraModel& camModel, const NppiRect& roi)
-{
-    mvl_camera_t* cam = camModel.GetModel();
-    cam->linear.cx -= roi.x;
-    cam->linear.cy -= roi.y;
-    cam->linear.width = roi.width;
-    cam->linear.height = roi.height;
-}
-
-inline Eigen::Matrix3d ScaleK(const Eigen::Matrix3d& K, double imageScale)
-{
-    Eigen::Matrix3d rK = K;
-    rK(0,0) *= imageScale;
-    rK(1,1) *= imageScale;
-    rK(0,2) = imageScale * (K(0,2)+0.5) - 0.5;
-    rK(1,2) = imageScale * (K(1,2)+0.5) - 0.5;
-    return rK;
-}
 
 inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size_t h)
 {
@@ -62,15 +15,6 @@ inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size
             0, camParamsVec(1)*h, camParamsVec(3)*h,
             0,0,1;
     return K;
-}
-
-inline Eigen::Matrix3d MakeKinv(const Eigen::Matrix3d& K)
-{
-    Eigen::Matrix3d Kinv = Eigen::Matrix3d::Identity();
-    Kinv << 1.0/K(0,0), 0, - K(0,2) / K(0,0),
-            0, 1.0/K(1,1), - K(1,2) / K(1,1),
-            0,0,1;
-    return Kinv;
 }
 
 Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(

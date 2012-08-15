@@ -105,8 +105,10 @@ if(CUDA_FOUND)
   set(CUDA_PROPAGATE_HOST_FLAGS off)
   set(CUDA_NVCC_FLAGS "-arch=sm_20" )
 
-  LIST(APPEND CU_COMMON_SRC cu/all.h cu/Image.h cu/Mat.h cu/MatUtils.h cu/sampling.h cu/pixel_convert.h cu/patch_score.h cu/reweighting.h)
-  LIST(APPEND CU_COMMON_SRC cu/cu_anaglyph.cu cu/cu_bilateral.cu cu/cu_convert.cu cu/cu_index_buffer.cu
+  LIST(APPEND CU_COMMON_SRC cu/all.h
+                            cu/Image.h cu/sampling.h cu/pixel_convert.h cu/patch_score.h
+                            cu/Mat.h cu/MatUtils.h cu/reweighting.h cu/Pyramid.h
+                            cu/cu_anaglyph.cu cu/cu_bilateral.cu cu/cu_convert.cu cu/cu_index_buffer.cu
                             cu/cu_model_refinement.cu cu/cu_dense_stereo.cu cu/cu_lookup_warp.cu
                             cu/cu_median.cu cu/cu_normals.cu cu/cu_openni.cu cu/cu_plane_fit.cu
                             cu/cu_resample.cu cu/cu_heightmap.cu)
