@@ -264,6 +264,15 @@ struct Image {
         MemcpyFromHost(ptr, w*sizeof(T) );
     }
 
+    inline __host__ __device__
+    void Swap(Image<T,Target,Management>& img)
+    {
+        std::swap(img.pitch, pitch);
+        std::swap(img.ptr, ptr);
+        std::swap(img.w, w);
+        std::swap(img.h, h);
+    }
+
     //////////////////////////////////////////////////////
     // Direct Pixel Access
     //////////////////////////////////////////////////////

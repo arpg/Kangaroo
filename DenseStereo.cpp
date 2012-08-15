@@ -184,7 +184,7 @@ int main( int /*argc*/, char* argv[] )
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,80);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 
-    HeightmapFusion hm(100,100,10);
+    HeightmapFusion hm(200,200,10);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -418,7 +418,7 @@ int main( int /*argc*/, char* argv[] )
             T_wv = T_wc;
             dImgv.CopyFrom(dCamImg[0][level]);
             InitCostVolume(dCostVol);
-//            InitCostVolume(dCostVol,dCamImg[0], dCamImg[1]);
+//            InitCostVolume(dCostVol,dCamImg[0][level], dCamImg[1][level]);
         }
 
         if(Pushed(save_hm)) {
