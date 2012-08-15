@@ -428,24 +428,11 @@ int main( int /*argc*/, char* argv[] )
         /////////////////////////////////////////////////////////////
         // Perform drawing
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
         glColor3f(1,1,1);
 
+        s_cam.Follow(T_wc.matrix(), lockToCam);
         view3d.ActivateAndScissor(s_cam);
-        glEnable(GL_DEPTH_TEST);
-
-        static bool lastLockToCam = lockToCam;
-        if( lockToCam != lastLockToCam ) {
-            if(lockToCam) {
-                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wc.matrix();
-                s_cam.SetModelViewMatrix(T_vc);
-            }else{
-                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wc.inverse().matrix();
-                s_cam.SetModelViewMatrix(T_vw);
-            }
-            lastLockToCam = lockToCam;
-        }
-
-        if(lockToCam) glSetFrameOfReferenceF(T_wc.inverse());
 
         //draw the global heightmap
         if(show_heightmap)
@@ -480,8 +467,6 @@ int main( int /*argc*/, char* argv[] )
                 DrawAxis(gtPoseT_wh[i]);
             }
         }
-
-        if(lockToCam) glUnsetFrameOfReference();
 
         glColor4f(1,1,1,1);
         pangolin::RenderViews();

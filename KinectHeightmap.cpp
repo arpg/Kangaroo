@@ -310,24 +310,11 @@ int main( int /*argc*/, char* argv[] )
         texnorm.RenderToViewportFlipY();
         GlSlUtilities::UseNone();
 
-        view3d.ActivateAndScissor(s_cam);
-        glEnable(GL_DEPTH_TEST);
-
         const Sophus::SE3 T_wl = T_wr * T_lr.inverse();
 
-        static bool lastLockToCam = lockToCam;
-        if( lockToCam != lastLockToCam ) {
-            if(lockToCam) {
-                const Eigen::Matrix4d T_vc = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wl.matrix();
-                s_cam.SetModelViewMatrix(T_vc);
-            }else{
-                const Eigen::Matrix4d T_vw = (Eigen::Matrix4d)s_cam.GetModelViewMatrix() * T_wl.inverse().matrix();
-                s_cam.SetModelViewMatrix(T_vw);
-            }
-            lastLockToCam = lockToCam;
-        }
-
-        if(lockToCam) glSetFrameOfReferenceF(T_wl.inverse());
+        s_cam.Follow(T_wl,lockToCam);
+        view3d.ActivateAndScissor(s_cam);
+        glEnable(GL_DEPTH_TEST);
 
         SetupDrawing(show_normals);
 
@@ -336,20 +323,16 @@ int main( int /*argc*/, char* argv[] )
             RenderVboIboCboNbo(vbo_hm,ibo_hm,cbo_hm,nbo_hm,hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_colour, show_normals);
         }
 
-        {
-            if(tracking_good && show_kinect) {
-                glSetFrameOfReferenceF(T_wl);
-                glDrawAxis(0.2);
-                glColor3f(1,1,1);
-                RenderVboCbo(vbo, cbo, w, h);
-                glUnsetFrameOfReference();
-            }
-
-            glColor3f(0.8,0.8,0.8);
-            glDraw_z0(1.0,5);
+        if(tracking_good && show_kinect) {
+            glSetFrameOfReferenceF(T_wl);
+            glDrawAxis(0.2);
+            glColor3f(1,1,1);
+            RenderVboCbo(vbo, cbo, w, h);
+            glUnsetFrameOfReference();
         }
 
-        if(lockToCam) glUnsetFrameOfReference();
+        glColor3f(0.8,0.8,0.8);
+        glDraw_z0(1.0,5);
 
         glColor3f(1,1,1);
         pangolin::FinishGlutFrame();
