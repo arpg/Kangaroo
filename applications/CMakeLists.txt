@@ -39,7 +39,7 @@ include_directories( ${NODE_INCLUDE_DIRS} )
 PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
-LIST(APPEND COMMON_SRC
+LIST(APPEND COMMON_HEADERS
     common/DisplayUtils.h common/RpgCameraOpen.h common/ImageSelect.h
     common/LeastSquaresBlockHelpers.h common/ViconTracker.h
     common/AssimpVboExport.h
@@ -81,37 +81,32 @@ endif()
 
 
 find_package( Kangaroo )
-include_directories( ${Kangaroo_INCLUDE_DIRS} )
-link_libraries(${Kangaroo_LIBRARIES})
-
 if(Kangaroo_FOUND)
+    include_directories( ${Kangaroo_INCLUDE_DIRS} )
+    link_libraries(${Kangaroo_LIBRARIES} vrpn)
+
     set( BuildCheckMemory true CACHE "" force )
     if( BuildCheckMemory )
       add_executable( CheckMemory CheckMemory.cpp)
-      target_link_libraries( CheckMemory ${Kangaroo_LIBRARIES} )
     endif()
 
     set( BuildStereoViewer true CACHE "" force )
     if( BuildStereoViewer )
-      add_executable( StereoViewer StereoViewer.cpp)
-      target_link_libraries( StereoViewer ${Kangaroo_LIBRARIES} )
+      add_executable( StereoViewer StereoViewer.cpp ${COMMON_HEADERS})
     endif()
 
     set( BuildDenseStereo true CACHE "" force )
     if( BuildDenseStereo )
-      add_executable( DenseStereo DenseStereo.cpp common/ScanlineRectify.h common/HeightmapFusion.h)
-      target_link_libraries( DenseStereo ${Kangaroo_LIBRARIES} )
+      add_executable( DenseStereo DenseStereo.cpp ${COMMON_HEADERS})
     endif()
 
     set( BuildKinectHeightmap true CACHE "" force )
     if( BuildKinectHeightmap )
-      add_executable( KinectHeightmap KinectHeightmap.cpp common/ScanlineRectify.h common/HeightmapFusion.h )
-      target_link_libraries( KinectHeightmap ${Kangaroo_LIBRARIES} vrpn )
+      add_executable( KinectHeightmap KinectHeightmap.cpp ${COMMON_HEADERS})
     endif()
 
     set( BuildBilateralFilter true CACHE "" force )
     if( BuildBilateralFilter )
-      add_executable( BilateralFilter ${CU_COMMON_SRC} ${COMMON_SRC} BilateralFilter.cpp )
-      target_link_libraries( BilateralFilter ${Kangaroo_LIBRARIES} )
+      add_executable( BilateralFilter BilateralFilter.cpp ${COMMON_HEADERS})
     endif()
 endif()

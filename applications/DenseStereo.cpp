@@ -152,9 +152,9 @@ int main( int /*argc*/, char* argv[] )
         s_cam.SetModelViewMatrix(gtPoseT_wh[0].inverse().matrix());
     }
 
-    GlBufferCudaPtr vbo(GlArrayBuffer, lw*lh*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo(GlArrayBuffer, lw*lh*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr ibo(GlElementArrayBuffer, lw*lh*sizeof(uint2) );
+    GlBufferCudaPtr vbo(GlArrayBuffer, lw,lh,GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo(GlArrayBuffer, lw,lh,GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo(GlElementArrayBuffer, lw,lh,GL_UNSIGNED_INT, 2 );
 
     // Generate Index Buffer Object for rendering mesh
     {
@@ -185,9 +185,9 @@ int main( int /*argc*/, char* argv[] )
 
     HeightmapFusion hm(200,200,10);
 
-    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(uint2) );
+    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_INT, 2 );
 
     //generate index buffer for heightmap
     {

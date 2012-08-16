@@ -3,6 +3,7 @@
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
+#include <pangolin/glvbo.h>
 
 #include <SceneGraph/SceneGraph.h>
 
@@ -112,10 +113,10 @@ int main( int /*argc*/, char* argv[] )
 
     HeightmapFusion hm(10,10,50,-0.02,2.0);
 
-    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.Pixels()*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr nbo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.Pixels()*sizeof(uint2) );
+    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr nbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_INT, 2 );
 
     //generate index buffer for heightmap
     {
@@ -131,9 +132,9 @@ int main( int /*argc*/, char* argv[] )
     GlTextureCudaArray texnorm(w,h,GL_RGBA32F_ARB, false);
     GlTextureCudaArray texdebug(w,h,GL_RGBA32F_ARB, false);
 
-    GlBufferCudaPtr vbo(GlArrayBuffer, w*h*sizeof(float4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo(GlArrayBuffer, w*h*sizeof(uchar4), cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-//    GlBufferCudaPtr ibo(GlElementArrayBuffer, w*h*sizeof(uint2) );
+    GlBufferCudaPtr vbo(GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo(GlArrayBuffer, w,h,GL_UNSIGNED_BYTE,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+//    GlBufferCudaPtr ibo(GlElementArrayBuffer, w,h,GL_UNSIGNED_INT,2 );
 
     // Create Smart viewports for each camera image that preserve aspect
     const int N = 3;
