@@ -26,12 +26,12 @@ void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDe
 //////////////////////////////////////////////////////
 
 template<typename Ti>
-__global__ void KernKinectToVbo(
-    Image<float4> dVbo, const Image<Ti> dKinectDepth, double fu, double fv, double u0, double v0
+__global__ void KernDepthToVbo(
+    Image<float4> dVbo, const Image<Ti> dKinectDepth, float fu, float fv, float u0, float v0, float depthscale
 ) {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
-    const float kz = dKinectDepth(u,v) / 1000.0f;
+    const float kz = depthscale * dKinectDepth(u,v);
 
     // (x,y,1) = kinv * (u,v,1)'
     const float z = (kz > 0.1) ? kz : NAN;
@@ -41,18 +41,18 @@ __global__ void KernKinectToVbo(
     dVbo(u,v) = make_float4(x,y,z,1);
 }
 
-void KinectToVbo(Image<float4> dVbo, const Image<unsigned short> dKinectDepth, double fu, double fv, double u0, double v0)
+void DepthToVbo(Image<float4> dVbo, const Image<unsigned short> dDepth, float fu, float fv, float u0, float v0, float depthscale)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dVbo);
-    KernKinectToVbo<unsigned short><<<gridDim,blockDim>>>(dVbo, dKinectDepth, fu, fv, u0, v0);
+    KernDepthToVbo<unsigned short><<<gridDim,blockDim>>>(dVbo, dDepth, fu, fv, u0, v0, depthscale);
 }
 
-void KinectToVbo(Image<float4> dVbo, const Image<float> dKinectDepth, double fu, double fv, double u0, double v0)
+void DepthToVbo(Image<float4> dVbo, const Image<float> dDepth, float fu, float fv, float u0, float v0, float depthscale)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dVbo);
-    KernKinectToVbo<float><<<gridDim,blockDim>>>(dVbo, dKinectDepth, fu, fv, u0, v0);
+    KernDepthToVbo<float><<<gridDim,blockDim>>>(dVbo, dDepth, fu, fv, u0, v0, depthscale);
 }
 
 //////////////////////////////////////////////////////

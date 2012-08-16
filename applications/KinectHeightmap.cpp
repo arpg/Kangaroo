@@ -216,7 +216,7 @@ int main( int /*argc*/, char* argv[] )
                 FilterBadKinectData(dKinectf,dKinect);
             }
 
-            KinectToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2) );
+            DepthToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2), 1.0f/1000.0f );
             NormalsFromVbo(dN, dV);
 
             if(bundle) {
