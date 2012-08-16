@@ -2,10 +2,9 @@
 
 #include <assimp/cexport.h>
 #include <assimp/scene.h>
-
 #include "AssimpMissing.h"
 
-#include "../cu/Image.h"
+#include <kangaroo/Image.h>
 
 inline aiFace* MakeAssimpImageFaces(size_t w, size_t h)
 {

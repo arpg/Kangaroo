@@ -21,8 +21,7 @@
 #include "common/CameraModelPyramid.h"
 #include "common/LoadPosesFromFile.h"
 
-#include "cu/all.h"
-
+#include <kangaroo/kangaroo.h>
 
 #include <Node.h>
 

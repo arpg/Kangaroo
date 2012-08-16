@@ -5,7 +5,9 @@
 #include <Pangolin/glsl.h>
 
 #include "DisplayUtils.h"
-#include "../cu/Image.h"
+
+#include <kangaroo/Image.h>
+#include <kangaroo/Pyramid.h>
 
 #include <algorithm>
 

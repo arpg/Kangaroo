@@ -16,8 +16,7 @@
 #include "common/DisplayUtils.h"
 #include "common/HeightmapFusion.h"
 
-#include "cu/all.h"
-#include "cu/Image.h"
+#include <kangaroo/kangaroo.h>
 
 using namespace std;
 using namespace pangolin;
@@ -312,7 +311,7 @@ int main( int /*argc*/, char* argv[] )
 
         const Sophus::SE3 T_wl = T_wr * T_lr.inverse();
 
-        s_cam.Follow(T_wl,lockToCam);
+        s_cam.Follow(T_wl.matrix(),lockToCam);
         view3d.ActivateAndScissor(s_cam);
         glEnable(GL_DEPTH_TEST);
 

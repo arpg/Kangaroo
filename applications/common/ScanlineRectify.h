@@ -6,7 +6,7 @@
 #include <Mvlpp/Cameras.h>
 
 #include "CameraModelPyramid.h"
-#include "../cu/all.h"
+#include <kangaroo/kangaroo.h>
 
 inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size_t h)
 {

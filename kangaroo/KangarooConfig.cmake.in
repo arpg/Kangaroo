@@ -1,0 +1,5 @@
+SET( Kangaroo_LIBRARIES    "@Kangaroo_LIBRARIES@" )
+SET( Kangaroo_LIBRARY      "@Kangaroo_LIBRARIES@" )
+
+SET( Kangaroo_INCLUDE_DIRS "@Kangaroo_INCLUDE_DIR@" )
+SET( Kangaroo_INCLUDE_DIR  "@Kangaroo_INCLUDE_DIR@" )

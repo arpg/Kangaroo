@@ -10,7 +10,7 @@
 
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
-#include "cu/all.h"
+#include <kangaroo/kangaroo.h>
 
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>

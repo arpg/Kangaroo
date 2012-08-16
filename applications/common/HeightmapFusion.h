@@ -7,8 +7,7 @@
 
 #include "AssimpVboExport.h"
 
-#include "../cu/Image.h"
-#include "../cu/all.h"
+#include <kangaroo/kangaroo.h>
 
 class HeightmapFusion
 {

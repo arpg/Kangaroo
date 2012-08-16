@@ -7,7 +7,7 @@
 #include <cuda_gl_interop.h>
 
 #include "common/RpgCameraOpen.h"
-#include "cu/all.h"
+#include <kangaroo/kangaroo.h>
 
 using namespace std;
 using namespace pangolin;

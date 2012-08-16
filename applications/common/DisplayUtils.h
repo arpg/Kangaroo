@@ -2,7 +2,7 @@
 
 #include <pangolin/glcuda.h>
 
-#include "../cu/Image.h"
+#include <kangaroo/Image.h>
 
 
 
