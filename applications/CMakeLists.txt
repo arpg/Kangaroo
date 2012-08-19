@@ -49,6 +49,12 @@ IF(CMAKE_COMPILER_IS_GNUCXX)
   SET(CMAKE_CXX_FLAGS "-std=c++11 -g")
 ENDIF()
 
+set( BuildOddsAndEnds true CACHE "" force )
+if( BuildOddsAndEnds )
+    add_executable( OddsAndEnds ${COMMON_SRC} OddsAndEnds.cpp)
+    target_link_libraries( OddsAndEnds )
+endif()
+
 set( BuildCameraViewer true CACHE "" force )
 if( BuildCameraViewer )
     add_executable( CameraViewer ${COMMON_SRC} CameraViewer.cpp)

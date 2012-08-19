@@ -53,6 +53,39 @@ void DenseStereo(
 }
 
 //////////////////////////////////////////////////////
+// Check computed disparity is a minima for reverse match
+//////////////////////////////////////////////////////
+
+template<typename TD, typename TI, typename Score>
+__global__ void KernReverseCheck(
+    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const int d = dDisp(x,y);
+    const int rx = x - d;
+
+    // Check that this pixel is also a minima for the right image
+    const float s1 = Score::Score(dCamLeft, x+1,y, dCamRight, rx,y);
+    const float s2 = Score::Score(dCamLeft, x,  y, dCamRight, rx,y);
+    const float s3 = Score::Score(dCamLeft, x-1,y, dCamRight, rx,y);
+
+    // If not, mark match is invalid
+    if(s1 < s2 || s3 < s2) {
+        dDisp(x,y) = 0;
+    }
+}
+
+void ReverseCheck(
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dDisp);
+    KernReverseCheck<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight);
+}
+
+//////////////////////////////////////////////////////
 // Visualise cross section of disparity image
 //////////////////////////////////////////////////////
 

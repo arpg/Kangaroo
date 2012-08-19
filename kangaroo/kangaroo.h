@@ -80,6 +80,12 @@ void DenseStereo(
 
 //////////////////////////////////////////////////////
 
+void ReverseCheck(
+    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
+);
+
+//////////////////////////////////////////////////////
+
 void DenseStereoSubpixelRefine(Image<float> dDispOut, const Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
 );
 
@@ -160,6 +166,10 @@ void MedianFilter3x3(
 
 void MedianFilter5x5(
     Image<float> dOut, Image<float> dIn
+);
+
+void MedianFilterRejectNegative5x5(
+    Image<float> dOut, Image<float> dIn, int maxbad = 100
 );
 
 //////////////////////////////////////////////////////

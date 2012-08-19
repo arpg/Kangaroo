@@ -45,9 +45,9 @@ int main( int /*argc*/, char* argv[] )
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
-         "Bumblebee2:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/Bumblebee2]//"
+//        "Bumblebee2:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/Bumblebee2]//"
     );
 
 //    CameraDevice camera = OpenPangoCamera(
@@ -98,7 +98,7 @@ int main( int /*argc*/, char* argv[] )
 
     cout << "Video stream dimensions: " << nw << "x" << nh << endl;
     cout << "Chosen Level: " << level << endl;
-    cout << "Processing dimensions: " << w << "x" << h << endl;
+    cout << "Processing dimensions: " << lw << "x" << lh << endl;
     cout << "Offset: " << roi.x << "x" << roi.y << endl;
 
     // OpenGL's Right Down Forward coordinate systems
@@ -221,6 +221,8 @@ int main( int /*argc*/, char* argv[] )
     Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
     Var<bool> subpix("ui.subpix", true, true);
+    Var<bool> reverse_check("ui.reverse_check", true, true);
+
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> resetPlane("ui.resetplane", true, false);
     Var<bool> save_hm("ui.save heightmap", false, false);
@@ -238,9 +240,10 @@ int main( int /*argc*/, char* argv[] )
     Var<float> gs("ui.gs",2, 1E-3, 5);
     Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
-    Var<int> domedits("ui.median its",10, 1, 10);
+    Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed5x5("ui.median 5x5", false, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
+    Var<int> medi("ui.medi",12, 0, 24);
 
     Var<bool> plane_do("ui.Compute Ground Plane", false, true);
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
@@ -309,6 +312,10 @@ int main( int /*argc*/, char* argv[] )
             // Compute dense stereo
             DenseStereo(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh);
 
+            if(reverse_check) {
+                ReverseCheck(dDispInt, dCamImg[0][level], dCamImg[1][level] );
+            }
+
             if(subpix) {
                 DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0][level], dCamImg[1][level]);
             }else{
@@ -326,7 +333,7 @@ int main( int /*argc*/, char* argv[] )
                 }
 
                 if(domed5x5) {
-                    MedianFilter5x5(dDisp,dDisp);
+                    MedianFilterRejectNegative5x5(dDisp,dDisp, medi);
                 }
             }
 

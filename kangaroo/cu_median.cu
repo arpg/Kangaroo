@@ -106,7 +106,7 @@ void MedianFilter3x3(
 #define t25(a, b, c, d, e, f, g, h, i, j)	t24(a, b, c, d, e, f, g, h); t2(i, j);
 
 // Based on fragment shader: http://graphics.cs.williams.edu/papers/MedianShaderX6/median5.pix
-template<typename To, typename Ti, int BLOCK_X, int BLOCK_Y>
+template<typename To, typename Ti>
 __global__ void KernMedianFilter5x5(Image<To> dOut, Image<Ti> dIn )
 {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -144,12 +144,69 @@ __global__ void KernMedianFilter5x5(Image<To> dOut, Image<Ti> dIn )
     dOut(x,y) = (To)v[12];
 }
 
+template<typename To, typename Ti>
+__global__ void KernMedianFilterRejectNegative5x5(Image<To> dOut, Image<Ti> dIn, int maxbad )
+{
+    const int krad = 2;
+    const int kw = 2*krad+1;
+    const int kpix = kw*kw;
+
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    int bad = 0;
+    Ti v[kpix];
+
+    // TODO: Distribute this accross block with apron
+    for(int dX = -2; dX <= 2; ++dX) {
+      for(int dY = -2; dY <= 2; ++dY) {
+          const int unwrap = (dX + 2) * 5 + (dY + 2);
+          v[unwrap] = dIn.GetWithClampedRange(x+dX,y+dY);
+          if( v[unwrap] < 0 ) {
+              bad++;
+          }
+      }
+    }
+
+    if( bad < maxbad) {
+        // Bitonic sort network of 25 numbers - only top half are guarenteed valid
+        t2(0,1); t2(2,3); t2(4,5); t2(6,7); t2(8,9); t2(10,11); t2(12,13); t2(14,15); t2(16,17); t2(18,19); t2(20,21); t2(22,23);
+        t2(0,3); t2(1,2); t2(4,7); t2(5,6); t2(8,11); t2(9,10); t2(12,15); t2(13,14); t2(16,19); t2(17,18); t2(20,23); t2(21,22);
+        t2(0,1); t2(2,3); t2(4,5); t2(6,7); t2(8,9); t2(10,11); t2(12,13); t2(14,15); t2(16,17); t2(18,19); t2(20,21); t2(22,23);
+        t2(0,7); t2(1,6); t2(2,5); t2(3,4); t2(8,15); t2(9,14); t2(10,13); t2(11,12); t2(16,23); t2(17,22); t2(18,21); t2(19,20);
+        t2(0,2); t2(1,3); t2(4,6); t2(5,7); t2(8,10); t2(9,11); t2(12,14); t2(13,15); t2(16,18); t2(17,19); t2(20,22); t2(21,23);
+        t2(0,1); t2(2,3); t2(4,5); t2(6,7); t2(8,9); t2(10,11); t2(12,13); t2(14,15); t2(16,17); t2(18,19); t2(20,21); t2(22,23);
+        t2(0,15); t2(1,14); t2(2,13); t2(3,12); t2(4,11); t2(5,10); t2(6,9); t2(7,8); t2(23,24);
+        t2(0,4); t2(1,5); t2(2,6); t2(3,7); t2(8,12); t2(9,13); t2(10,14); t2(11,15); t2(16,20); t2(17,21); t2(18,22); t2(19,23);
+        t2(0,2); t2(1,3); t2(4,6); t2(5,7); t2(8,10); t2(9,11); t2(12,14); t2(13,15); t2(16,18); t2(17,19); t2(20,22); t2(21,23);
+        t2(0,1); t2(2,3); t2(4,5); t2(6,7); t2(8,9); t2(10,11); t2(12,13); t2(14,15); t2(16,17); t2(18,19); t2(20,21); t2(22,23);
+        t2(7,24); t2(8,23); t2(9,22); t2(10,21); t2(11,20); t2(12,19); t2(13,18); t2(14,17); t2(15,16);
+        t2(0,8); t2(1,9); t2(2,10); t2(3,11); t2(4,12); t2(5,13); t2(6,14); t2(7,15); t2(16,24);
+        t2(8,12); t2(9,13); t2(10,14); t2(11,15); t2(16,20); t2(17,21); t2(18,22); t2(19,23);
+        t2(12,14); t2(13,15); t2(16,18); t2(17,19); t2(20,22); t2(21,23);
+        t2(12,13); t2(14,15); t2(16,17); t2(18,19); t2(20,21); t2(22,23);
+
+        // Select median, ignoring bad values.
+        dOut(x,y) = (To)v[(kpix+bad)/2];
+    }else{
+        dOut(x,y) = -1;
+    }
+}
+
 void MedianFilter5x5(
     Image<float> dOut, Image<float> dIn
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dOut, 16, 16);
-    KernMedianFilter5x5<float,float,16,16><<<gridDim,blockDim>>>(dOut, dIn);
+    KernMedianFilter5x5<float,float><<<gridDim,blockDim>>>(dOut, dIn);
+}
+
+void MedianFilterRejectNegative5x5(
+    Image<float> dOut, Image<float> dIn, int maxbad
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut, 16, 16);
+    KernMedianFilterRejectNegative5x5<float,float><<<gridDim,blockDim>>>(dOut, dIn, maxbad);
 }
 
 }
