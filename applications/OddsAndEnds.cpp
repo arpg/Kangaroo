@@ -6,7 +6,7 @@ using namespace std;
 
 int main( int /*argc*/, char* argv[] )
 {
-    const int size = 25;
+    const int size = 9*9;
 
     // Which sorted indices do we need?
     set<int> desired;

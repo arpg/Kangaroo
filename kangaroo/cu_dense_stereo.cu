@@ -5,7 +5,7 @@
 namespace Gpu
 {
 
-const int DefaultRad = 2;
+const int DefaultRad = 1;
 typedef SSNDPatchScore<float,DefaultRad,ImgAccessClamped> DefaultSafeScoreType;
 //typedef SinglePixelSqPatchScore<float,ImgAccessRaw> DefaultSafeScoreType;
 
@@ -25,7 +25,7 @@ __global__ void KernDenseStereo(
     float bestScore = 1E+36;
     float sndBestScore = 1E+37;
 
-    maxDisp = min(maxDisp, x);
+    maxDisp = min(maxDisp, x + Score::width);
 
     for(int c = 0; c <= maxDisp; ++c ) {
         const int rx = x-c;
@@ -39,7 +39,10 @@ __global__ void KernDenseStereo(
         }
     }
 
-    const bool valid = (bestScore * acceptThresh) < sndBestScore;
+    const bool valid =
+            Score::width  <= x && x < dCamLeft.w - Score::width &&
+            Score::height <= y && y < dCamLeft.h - Score::height &&
+            (bestScore * acceptThresh) < sndBestScore;
 
     dDisp(x,y) = valid ? bestDisp : 0;
 }
@@ -53,7 +56,7 @@ void DenseStereo(
 }
 
 //////////////////////////////////////////////////////
-// Check computed disparity is a minima for reverse match
+// Check computed disparity is a local minima for reverse match
 //////////////////////////////////////////////////////
 
 template<typename TD, typename TI, typename Score>
@@ -66,13 +69,21 @@ __global__ void KernReverseCheck(
     const int d = dDisp(x,y);
     const int rx = x - d;
 
-    // Check that this pixel is also a minima for the right image
-    const float s1 = Score::Score(dCamLeft, x+1,y, dCamRight, rx,y);
-    const float s2 = Score::Score(dCamLeft, x,  y, dCamRight, rx,y);
-    const float s3 = Score::Score(dCamLeft, x-1,y, dCamRight, rx,y);
+    int best = 0;
+    float bestscore = 1E10;
 
-    // If not, mark match is invalid
-    if(s1 < s2 || s3 < s2) {
+    // Check that this pixel is also a minima for the right image
+    const int rad = 10;
+    for(int i=-rad; i <= rad; ++i) {
+        const float s = Score::Score(dCamLeft, x+i,y, dCamRight, rx,y);
+        if(s < bestscore) {
+            bestscore = s;
+            best = i;
+        }
+    }
+
+    // If not, mark match as invalid
+    if(best != 0) {
         dDisp(x,y) = 0;
     }
 }
@@ -297,5 +308,29 @@ void CostVolumeCrossSection(
     InitDimFromOutputImage(blockDim,gridDim, dScore);
     KernCostVolumeCrossSection<<<gridDim,blockDim>>>(dScore, dCostVol.ImageXZ(y));
 }
+
+//////////////////////////////////////////////////////
+
+template<typename To, typename Ti>
+__global__ void KernFilterDispGrad(Image<To> dOut, Image<Ti> dIn, float threshold )
+{
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float dx = dOut.template GetCentralDiffDx<float>(x,y);
+    const float dy = dOut.template GetCentralDiffDy<float>(x,y);
+    const bool valid = dx*dx + dy*dy < threshold;
+
+    dOut(x,y) = valid ? dIn(x,y) : -1;
+}
+
+void FilterDispGrad(
+    Image<float> dOut, Image<float> dIn, float threshold
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, dOut, 16, 16);
+    KernFilterDispGrad<float,float><<<gridDim,blockDim>>>(dOut, dIn, threshold);
+}
+
 
 }

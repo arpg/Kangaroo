@@ -42,6 +42,11 @@ struct BitonicSwaps
     std::vector<biswap> swaps;
 };
 
+// Based on http://en.wikipedia.org/wiki/Bitonic_sorter
+// Some talk of using it with cuda here:
+// http://www.scribd.com/doc/87393205/25/Parallel-Bitonic-Sort-On-CUDA#outer_page_33
+// But we're inspired more by this implementation in glsl
+// http://graphics.cs.williams.edu/papers/MedianShaderX6/median5.pix
 struct BitonicNetwork
 {
     BitonicNetwork(int size)
@@ -108,6 +113,7 @@ protected:
         }
     }
 
+    // http://en.wikipedia.org/wiki/File:BitonicSort1.svg
     void AddRoundSwaps(BitonicSwaps& swaps, int s, int r)
     {
         const int blocks = N>>(s+1-r);
@@ -127,6 +133,7 @@ protected:
         }
     }
 
+    // http://en.wikipedia.org/wiki/File:BitonicSort.svg
     void AddRoundSwapsKeepOrder(BitonicSwaps& swaps, int s, int r)
     {
         const int blocks = N>>(s+1-r);

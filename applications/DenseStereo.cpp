@@ -175,6 +175,7 @@ int main( int /*argc*/, char* argv[] )
     Image<float, TargetDevice, Manage>  dDisp(lw,lh);
     Image<float, TargetDevice, Manage>  dDispFilt(lw,lh);
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
+    Image<float4, TargetDevice, Manage>  dN(lw,lh);
     Image<unsigned char, TargetDevice,Manage> dScratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
     Image<float4, TargetDevice, Manage>  dDebugf4(lw,lh);
     Image<float, TargetDevice, Manage>  dErr(lw,lh);
@@ -184,7 +185,8 @@ int main( int /*argc*/, char* argv[] )
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,80);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 
-    HeightmapFusion hm(200,200,10);
+//    HeightmapFusion hm(200,200,10);
+    HeightmapFusion hm(100,100,10);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -232,7 +234,7 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
     Var<bool> show_heightmap("ui.show heightmap", false, true);
-    Var<bool> cross_section("ui.Cross Section", true, true);
+    Var<bool> cross_section("ui.Cross Section", false, true);
     Var<bool> pose_refinement("ui.Pose Refinement", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
@@ -241,9 +243,13 @@ int main( int /*argc*/, char* argv[] )
     Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
     Var<int> domedits("ui.median its",1, 1, 10);
+    Var<bool> domed9x9("ui.median 9x9", false, true);
+    Var<bool> domed7x7("ui.median 7x7", false, true);
     Var<bool> domed5x5("ui.median 5x5", false, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
+
+    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 
     Var<bool> plane_do("ui.Compute Ground Plane", false, true);
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
@@ -322,23 +328,25 @@ int main( int /*argc*/, char* argv[] )
                 ConvertImage<float, unsigned char>(dDisp, dDispInt);
             }
 
+            for(int i=0; i < domedits; ++i ) {
+                if(domed9x9) MedianFilterRejectNegative9x9(dDisp,dDisp, medi);
+                if(domed7x7) MedianFilterRejectNegative7x7(dDisp,dDisp, medi);
+                if(domed5x5) MedianFilterRejectNegative5x5(dDisp,dDisp, medi);
+                if(domed3x3) MedianFilter3x3(dDisp,dDisp);
+            }
+
+            if(filtgradthresh > 0) {
+                FilterDispGrad(dDisp, dDisp, filtgradthresh);
+            }
+
             if(applyBilateralFilter) {
                 BilateralFilter(dDispFilt,dDisp,gs,gr,bilateralWinSize);
                 dDisp.CopyFrom(dDispFilt);
             }
 
-            for(int i=0; i < domedits; ++i ) {
-                if(domed3x3) {
-                    MedianFilter3x3(dDisp,dDisp);
-                }
-
-                if(domed5x5) {
-                    MedianFilterRejectNegative5x5(dDisp,dDisp, medi);
-                }
-            }
-
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
+            NormalsFromVbo(dN, d3d);
 
             if(plane_do || resetPlane) {
                 // Fit plane
@@ -419,6 +427,8 @@ int main( int /*argc*/, char* argv[] )
             }else{
                 CostVolumeCrossSection(dDebugf4, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
             }
+        }else{
+            dDebugf4.CopyFrom(dN);
         }
 
         if(Pushed(costvol_reset)) {

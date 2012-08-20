@@ -172,6 +172,14 @@ void MedianFilterRejectNegative5x5(
     Image<float> dOut, Image<float> dIn, int maxbad = 100
 );
 
+void MedianFilterRejectNegative7x7(
+    Image<float> dOut, Image<float> dIn, int maxbad
+);
+
+void MedianFilterRejectNegative9x9(
+    Image<float> dOut, Image<float> dIn, int maxbad
+);
+
 //////////////////////////////////////////////////////
 
 void MakeAnaglyth(
@@ -214,6 +222,10 @@ void AddToCostVolume(Volume<CostVolElem> vol, const Image<unsigned char> imgv,
 
 void CostVolumeCrossSection(
     Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
+);
+
+void FilterDispGrad(
+    Image<float> dOut, Image<float> dIn, float threshold
 );
 
 }
