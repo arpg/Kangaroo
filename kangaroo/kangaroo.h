@@ -228,4 +228,8 @@ void FilterDispGrad(
     Image<float> dOut, Image<float> dIn, float threshold
 );
 
+//////////////////////////////////////////////////////
+
+void Blur(Image<unsigned char> in_out, Image<unsigned char> temp );
+
 }

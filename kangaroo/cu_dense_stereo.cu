@@ -5,7 +5,7 @@
 namespace Gpu
 {
 
-const int DefaultRad = 1;
+const int DefaultRad = 2;
 typedef SSNDPatchScore<float,DefaultRad,ImgAccessClamped> DefaultSafeScoreType;
 //typedef SinglePixelSqPatchScore<float,ImgAccessRaw> DefaultSafeScoreType;
 
@@ -189,7 +189,7 @@ __global__ void KernDisparityImageToVbo(
     const float invalid = 0.0f/0.0f;
 
     const float disp = dDisp(u,v);
-    const float z = disp > 2 ? fu * baseline / disp : invalid;
+    const float z = disp > 0 ? fu * baseline / disp : invalid;
 
     // (x,y,1) = kinv * (u,v,1)'
     const float x = z * (u-u0) / fu;

@@ -87,7 +87,10 @@ __global__ void KernPoseRefinementFromDepthmap(
         sum.sqErr = y*y;
 
         const float debug = (abs(y) + 128) / 255.0f;
-        dDebug(u,v) = make_float4(debug,0,w,1);
+        dDebug(u,v) = make_float4(debug,0, w,1);
+//        dDebug(u,v) = make_float4(debug,debug,debug,1);
+//        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
+//        dDebug(u,v) = make_float4(1.0/Pr4.z,1.0/Pr4.z,1.0/Pr4.z,1);
     }else{
         dDebug(u,v) = make_float4(1,0,0,1);
     }
