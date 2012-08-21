@@ -45,9 +45,11 @@ int main( int /*argc*/, char* argv[] )
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
 //        "Bumblebee2:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/Bumblebee2]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/NightDC/Sun Aug 19 23:02:41 EDT 2012,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/KIT-odometry-grey/00,Channel-0=image_0/.*png,Channel-1=image_1/.*png,StartFrame=0]//"
     );
 
 //    CameraDevice camera = OpenPangoCamera(
@@ -65,7 +67,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 320*240 ); //640*480 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
 //    const int level = 4;
     assert(level <= max_levels);
 

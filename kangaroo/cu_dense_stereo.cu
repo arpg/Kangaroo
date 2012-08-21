@@ -5,6 +5,7 @@
 namespace Gpu
 {
 
+const int MinDisparity = 0;
 const int DefaultRad = 2;
 typedef SSNDPatchScore<float,DefaultRad,ImgAccessClamped> DefaultSafeScoreType;
 //typedef SinglePixelSqPatchScore<float,ImgAccessRaw> DefaultSafeScoreType;
@@ -138,7 +139,7 @@ __global__ void KernDenseStereoSubpixelRefine(
     const int bestDisp = dDisp(x,y);
 
     // Ignore things at infinity (and outliers marked with 0)
-    if(bestDisp <1) {
+    if(bestDisp < MinDisparity) {
         dDispOut(x,y) = -1;
         return;
     }
@@ -189,7 +190,7 @@ __global__ void KernDisparityImageToVbo(
     const float invalid = 0.0f/0.0f;
 
     const float disp = dDisp(u,v);
-    const float z = disp > 0 ? fu * baseline / disp : invalid;
+    const float z = disp >= MinDisparity ? fu * baseline / disp : invalid;
 
     // (x,y,1) = kinv * (u,v,1)'
     const float x = z * (u-u0) / fu;
