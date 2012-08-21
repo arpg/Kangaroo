@@ -1,6 +1,7 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
 #include "reweighting.h"
+#include "disparity.h"
 
 namespace Gpu {
 
@@ -36,20 +37,13 @@ bool IsFinite(const Mat<float3,R,C>& mat)
 //////////////////////////////////////////////////////
 
 template<typename Ti>
-__global__ void KernPoseRefinementFromDepthmap(
-    const Image<Ti> dImgl,
-    const Image<Ti> dImgr, const Image<float4> dPr,
-    const Mat<float,3,4> KT_lr, float c,
-    Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug
-){
-    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
-//    const Mat<float,2> pr = {u,v};
-
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
-
-    const float4 Pr4 = dPr(u,v);
+__device__ inline
+void BuildPoseRefinementFromDepthmapSystem(
+    const unsigned int u,  const unsigned int v, const float4 Pr4,
+    const Image<Ti>& dImgl, const Image<Ti>& dImgr,
+    const Mat<float,3,4>& KT_lr, float c,
+    LeastSquaresSystem<float,6>& sum, Image<float4> dDebug
+) {
     const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
 
     const Mat<float,3> KPl = KT_lr * Pr;
@@ -87,18 +81,34 @@ __global__ void KernPoseRefinementFromDepthmap(
         sum.sqErr = y*y;
 
         const float debug = (abs(y) + 128) / 255.0f;
-        dDebug(u,v) = make_float4(debug,0, w,1);
+        dDebug(u,v) = make_float4(debug,0,w,1);
 //        dDebug(u,v) = make_float4(debug,debug,debug,1);
 //        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
 //        dDebug(u,v) = make_float4(1.0/Pr4.z,1.0/Pr4.z,1.0/Pr4.z,1);
     }else{
         dDebug(u,v) = make_float4(1,0,0,1);
     }
+}
+
+template<typename Ti>
+__global__ void KernPoseRefinementFromVbo(
+    const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float4> dPr,
+    const Mat<float,3,4> KT_lr, float c,
+    Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug
+){
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    LeastSquaresSystem<float,6> sum;
+    sum.SetZero();
+
+    const float4 Pr4 = dPr(u,v);
+    BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,sum,dDebug);
 
     dSum(u,v) = sum;
 }
 
-LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
+LeastSquaresSystem<float,6> PoseRefinementFromVbo(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float4> dPr,
     const Mat<float,3,4> KT_lr, float c,
@@ -108,7 +118,45 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
     InitDimFromOutputImage(blockDim, gridDim, dImgr);
     Image<LeastSquaresSystem<float,6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,6> >(dImgr.w, dImgr.h);
 
-    KernPoseRefinementFromDepthmap<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dPr, KT_lr, c, dSum, dDebug );
+    KernPoseRefinementFromVbo<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dPr, KT_lr, c, dSum, dDebug );
+
+    LeastSquaresSystem<float,6> sum;
+    sum.SetZero();
+    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
+}
+
+template<typename Ti>
+__global__ void KernPoseRefinementFromDisparity(
+    const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDispr,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug
+){
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    LeastSquaresSystem<float,6> sum;
+    sum.SetZero();
+
+    const float4 Pr4 = DepthFromDisparity(u,v,dDispr(u,v), baseline, fu, fv, u0, v0);
+    BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,sum,dDebug);
+
+    dSum(u,v) = sum;
+}
+
+
+LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float> dDispr,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug
+){
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dImgr);
+    Image<LeastSquaresSystem<float,6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,6> >(dImgr.w, dImgr.h);
+
+    KernPoseRefinementFromDisparity<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, dSum, dDebug );
 
     LeastSquaresSystem<float,6> sum;
     sum.SetZero();

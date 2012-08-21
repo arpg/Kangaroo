@@ -56,6 +56,25 @@ inline void BoxReduce(Pyramid<T,Levels> pyramid)
     }
 }
 
+template<typename T, unsigned Levels, typename UpType>
+inline void BlurReduce(Pyramid<T,Levels> pyramid, Image<T> temp1, Image<T> temp2)
+{
+    // TODO: Make better
+
+    // pyramid.imgs[0] has size (w,h)
+    const int w = pyramid.imgs[0].w;
+    const int h = pyramid.imgs[0].h;
+
+    // Downsample from pyramid.imgs[0], blurring into temporary, and using BoxHalf.
+    for(int l=1; l<Levels && (w>>l > 0) && (h>>l > 0); ++l) {
+        const int parent = l-1;
+        const int parentw = w >> parent;
+        const int parenth = h >> parent;
+        Blur( temp1.SubImage(parentw,parenth), pyramid.imgs[l-1], temp2.SubImage(parentw,parenth));
+        BoxHalf<T,UpType,T>(pyramid.imgs[l], temp1.SubImage(parentw,parenth) );
+    }
+}
+
 //////////////////////////////////////////////////////
 
 void CreateMatlabLookupTable(Image<float2> lookup,
@@ -115,9 +134,16 @@ void GenerateTriangleStripIndexBuffer( Image<uint2> dIbo);
 
 //////////////////////////////////////////////////////
 
-LeastSquaresSystem<float,6> PoseRefinementFromDepthmap(
+LeastSquaresSystem<float,6> PoseRefinementFromVbo(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float4> dPr,
+    const Mat<float,3,4> KT_lr, float c,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug
+);
+
+LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float> dDispr,
     const Mat<float,3,4> KT_lr, float c,
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
@@ -230,6 +256,11 @@ void FilterDispGrad(
 
 //////////////////////////////////////////////////////
 
-void Blur(Image<unsigned char> in_out, Image<unsigned char> temp );
+void Blur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char> temp );
+
+inline void Blur(Image<unsigned char> in_out, Image<unsigned char> temp )
+{
+    Blur(in_out,temp,in_out);
+}
 
 }

@@ -33,12 +33,12 @@ __global__ void KernBlurY(Image<TO> out, Image<TI> in)
     }
 }
 
-void Blur(Image<unsigned char> in_out, Image<unsigned char> temp )
+void Blur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char> temp )
 {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim,gridDim, in_out, 16, 16);
-    KernBlurX<unsigned char,unsigned char><<<gridDim,blockDim>>>(temp,in_out);
-    KernBlurY<unsigned char,unsigned char><<<gridDim,blockDim>>>(in_out,temp);
+    InitDimFromOutputImage(blockDim,gridDim, out, 16, 16);
+    KernBlurX<unsigned char,unsigned char><<<gridDim,blockDim>>>(temp,in);
+    KernBlurY<unsigned char,unsigned char><<<gridDim,blockDim>>>(out,temp);
 }
 
 }

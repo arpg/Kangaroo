@@ -384,7 +384,7 @@ int main( int /*argc*/, char* argv[] )
                 // attempt to reestimate baseline from depthmap
                 // Compute Pose
                 Eigen::Matrix<double, 3,4> KT_rl = Kl * T_rl.matrix3x4();
-                Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementFromDepthmap(dCamImg[1][level], dCamImg[0][level], d3d, KT_rl, 1E10, dScratch, dDebugf4);
+                Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementFromVbo(dCamImg[1][level], dCamImg[0][level], d3d, KT_rl, 1E10, dScratch, dDebugf4);
                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
                 cout << "--------------------------------------" << endl;
