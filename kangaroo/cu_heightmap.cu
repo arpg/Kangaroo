@@ -102,9 +102,9 @@ __global__ void KernColourHeightmap(Image<uchar4> dCbo, const Image<float4> dHei
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    float v_z = dHeightMap(u,v).z;
+    float4 hm = dHeightMap(u,v);
 //    dCbo(u,v) = make_uchar4(255,0,0,255);
-    dCbo(u,v) = make_uchar4(v_z,v_z,v_z,255);
+    dCbo(u,v) = make_uchar4(hm.z, hm.z, hm.z, hm.y > 1E10 ? 10 : 255);
 }
 
 void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap)

@@ -38,6 +38,7 @@ int main( int /*argc*/, char* argv[] )
     cudaGLSetGLDevice(0);
     size_t cu_mem_start, cu_mem_end, cu_mem_total;
     cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
+    glClearColor(1,1,1,1);
 
     // Open video device
 //    const std::string cam_uri =
@@ -45,11 +46,11 @@ int main( int /*argc*/, char* argv[] )
 //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
+        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
 //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
 //        "Bumblebee2:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/Bumblebee2]//"
 //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/NightDC/Sun Aug 19 23:02:41 EDT 2012,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/KIT-odometry-grey/00,Channel-0=image_0/.*png,Channel-1=image_1/.*png,StartFrame=0]//"
+//        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/KIT-odometry-grey/00,Channel-0=image_0/.*png,Channel-1=image_1/.*png,StartFrame=0]//"
     );
 
 //    CameraDevice camera = OpenPangoCamera(
@@ -67,7 +68,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 / 4 );
 //    const int level = 4;
     assert(level <= max_levels);
 
@@ -148,7 +149,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrixRDF_TopLeft(w,h,K0(0,0),K0(1,1),K0(0,2),K0(1,2),0.1,1000),
+        ProjectionMatrixRDF_TopLeft(w,h,K0(0,0),K0(1,1),K0(0,2),K0(1,2),0.1,10000),
         IdentityMatrix(GlModelViewStack)
     );
     if(!gtPoseT_wh.empty()) {
@@ -187,8 +188,8 @@ int main( int /*argc*/, char* argv[] )
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,80);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 
-//    HeightmapFusion hm(200,200,10);
-    HeightmapFusion hm(100,100,10);
+    HeightmapFusion hm(800,800,1);
+//    HeightmapFusion hm(100,100,10);
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -246,7 +247,7 @@ int main( int /*argc*/, char* argv[] )
 
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed9x9("ui.median 9x9", false, true);
-    Var<bool> domed7x7("ui.median 7x7", false, true);
+    Var<bool> domed7x7("ui.median 7x7", true, true);
     Var<bool> domed5x5("ui.median 5x5", false, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
@@ -263,6 +264,11 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback('~', [&container](){static bool showpanel=true; showpanel = !showpanel; if(showpanel) { container.SetBounds(0,1,Attach::Pix(180), 1); }else{ container.SetBounds(0,1,0, 1); } Display("ui").Show(showpanel); } );
+    pangolin::RegisterKeyPressCallback('1', [&container](){container[0].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('2', [&container](){container[1].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('3', [&container](){container[2].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
 
     const int N = 3;
     for(int i=0; i<N; ++i ) {
@@ -368,7 +374,8 @@ int main( int /*argc*/, char* argv[] )
 
             if(Pushed(resetPlane) ) {
                 Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
-                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
+//                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
+                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /2);
                 hm.Init(T_nw);
             }
 
@@ -451,39 +458,41 @@ int main( int /*argc*/, char* argv[] )
         glColor3f(1,1,1);
 
         s_cam.Follow(T_wc.matrix(), lockToCam);
-        view3d.ActivateAndScissor(s_cam);
+        if(view3d.show) {
+            view3d.ActivateAndScissor(s_cam);
 
-        //draw the global heightmap
-        if(show_heightmap)
-        {
-            //transform the mesh into world coordinates from heightmap coordinates
-            glMatrixMode(GL_MODELVIEW);
-            glPushMatrix();
-            glMultMatrix( hm.T_hw().inverse() );
-            RenderVboIboCbo(vbo_hm,ibo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
-            glPopMatrix();
-        }
-
-        // Render camera frustum and mesh
-        {
-            glSetFrameOfReferenceF(T_wc);
-            if(show_depthmap) {
-                RenderVboIboCbo(vbo,ibo,cbo, lw, lh, show_mesh, show_color);
+            //draw the global heightmap
+            if(show_heightmap)
+            {
+                //transform the mesh into world coordinates from heightmap coordinates
+                glMatrixMode(GL_MODELVIEW);
+                glPushMatrix();
+                glMultMatrix( hm.T_hw().inverse() );
+                RenderVboIboCbo(vbo_hm,ibo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
+                glPopMatrix();
             }
-            glColor3f(1.0,1.0,1.0);
-            DrawFrustrum(cam[0].Kinv(level),lw,lh,1.0);
-            if(plane_do) {
-                // Draw ground plane
-                glColor4f(0,1,0,1);
-                DrawPlane(n_c,1,100);
-            }
-            glUnsetFrameOfReference();
-        }
 
-        if(show_history) {
-            // Draw history
-            for(int i=0; i< gtPoseT_wh.size() && i< frame; ++i) {
-                DrawAxis(gtPoseT_wh[i]);
+            // Render camera frustum and mesh
+            {
+                glSetFrameOfReferenceF(T_wc);
+                if(show_depthmap) {
+                    RenderVboIboCbo(vbo,ibo,cbo, lw, lh, show_mesh, show_color);
+                }
+                glColor3f(1.0,1.0,1.0);
+                DrawFrustrum(cam[0].Kinv(level),lw,lh,1.0);
+                if(plane_do) {
+                    // Draw ground plane
+                    glColor4f(0,1,0,1);
+                    DrawPlane(n_c,1,100);
+                }
+                glUnsetFrameOfReference();
+            }
+
+            if(show_history) {
+                // Draw history
+                for(int i=0; i< gtPoseT_wh.size() && i< frame; ++i) {
+                    DrawAxis(gtPoseT_wh[i]);
+                }
             }
         }
 
