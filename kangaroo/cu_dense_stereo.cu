@@ -2,11 +2,12 @@
 #include "launch_utils.h"
 #include "patch_score.h"
 #include "disparity.h"
+#include "InvalidValue.h"
 
 namespace Gpu
 {
 
-const int MinDisparity = 0;
+const int MinDisparity = 1;
 const int DefaultRad = 2;
 typedef SSNDPatchScore<float,DefaultRad,ImgAccessClamped> DefaultSafeScoreType;
 //typedef SinglePixelSqPatchScore<float,ImgAccessRaw> DefaultSafeScoreType;
@@ -46,7 +47,7 @@ __global__ void KernDenseStereo(
             Score::height <= y && y < dCamLeft.h - Score::height &&
             (bestScore * acceptThresh) < sndBestScore;
 
-    dDisp(x,y) = valid ? bestDisp : 0;
+    dDisp(x,y) = valid ? bestDisp : InvalidValue<TD>::Value();
 }
 
 void DenseStereo(
@@ -86,7 +87,7 @@ __global__ void KernReverseCheck(
 
     // If not, mark match as invalid
     if(best != 0) {
-        dDisp(x,y) = 0;
+        dDisp(x,y) = InvalidValue<TD>::Value();
     }
 }
 
@@ -139,9 +140,9 @@ __global__ void KernDenseStereoSubpixelRefine(
 
     const int bestDisp = dDisp(x,y);
 
-    // Ignore things at infinity (and outliers marked with 0)
+    // Ignore things at infinity
     if(bestDisp < MinDisparity) {
-        dDispOut(x,y) = -1;
+        dDispOut(x,y) = InvalidValue<TDo>::Value();
         return;
     }
 
@@ -167,7 +168,7 @@ __global__ void KernDenseStereoSubpixelRefine(
         dDispOut(x,y) = newDisp;
     }else{
 //        dDisp(x,y) = bestDisp / maxDisp;
-        dDispOut(x,y) = -1;
+        dDispOut(x,y) = InvalidValue<TDo>::Value();
     }
 }
 

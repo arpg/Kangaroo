@@ -1,5 +1,6 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
+#include "InvalidValue.h"
 
 namespace Gpu
 {
@@ -170,7 +171,7 @@ __global__ void KernMedianFilterRejectNegative5x5(Image<To> dOut, Image<Ti> dIn,
       for(int dY = -krad; dY <= krad; ++dY) {
           const int unwrap = (dX + krad) * kw + (dY + krad);
           v[unwrap] = dIn.GetWithClampedRange(x+dX,y+dY);
-          if( v[unwrap] < 0 ) {
+          if( !InvalidValue<Ti>::IsValid(v[unwrap]) ) {
               bad++;
           }
       }
@@ -197,7 +198,7 @@ __global__ void KernMedianFilterRejectNegative5x5(Image<To> dOut, Image<Ti> dIn,
         // Select median, ignoring bad values.
         dOut(x,y) = (To)v[(kpix+bad)/2];
     }else{
-        dOut(x,y) = -1;
+        dOut(x,y) = InvalidValue<To>::Value();
     }
 }
 
@@ -227,7 +228,7 @@ __global__ void KernMedianFilterRejectNegative7x7(Image<To> dOut, Image<Ti> dIn,
       for(int dY = -krad; dY <= krad; ++dY) {
           const int unwrap = (dX + krad) * kw + (dY + krad);
           v[unwrap] = dIn.GetWithClampedRange(x+dX,y+dY);
-          if( v[unwrap] < 0 ) {
+          if( !InvalidValue<Ti>::IsValid(v[unwrap]) ) {
               bad++;
           }
       }
@@ -263,7 +264,7 @@ __global__ void KernMedianFilterRejectNegative7x7(Image<To> dOut, Image<Ti> dIn,
         const To median = (To)v[(kpix+bad)/2];
         dOut(x,y) = median;
     }else{
-        dOut(x,y) = -1;
+        dOut(x,y) = InvalidValue<To>::Value();
     }
 }
 
@@ -293,7 +294,7 @@ __global__ void KernMedianFilterRejectNegative9x9(Image<To> dOut, Image<Ti> dIn,
       for(int dY = -krad; dY <= krad; ++dY) {
           const int unwrap = (dX + krad) * kw + (dY + krad);
           v[unwrap] = dIn.GetWithClampedRange(x+dX,y+dY);
-          if( v[unwrap] < 0 ) {
+          if( !InvalidValue<Ti>::IsValid(v[unwrap]) ) {
               bad++;
           }
       }
@@ -332,7 +333,7 @@ __global__ void KernMedianFilterRejectNegative9x9(Image<To> dOut, Image<Ti> dIn,
         // Select median, ignoring bad values.
         dOut(x,y) = (To)v[(kpix+bad)/2];
     }else{
-        dOut(x,y) = -1;
+        dOut(x,y) = InvalidValue<To>::Value();
     }
 }
 

@@ -1,6 +1,7 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
 #include "sampling.h"
+#include "InvalidValue.h"
 
 namespace Gpu
 {
@@ -68,5 +69,48 @@ void BoxHalf( Image<To> out, const Image<Ti> in)
 
 // Instantiate
 template void BoxHalf<unsigned char,unsigned int,unsigned char>(Image<unsigned char>, const Image<unsigned char>);
+template void BoxHalf<float,float,float>(Image<float>, const Image<float>);
+
+//////////////////////////////////////////////////////
+// Downsampling (Ignore invalid)
+//////////////////////////////////////////////////////
+
+template<typename To, typename UpType, typename Ti>
+__global__ void KernBoxHalfIgnoreInvalid( Image<To> out, const Image<Ti> in )
+{
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const Ti* tl = &in(2*x,2*y);
+    const Ti* bl = &in(2*x,2*y+1);
+    const Ti v1 = *tl;
+    const Ti v2 = *tl+1;
+    const Ti v3 = *bl;
+    const Ti v4 = *bl+1;
+
+    int n = 0;
+    UpType sum = 0;
+
+    if(InvalidValue<Ti>::IsValid(v1)) { sum += v1; n++; }
+    if(InvalidValue<Ti>::IsValid(v2)) { sum += v2; n++; }
+    if(InvalidValue<Ti>::IsValid(v3)) { sum += v3; n++; }
+    if(InvalidValue<Ti>::IsValid(v4)) { sum += v4; n++; }
+
+    out(x,y) = n > 0 ? (To)(sum / n) : InvalidValue<To>::Value();
+}
+
+template<typename To, typename UpType, typename Ti>
+void BoxHalfIgnoreInvalid( Image<To> out, const Image<Ti> in)
+{
+    dim3 blockDim;
+    dim3 gridDim;
+    InitDimFromOutputImage(blockDim,gridDim, out, 16, 16);
+    KernBoxHalfIgnoreInvalid<To,UpType,Ti><<<gridDim,blockDim>>>(out,in);
+}
+
+// Instantiate
+template void BoxHalfIgnoreInvalid<unsigned char,unsigned int,unsigned char>(Image<unsigned char>, const Image<unsigned char>);
+template void BoxHalfIgnoreInvalid<float,float,float>(Image<float>, const Image<float>);
+
 
 }
