@@ -96,6 +96,11 @@ if(Kangaroo_FOUND)
       add_executable( CheckMemory CheckMemory.cpp)
     endif()
 
+    set( BuildCudaSumSpeed true CACHE "" force )
+    if( BuildCudaSumSpeed )
+      add_executable( CudaSumSpeed CudaSumSpeed.cpp)
+    endif()
+
     set( BuildStereoViewer true CACHE "" force )
     if( BuildStereoViewer )
       add_executable( StereoViewer StereoViewer.cpp ${COMMON_HEADERS})

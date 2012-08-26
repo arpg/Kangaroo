@@ -16,7 +16,7 @@ endif()
 list(APPEND SRC_H
     kangaroo.h
     Image.h sampling.h pixel_convert.h patch_score.h
-    Mat.h MatUtils.h reweighting.h Pyramid.h reduce.h InvalidValue.h
+    Mat.h MatUtils.h reweighting.h Pyramid.h reduce.h InvalidValue.h CudaTimer.h LeastSquareSum.h
 )
 
 list(APPEND SRC_CU

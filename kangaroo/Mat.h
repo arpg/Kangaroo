@@ -467,7 +467,7 @@ inline __device__ __host__ SymMat<P,N> SymMat_zero()
 }
 
 ///////////////////////////////////////////
-// Linear System
+// Least Squares Linear System
 ///////////////////////////////////////////
 
 template<typename P, unsigned N>

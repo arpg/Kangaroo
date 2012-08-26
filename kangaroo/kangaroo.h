@@ -12,6 +12,7 @@
 #include "Mat.h"
 #include "MatUtils.h"
 #include "reduce.h"
+#include "CudaTimer.h"
 
 namespace Gpu
 {
@@ -105,6 +106,10 @@ LeastSquaresSystem<float,2*6> KinectCalibration(
     const Image<float4> dPr, const Image<uchar3> dIr,
     const Mat<float,3,4> KcT_cd, const Mat<float,3,4> T_lr,
     float c, Image<unsigned char> dWorkspace, Image<float4> dDebug
+);
+
+void SumSpeedTest(
+    Image<unsigned char> dWorkspace, int w, int h, int blockx, int blocky
 );
 
 //////////////////////////////////////////////////////

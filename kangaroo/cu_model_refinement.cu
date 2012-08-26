@@ -2,6 +2,7 @@
 #include "launch_utils.h"
 #include "reweighting.h"
 #include "disparity.h"
+#include "LeastSquareSum.h"
 
 namespace Gpu {
 
@@ -42,7 +43,7 @@ void BuildPoseRefinementFromDepthmapSystem(
     const unsigned int u,  const unsigned int v, const float4 Pr4,
     const Image<Ti>& dImgl, const Image<Ti>& dImgr,
     const Mat<float,3,4>& KT_lr, float c,
-    LeastSquaresSystem<float,6>& sum, Image<float4> dDebug
+    LeastSquaresSystem<float,6>& lss, Image<float4> dDebug
 ) {
     const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
 
@@ -75,10 +76,10 @@ void BuildPoseRefinementFromDepthmapSystem(
         };
 
         const float w = LSReweightTukey(y,c);
-        sum.JTJ = OuterProduct(Jr,w);
-        sum.JTy = mul_aTb(Jr, y*w);
-        sum.obs = 1;
-        sum.sqErr = y*y;
+        lss.JTJ = OuterProduct(Jr,w);
+        lss.JTy = mul_aTb(Jr, y*w);
+        lss.obs = 1;
+        lss.sqErr = y*y;
 
         const float debug = (abs(y) + 128) / 255.0f;
         dDebug(u,v) = make_float4(debug,0,w,1);
@@ -99,13 +100,12 @@ __global__ void KernPoseRefinementFromVbo(
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
+    SumLeastSquaresSystem<float,6,16,16> sumlss;
 
     const float4 Pr4 = dPr(u,v);
-    BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,sum,dDebug);
+    BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,sumlss.ZeroThisObs(),dDebug);
 
-    dSum(u,v) = sum;
+    sumlss.ReducePutBlock(dSum);
 }
 
 LeastSquaresSystem<float,6> PoseRefinementFromVbo(
@@ -116,13 +116,10 @@ LeastSquaresSystem<float,6> PoseRefinementFromVbo(
 ){
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim, gridDim, dImgr);
-    Image<LeastSquaresSystem<float,6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,6> >(dImgr.w, dImgr.h);
 
-    KernPoseRefinementFromVbo<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dPr, KT_lr, c, dSum, dDebug );
-
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
-    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
+    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
+    KernPoseRefinementFromVbo<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dPr, KT_lr, c, lss.LeastSquareImage(), dDebug );
+    return lss.FinalSystem();
 }
 
 template<typename Ti>
@@ -135,13 +132,12 @@ __global__ void KernPoseRefinementFromDisparity(
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
+    SumLeastSquaresSystem<float,6,16,16> lss;
 
     const float4 Pr4 = DepthFromDisparity(u,v,dDispr(u,v), baseline, fu, fv, u0, v0);
-    BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,sum,dDebug);
+    BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,lss.ZeroThisObs(),dDebug);
 
-    dSum(u,v) = sum;
+    lss.ReducePutBlock(dSum);
 }
 
 
@@ -154,13 +150,10 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
 ){
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim, gridDim, dImgr);
-    Image<LeastSquaresSystem<float,6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,6> >(dImgr.w, dImgr.h);
 
-    KernPoseRefinementFromDisparity<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, dSum, dDebug );
-
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
-    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
+    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
+    KernPoseRefinementFromDisparity<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug );
+    return lss.FinalSystem();
 }
 
 //////////////////////////////////////////////////////
@@ -329,6 +322,38 @@ LeastSquaresSystem<float,2*6> KinectCalibration(
     sum.SetZero();
     return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,2*6> >() );
 
+}
+
+
+//////////////////////////////////////////////////////
+// Speed test
+//////////////////////////////////////////////////////
+
+const int TEST_SYS_SIZE = 6;
+
+__global__ void KernSumSpeedTest(
+    Image<LeastSquaresSystem<float,TEST_SYS_SIZE> > dSum
+) {
+    __shared__ SumLeastSquaresSystem<float,TEST_SYS_SIZE,16,16> sumlss;
+    LeastSquaresSystem<float,TEST_SYS_SIZE>& sum = sumlss.ThisObs();
+
+    sum.SetZero();
+    sum.obs = 1;
+
+    sumlss.ReducePutBlock(dSum);
+}
+
+void SumSpeedTest(
+    Image<unsigned char> dWorkspace, int w, int h, int blockx, int blocky
+) {
+    dim3 blockDim, gridDim;
+    blockDim = dim3(boost::math::gcd<unsigned>(w,blockx), boost::math::gcd<unsigned>(h,blocky), 1);
+    gridDim =  dim3( w / blockDim.x, h / blockDim.y, 1);
+
+    HostSumLeastSquaresSystem<float,TEST_SYS_SIZE> lss(dWorkspace, blockDim, gridDim);
+    KernSumSpeedTest<<<gridDim,blockDim>>>(lss.LeastSquareImage());
+    LeastSquaresSystem<float,TEST_SYS_SIZE> sum = lss.FinalSystem();
+    std::cout << sum.obs << std::endl;
 }
 
 }
