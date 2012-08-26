@@ -11,12 +11,12 @@ namespace Gpu
 void InitHeightMap(Image<float4> dHeightMap)
 {
     // initialize the heightmap
-    dHeightMap.Fill(make_float4(0,1E20,128,0.0));
+    dHeightMap.Fill(make_float4(0,0,128,0.0));
 }
 
 //////////////////////////////////////////////////////
 
-__global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage,  const Mat<float,3,4> T_hc, float min_height, float max_height)
+__global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage,  const Mat<float,3,4> T_hc, float min_height, float max_height, float max_distance)
 {
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -31,16 +31,22 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
     int x = (int)(p_h.x+0.5);
     int y = (int)(p_h.y+0.5);
 
-    if(dHeightMap.InBounds(x,y) && isfinite(p_c.z) && min_height <= p_h.z && p_h.z <= max_height ) {
+    if(dHeightMap.InBounds(x,y) && isfinite(p_c.z) && min_height <= p_h.z && p_h.z <= max_height && p_c.z < max_distance) {
         //calculate the variance of the measurement
         float v_z = p_c.z*1; //this is the perp. distance from the camera
         unsigned char colour = dImage.IsValid() ? dImage(u,v) : 0;
 
         float4 oldVal = dHeightMap(x,y);
-        float4 newVal = make_float4((oldVal.y * p_h.z + v_z * oldVal.x)/(oldVal.y+v_z),
-                                    oldVal.y*v_z / (oldVal.y+v_z),
-                                    colour > 0 ? (oldVal.y * colour + v_z * oldVal.z)/(oldVal.y+v_z) : oldVal.z,
-                                    0.0);
+//        float4 newVal = make_float4((oldVal.y * p_h.z + v_z * oldVal.x)/(oldVal.y+v_z),
+//                                    oldVal.y*v_z / (oldVal.y+v_z),
+//                                    colour > 0 ? (oldVal.y * colour + v_z * oldVal.z)/(oldVal.y+v_z) : oldVal.z,
+//                                    0.0);
+        float4 newVal = make_float4(
+                    (oldVal.y*oldVal.x + p_h.z)/ (oldVal.y+1),
+                    (oldVal.y+1),
+                    colour > 0 ? (oldVal.y*oldVal.z + colour)/ (oldVal.y+1) : oldVal.z,
+                    0
+        );
 
         // Take new val
 //        float4 newVal = make_float4(p_h.z, 0, dImage(u,v), 0);
@@ -49,11 +55,11 @@ __global__ void KernUpdateHeightmap(Image<float4> dHeightMap, const Image<float4
     }
 }
 
-void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc, float min_height, float max_height)
+void UpdateHeightMap(Image<float4> dHeightMap, const Image<float4> d3d, const Image<unsigned char> dImage, const Mat<float,3,4> T_hc, float min_height, float max_height, float max_distance)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, d3d);
-    KernUpdateHeightmap<<<gridDim,blockDim>>>(dHeightMap,d3d,dImage,T_hc, min_height, max_height);
+    KernUpdateHeightmap<<<gridDim,blockDim>>>(dHeightMap,d3d,dImage,T_hc, min_height, max_height, max_distance);
 }
 
 //////////////////////////////////////////////////////
@@ -63,7 +69,9 @@ __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHe
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    dVbo(u,v) = make_float4(u,v,dHeightMap(u,v).x,1.0);
+    const float4 hm = dHeightMap(u,v);
+    const float z = hm.y > 0 ? hm.x : 0.0f/0.0f;
+    dVbo(u,v) = make_float4(u,v,z,1.0);
 }
 
 
@@ -104,7 +112,7 @@ __global__ void KernColourHeightmap(Image<uchar4> dCbo, const Image<float4> dHei
 
     float4 hm = dHeightMap(u,v);
 //    dCbo(u,v) = make_uchar4(255,0,0,255);
-    dCbo(u,v) = make_uchar4(hm.z, hm.z, hm.z, hm.y > 1E10 ? 10 : 255);
+    dCbo(u,v) = make_uchar4(hm.z, hm.z, hm.z, (hm.y < 2 ) ? 0 : 255);
 }
 
 void ColourHeightMap(Image<uchar4> dCbo, const Image<float4> dHeightMap)

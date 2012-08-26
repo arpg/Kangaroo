@@ -15,6 +15,7 @@ inline pangolin::View& SetupPangoGL(int w, int h)
     glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
     glEnable (GL_BLEND);
     glEnable (GL_LINE_SMOOTH);
+    glEnable(GL_DEPTH_TEST);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(1.5);
     glPixelStorei(GL_PACK_ALIGNMENT,1);

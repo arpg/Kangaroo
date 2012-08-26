@@ -8,6 +8,8 @@
 #include <npp.h>
 
 #include <SceneGraph/SceneGraph.h>
+#include <SceneGraph/GLVbo.h>
+#include "common/GLCameraHistory.h"
 
 #include <fiducials/drawing.h>
 #include <fiducials/camera.h>
@@ -38,7 +40,7 @@ int main( int /*argc*/, char* argv[] )
     cudaGLSetGLDevice(0);
     size_t cu_mem_start, cu_mem_end, cu_mem_total;
     cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
-    glClearColor(1,1,1,1);
+    glClearColor(1,1,1,0);
 
     // Open video device
 //    const std::string cam_uri =
@@ -68,7 +70,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 / 4 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 / 8 );
 //    const int level = 4;
     assert(level <= max_levels);
 
@@ -188,8 +190,9 @@ int main( int /*argc*/, char* argv[] )
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,80);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 
-    HeightmapFusion hm(800,800,1);
-//    HeightmapFusion hm(100,100,10);
+//    HeightmapFusion hm(800,800,2);
+    HeightmapFusion hm(200,200,10);
+    const bool center_y = false;
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -232,13 +235,13 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> resetPlane("ui.resetplane", true, false);
     Var<bool> save_hm("ui.save heightmap", false, false);
 
-    Var<bool> show_mesh("ui.show mesh", true, true);
-    Var<bool> show_color("ui.show color", true, true);
+//    Var<bool> draw_frustrum("ui.show frustrum", false, true);
+//    Var<bool> show_mesh("ui.show mesh", true, true);
+//    Var<bool> show_color("ui.show color", true, true);
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
     Var<bool> show_heightmap("ui.show heightmap", false, true);
     Var<bool> cross_section("ui.Cross Section", false, true);
-    Var<bool> pose_refinement("ui.Pose Refinement", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
@@ -269,6 +272,7 @@ int main( int /*argc*/, char* argv[] )
     pangolin::RegisterKeyPressCallback('2', [&container](){container[1].ToggleShow();} );
     pangolin::RegisterKeyPressCallback('3', [&container](){container[2].ToggleShow();} );
     pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
 
     const int N = 3;
     for(int i=0; i<N; ++i ) {
@@ -284,9 +288,22 @@ int main( int /*argc*/, char* argv[] )
     ActivateDrawPyramid<unsigned char,max_levels> adleft(dCamImg[0],GL_LUMINANCE8, false, true);
     ActivateDrawImage<float> adDisp(dDisp,GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float4> adDebug(dDebugf4,GL_RGBA_FLOAT32_APPLE, false, true);
+
+    SceneGraph::GLSceneGraph graph;
+    SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
+    SceneGraph::GLVbo glhmvbo(&vbo_hm,&ibo_hm,&cbo_hm);
+    SceneGraph::GLGrid glGroundPlane;
+    SceneGraph::GLCameraHistory history;
+    history.LoadFromAbsoluteCartesianFile(video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
+    graph.AddChild(&glvbo);
+    glvbo.AddChild(&glGroundPlane);
+    graph.AddChild(&glhmvbo);
+    graph.AddChild(&history);
+
     container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
     container[1].SetDrawFunction(boost::ref(adDisp)).SetHandler(&handler2d);
     container[2].SetDrawFunction(boost::ref(adDebug)).SetHandler(new Handler2dImageSelect(lw,lh));
+    view3d.SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -375,31 +392,15 @@ int main( int /*argc*/, char* argv[] )
             if(Pushed(resetPlane) ) {
                 Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
 //                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
-                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /2);
+                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() / (center_y ? 2 : 1) );
                 hm.Init(T_nw);
             }
 
             //calcualte the camera to heightmap transform
-            if(fuse)
-            {
+            if(fuse) {
                 hm.Fuse(d3d, dCamImg[0][level], T_wc);
                 hm.GenerateVbo(vbo_hm);
                 hm.GenerateCbo(cbo_hm);
-            }
-
-            if(pose_refinement) {
-                // attempt to reestimate baseline from depthmap
-                // Compute Pose
-                Eigen::Matrix<double, 3,4> KT_rl = Kl * T_rl.matrix3x4();
-                Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementFromVbo(dCamImg[1][level], dCamImg[0][level], d3d, KT_rl, 1E10, dScratch, dDebugf4);
-                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                cout << "--------------------------------------" << endl;
-                cout << ((Eigen::Matrix<double,6,6>)lss.JTJ) << endl << endl;
-                cout << ((Eigen::Matrix<double,6,1>)lss.JTy).transpose() << endl << endl;
-                cout << x.transpose() << endl;
-//                if( x.norm() > 1 ) x = x / x.norm();
-                T_rl = T_rl * Sophus::SE3::exp(x);
             }
 
             if(costvol_add) {
@@ -452,52 +453,28 @@ int main( int /*argc*/, char* argv[] )
         }
 
         /////////////////////////////////////////////////////////////
-        // Perform drawing
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glColor3f(1,1,1);
+        // Setup Drawing
 
         s_cam.Follow(T_wc.matrix(), lockToCam);
-        if(view3d.show) {
-            view3d.ActivateAndScissor(s_cam);
 
-            //draw the global heightmap
-            if(show_heightmap)
-            {
-                //transform the mesh into world coordinates from heightmap coordinates
-                glMatrixMode(GL_MODELVIEW);
-                glPushMatrix();
-                glMultMatrix( hm.T_hw().inverse() );
-                RenderVboIboCbo(vbo_hm,ibo_hm,cbo_hm, hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_color);
-                glPopMatrix();
-            }
+        glvbo.SetPose(T_wc.matrix());
+        glvbo.SetVisible(show_depthmap);
 
-            // Render camera frustum and mesh
-            {
-                glSetFrameOfReferenceF(T_wc);
-                if(show_depthmap) {
-                    RenderVboIboCbo(vbo,ibo,cbo, lw, lh, show_mesh, show_color);
-                }
-                glColor3f(1.0,1.0,1.0);
-                DrawFrustrum(cam[0].Kinv(level),lw,lh,1.0);
-                if(plane_do) {
-                    // Draw ground plane
-                    glColor4f(0,1,0,1);
-                    DrawPlane(n_c,1,100);
-                }
-                glUnsetFrameOfReference();
-            }
+        glGroundPlane.SetPose(PlaneBasis_wp(n_c).matrix());
+        glGroundPlane.SetVisible(plane_do);
 
-            if(show_history) {
-                // Draw history
-                for(int i=0; i< gtPoseT_wh.size() && i< frame; ++i) {
-                    DrawAxis(gtPoseT_wh[i]);
-                }
-            }
-        }
+        glhmvbo.SetPose((Eigen::Matrix4d)hm.T_hw().inverse());
+        glhmvbo.SetVisible(show_heightmap);
 
-        glColor4f(1,1,1,1);
-        pangolin::RenderViews();
+        history.SetNumberToShow(frame);
+        history.SetVisible(show_history);
+
+        /////////////////////////////////////////////////////////////
+        // Draw
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glColor3f(1,1,1);
+
         pangolin::FinishGlutFrame();
     }
 }

@@ -140,6 +140,7 @@ public:
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_LIGHTING);
         view.Activate();
+        glColor3f(1,1,1);
 
         ImageSelect* imageSelect = dynamic_cast<ImageSelect*>(view.handler);
 
@@ -175,6 +176,7 @@ public:
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_LIGHTING);
         view.Activate();
+        glColor3f(1,1,1);
 
         ImageSelect* imageSelect = dynamic_cast<ImageSelect*>(view.handler);
 
@@ -215,6 +217,7 @@ public:
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_LIGHTING);
         view.Activate();
+        glColor3f(1,1,1);
 
         ImageSelect* imageSelect = dynamic_cast<ImageSelect*>(view.handler);
 

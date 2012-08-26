@@ -11,8 +11,10 @@ int main( int /*argc*/, char* argv[] )
     // Open video device
     const std::string cam_uri =
 //            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//";
-            "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
+//            "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
 //            "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//";
+//            "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/NightDC/Sun Aug 19 23:02:41 EDT 2012,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
+    "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/NightDC/Sun Aug 19 22:19:42 EDT 2012,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//";
 
     CameraDevice camera = OpenRpgCamera(cam_uri);
 
