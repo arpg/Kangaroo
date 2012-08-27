@@ -38,7 +38,7 @@ struct HostSumLeastSquaresSystem
 };
 
 
-template<typename T, unsigned N, unsigned MAX_BLOCK_X=16, unsigned MAX_BLOCK_Y=16>
+template<typename T, unsigned N, unsigned MAX_BLOCK_X, unsigned MAX_BLOCK_Y>
 struct SumLeastSquaresSystem
 {
     LeastSquaresSystem<T,N> sReduce[MAX_BLOCK_X * MAX_BLOCK_Y];

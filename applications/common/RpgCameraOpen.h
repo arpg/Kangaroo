@@ -2,6 +2,9 @@
 
 #include <pangolin/pangolin.h>
 #include <RPG/Devices/Camera/CameraDevice.h>
+#include <RPG/Utils/GetPot>
+
+CameraDevice OpenRpgCamera(int argc, char* argv[]);
 
 //! Convenience method to load camera based on string URI containing PropertyMap and device.
 CameraDevice OpenRpgCamera( const std::string& str_uri);
@@ -29,6 +32,47 @@ protected:
     size_t m_numCams;
     pangolin::VideoInput pangovid[MAX_CAMS];
 };
+
+const char USAGE[] =
+"Usage:     program -idev <input> <options>\n"
+"\n"
+"where input device can be: FileReader Bumblebee2 etc\n"
+"\n"
+"Input Specific Options:\n"
+"   FileReader:      -lfile <regular expression for left image channel>\n"
+"                    -rfile <regular expression for right image channel>\n"
+"                    -sdir  <directory where source images are located [default '.']>\n"
+"                    -sf    <start frame [default 0]>\n"
+"\n"
+"General Options:    -lcmod <left camera model xml file>\n"
+"                    -rcmod <right camera model xml file>\n"
+"					 -gt <ground truth file> [not required]\n"
+"\n"
+"Example:\n"
+"program  -idev FileReader  -lcmod lcmod.xml  -rcmod rcmod.xml  -lfile \"left.*pgm\"  -rfile \"right.*pgm\"\n\n";
+
+inline CameraDevice OpenRpgCamera(int argc, char* argv[])
+{
+    if( argc < 2 ) {
+        std::cout << USAGE;
+        exit(0);
+    }
+
+    GetPot cl(argc,argv);
+
+    CameraDevice camera;
+    camera.SetProperty("NumChannels", 2);
+    camera.SetProperty("DataSourceDir", cl.follow( ".", "-sdir"  ) );
+    camera.SetProperty("Channel-0", cl.follow( ".*left.*", "-lfile" ) );
+    camera.SetProperty("Channel-1", cl.follow( ".*right.*", "-rfile" ) );
+    camera.SetProperty("StartFrame", cl.follow(0,"-sf") );
+    camera.SetProperty("lcmod", cl.follow( "lcmod.xml", "-lcmod" ) );
+    camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
+    camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
+
+    camera.InitDriver( cl.follow( "FileReader", "-idev" ) );
+    return camera;
+}
 
 inline CameraDevice OpenRpgCamera( const std::string& str_uri)
 {

@@ -1,5 +1,6 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
+#include "LeastSquareSum.h"
 
 namespace Gpu
 {
@@ -10,7 +11,8 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
     const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float4 P = dVbo(x,y);
-    LeastSquaresSystem<float,3> sum;
+    __shared__ SumLeastSquaresSystem<float,3,32,32> lss;
+    LeastSquaresSystem<float,3>& sum = lss.ThisObs();
 
     if( length(P) < within ) {
         const Mat<float,3,1> nhat = Qinv * zhat;
@@ -42,21 +44,18 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
     }
 
     dErr(x,y) = sum.sqErr;
-    dSum(x,y) = sum;
+    lss.ReducePutBlock(dSum);
 }
 
 LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<unsigned char> dWorkspace, Image<float> dErr, float within, float c )
 {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, dVbo);
-    Image<LeastSquaresSystem<float,3> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,3> >(dVbo.w, dVbo.h);
+    InitDimFromOutputImage(blockDim, gridDim, dVbo, 32, 32);
 
-    KernPlaneFitGN<<<gridDim,blockDim>>>(dVbo, Qinv, zhat, dSum, dErr, within, c );
-
-    LeastSquaresSystem<float,3> sum;
-    sum.SetZero();
-
-    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,3> >() );
+    HostSumLeastSquaresSystem<float,3> lss(dWorkspace, blockDim, gridDim);
+    KernPlaneFitGN<<<gridDim,blockDim>>>(dVbo, Qinv, zhat, lss.LeastSquareImage(), dErr, within, c );
+    return lss.FinalSystem();
 }
+
 
 }
