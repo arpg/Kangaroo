@@ -14,7 +14,7 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
     __shared__ SumLeastSquaresSystem<float,3,32,32> lss;
     LeastSquaresSystem<float,3>& sum = lss.ThisObs();
 
-    if( length(P) < within ) {
+    if( isfinite(P.z) && length(P) < within ) {
         const Mat<float,3,1> nhat = Qinv * zhat;
         const float dinv = sqrt(nhat * nhat);
         const float d = 1.0 / dinv;

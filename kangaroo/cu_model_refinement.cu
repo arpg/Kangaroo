@@ -100,7 +100,7 @@ __global__ void KernPoseRefinementFromVbo(
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    SumLeastSquaresSystem<float,6,16,16> sumlss;
+    __shared__ SumLeastSquaresSystem<float,6,16,16> sumlss;
 
     const float4 Pr4 = dPr(u,v);
     BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,sumlss.ZeroThisObs(),dDebug);
@@ -132,7 +132,7 @@ __global__ void KernPoseRefinementFromDisparity(
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    SumLeastSquaresSystem<float,6,16,16> lss;
+    __shared__ SumLeastSquaresSystem<float,6,16,16> lss;
 
     const float4 Pr4 = DepthFromDisparity(u,v,dDispr(u,v), baseline, fu, fv, u0, v0);
     BuildPoseRefinementFromDepthmapSystem(u,v,Pr4,dImgl,dImgr,KT_lr,c,lss.ZeroThisObs(),dDebug);
