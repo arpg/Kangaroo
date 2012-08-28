@@ -8,8 +8,9 @@ namespace Gpu
 {
 
 const int MinDisparity = 1;
-const int DefaultRad = 2;
-typedef SSNDPatchScore<float,DefaultRad,ImgAccessClamped> DefaultSafeScoreType;
+const int DefaultRad = 1;
+//typedef SSNDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
+typedef SANDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
 //typedef SinglePixelSqPatchScore<float,ImgAccessRaw> DefaultSafeScoreType;
 
 //////////////////////////////////////////////////////
@@ -23,31 +24,35 @@ __global__ void KernDenseStereo(
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
-    // Search for best matching pixel
-    int bestDisp = 0;
-    float bestScore = 1E+36;
-    float sndBestScore = 1E+37;
+    int bestDisp = InvalidValue<TD>::Value();
 
-    maxDisp = min(maxDisp, x + Score::width);
+    if( Score::width  <= x && x < dCamLeft.w - Score::width &&
+        Score::height <= y && y < dCamLeft.h - Score::height )
+    {
+        // Search for best matching pixel
+        float bestScore = 1E+36;
+        float sndBestScore = 1E+37;
 
-    for(int c = 0; c <= maxDisp; ++c ) {
-        const int rx = x-c;
-        const float score =  Score::Score(dCamLeft, x,y, dCamRight, rx, y);
-        if(score < bestScore) {
-            sndBestScore = bestScore;
-            bestScore = score;
-            bestDisp = c;
-        }else if( score < sndBestScore) {
-            sndBestScore = score;
+        maxDisp = min(maxDisp, x + Score::width);
+
+        for(int c = 0; c <= maxDisp; ++c ) {
+            const int rx = x-c;
+            const float score =  Score::Score(dCamLeft, x,y, dCamRight, rx, y);
+            if(score < bestScore) {
+                sndBestScore = bestScore;
+                bestScore = score;
+                bestDisp = c;
+            }else if( score < sndBestScore) {
+                sndBestScore = score;
+            }
+        }
+
+        if( (bestScore * acceptThresh) >= sndBestScore ) {
+            bestDisp = InvalidValue<TD>::Value();
         }
     }
 
-    const bool valid =
-            Score::width  <= x && x < dCamLeft.w - Score::width &&
-            Score::height <= y && y < dCamLeft.h - Score::height &&
-            (bestScore * acceptThresh) < sndBestScore;
-
-    dDisp(x,y) = valid ? bestDisp : InvalidValue<TD>::Value();
+    dDisp(x,y) = bestDisp;
 }
 
 void DenseStereo(
@@ -77,6 +82,7 @@ __global__ void KernReverseCheck(
 
     // Check that this pixel is also a minima for the right image
     const int rad = 10;
+#pragma unroll
     for(int i=-rad; i <= rad; ++i) {
         const float s = Score::Score(dCamLeft, x+i,y, dCamRight, rx,y);
         if(s < bestscore) {

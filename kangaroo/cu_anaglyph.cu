@@ -37,7 +37,7 @@ __global__ void KernMakeAnaglythColorCode(Image<uchar4> anaglyth, const Image<un
 void MakeAnaglyth(Image<uchar4> anaglyth, const Image<unsigned char> left, const Image<unsigned char> right, int shift)
 {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, anaglyth.SubImage(shift,0, anaglyth.w-shift, anaglyth.h));
+    InitDimFromOutputImage(blockDim, gridDim, anaglyth);
     KernMakeAnaglythColorCode<<<gridDim,blockDim>>>(anaglyth, left, right, shift);
 }
 

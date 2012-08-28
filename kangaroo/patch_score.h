@@ -235,4 +235,46 @@ struct SSNDLineScore
     }
 };
 
+// Sum Absolute Normalised Difference
+template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
+struct SANDPatchScore {
+    static const int width = 2*rad+1;
+    static const int height = 2*rad+1;
+    static const int area = width*height;
+
+    template<typename T>
+    __host__ __device__ inline static
+    To Score(
+        Image<T> img1, int x1, int y1,
+        Image<T> img2, int x2, int y2
+    ) {
+        To sum_abs_diff = 0;
+
+        To sum1 = 0;
+        To sum2 = 0;
+
+        for(int r=-rad; r <=rad; ++r ) {
+            for(int c=-rad; c <=rad; ++c ) {
+                const T i1 = ImgAccess::Get(img1,x1+c,y1+r);
+                const T i2 = ImgAccess::Get(img2,x2+c,y2+r);
+                sum1 += i1;
+                sum2 += i2;
+            }
+        }
+
+        const To mean1 = sum1 / area;
+        const To mean2 = sum2 / area;
+
+        for(int r=-rad; r <=rad; ++r ) {
+            for(int c=-rad; c <=rad; ++c ) {
+                const T i1 = ImgAccess::Get(img1,x1+c,y1+r);
+                const T i2 = ImgAccess::Get(img2,x2+c,y2+r);
+                sum_abs_diff += abs( (i1-mean1) - (i2-mean2) );
+            }
+        }
+
+        return sum_abs_diff;
+    }
+};
+
 }

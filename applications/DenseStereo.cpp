@@ -55,7 +55,7 @@ int main( int argc, char* argv[] )
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 / 8 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 4*640*480 );
 //    const int level = 4;
     assert(level <= max_levels);
 
@@ -176,7 +176,8 @@ int main( int argc, char* argv[] )
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 
 //    HeightmapFusion hm(800,800,2);
-    HeightmapFusion hm(200,200,10);
+//    HeightmapFusion hm(200,200,10);
+    HeightmapFusion hm(100,100,10);
     const bool center_y = false;
 
     GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -213,8 +214,8 @@ int main( int argc, char* argv[] )
     Var<int> maxDisp("ui.disp",80, 0, 128);
     Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
 
-    Var<bool> subpix("ui.subpix", true, true);
-    Var<bool> reverse_check("ui.reverse_check", true, true);
+    Var<bool> subpix("ui.subpix", false, true);
+    Var<bool> reverse_check("ui.reverse_check", false, true);
 
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> resetPlane("ui.resetplane", true, false);
@@ -235,7 +236,7 @@ int main( int argc, char* argv[] )
 
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed9x9("ui.median 9x9", false, true);
-    Var<bool> domed7x7("ui.median 7x7", true, true);
+    Var<bool> domed7x7("ui.median 7x7", false, true);
     Var<bool> domed5x5("ui.median 5x5", false, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
@@ -356,7 +357,11 @@ int main( int argc, char* argv[] )
 
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
-            NormalsFromVbo(dN, d3d);
+
+            if(container[2].IsShown()) {
+                NormalsFromVbo(dN, d3d);
+                dDebugf4.CopyFrom(dN);
+            }
 
             if(plane_do || resetPlane) {
                 // Fit plane
@@ -395,18 +400,20 @@ int main( int argc, char* argv[] )
 //                AddToCostVolume(dCostVol,dImgv, dCamImg[1][level], KT_rv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
             }
 
-            // Copy point cloud into VBO
-            {
-                CudaScopedMappedPtr var(vbo);
-                Gpu::Image<float4> dVbo((float4*)*var,lw,lh);
-                dVbo.CopyFrom(d3d);
-            }
+            if(container[3].IsShown()) {
+                // Copy point cloud into VBO
+                {
+                    CudaScopedMappedPtr var(vbo);
+                    Gpu::Image<float4> dVbo((float4*)*var,lw,lh);
+                    dVbo.CopyFrom(d3d);
+                }
 
-            // Generate CBO
-            {
-                CudaScopedMappedPtr var(cbo);
-                Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
-                ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
+                // Generate CBO
+                {
+                    CudaScopedMappedPtr var(cbo);
+                    Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
+                    ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
+                }
             }
 
             // normalise dDisp
@@ -417,13 +424,13 @@ int main( int argc, char* argv[] )
         }
 
         if(cross_section) {
-            if(0) {
+            if(1) {
                 DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0][level], dCamImg[1][level], handler2d.GetSelectedPoint(true)[1] + 0.5);
             }else{
                 CostVolumeCrossSection(dDebugf4, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
             }
         }else{
-            dDebugf4.CopyFrom(dN);
+//            dDebugf4.CopyFrom(dN);
         }
 
         if(Pushed(costvol_reset)) {

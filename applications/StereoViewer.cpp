@@ -13,21 +13,10 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
-int main( int /*argc*/, char* argv[] )
+int main( int argc, char* argv[] )
 {
     // Open video device
-    CameraDevice camera = OpenRpgCamera(
-//            "AlliedVision:[NumChannels=2,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-//            "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-//              "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-              "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/NightDC/Sun Aug 19 23:02:41 EDT 2012,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0]//"
-//            "Dvi2Pci:[NumImages=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
-    );
-
-//    CameraDevice camera = OpenPangoCamera(
-//        "file:[stream=0,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI",
-//        "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
-//    );
+    CameraDevice camera = OpenRpgCamera(argc,argv);
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
@@ -70,6 +59,7 @@ int main( int /*argc*/, char* argv[] )
     int shift = 0;
     bool run = true;
 
+    pangolin::RegisterKeyPressCallback('0', [&shift](){shift=0;} );
     pangolin::RegisterKeyPressCallback('=', [&shift](){shift++;} );
     pangolin::RegisterKeyPressCallback('-', [&shift](){shift--;} );
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
