@@ -3,6 +3,7 @@
 #include "patch_score.h"
 #include "disparity.h"
 #include "InvalidValue.h"
+//#include "ImageApron.h"
 
 namespace Gpu
 {
@@ -19,48 +20,121 @@ typedef SANDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
 
 template<typename TD, typename TI, typename Score>
 __global__ void KernDenseStereo(
-    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, int maxDisp, double acceptThresh
+    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, TD maxDispVal, TD dispStep, float acceptThresh
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
-    int bestDisp = InvalidValue<TD>::Value();
+    TD bestDisp = InvalidValue<TD>::Value();
 
-    if( Score::width  <= x && x < dCamLeft.w - Score::width &&
-        Score::height <= y && y < dCamLeft.h - Score::height )
+    if( Score::width  <= x && x < (dCamLeft.w - Score::width) &&
+        Score::height <= y && y < (dCamLeft.h - Score::height) )
     {
         // Search for best matching pixel
         float bestScore = 1E+36;
+
+        TD sndBestDisp = InvalidValue<TD>::Value();
         float sndBestScore = 1E+37;
 
-        maxDisp = min(maxDisp, x + Score::width);
+        TD minDisp = min(maxDispVal, (TD)0);
+        TD maxDisp = max((TD)0, maxDispVal);
+        minDisp = max((int)minDisp, -(int)( ((int)dCamLeft.w - (int)Score::width) - (int)x));
+        maxDisp = min((int)maxDisp, (int)(x + Score::width));
 
-        for(int c = 0; c <= maxDisp; ++c ) {
-            const int rx = x-c;
-            const float score =  Score::Score(dCamLeft, x,y, dCamRight, rx, y);
+        for(TD c = minDisp; c <= maxDisp; c += dispStep ) {
+            const float score =  Score::Score(dCamLeft, x,y, dCamRight, x-c, y);
             if(score < bestScore) {
+                sndBestDisp = bestDisp;
                 sndBestScore = bestScore;
-                bestScore = score;
                 bestDisp = c;
-            }else if( score < sndBestScore) {
+                bestScore = score;
+            }else if( score <= sndBestScore) {
+                sndBestDisp = c;
                 sndBestScore = score;
             }
         }
-
-        if( (bestScore * acceptThresh) >= sndBestScore ) {
-            bestDisp = InvalidValue<TD>::Value();
+        if(abs(bestDisp-sndBestDisp) > 1) {
+            const float cd = (sndBestScore - bestScore) / bestScore;
+            if( cd < acceptThresh ) {
+                bestDisp = InvalidValue<TD>::Value();
+            }
         }
     }
 
     dDisp(x,y) = bestDisp;
 }
 
+template<typename TDisp, typename TImg>
 void DenseStereo(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
+    Image<TDisp> dDisp, const Image<TImg> dCamLeft, const Image<TImg> dCamRight,
+    TDisp maxDisp, float acceptThresh, int score_rad
+) {
+    dim3 blockDim(dDisp.w, 1);
+    dim3 gridDim(1, dDisp.h);
+
+    const TDisp dispStep = 1;
+
+    if( score_rad == 0 ) {
+        KernDenseStereo<TDisp, TImg, SinglePixelSqPatchScore<float,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if(score_rad == 1 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,1,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if( score_rad == 2 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,2,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if(score_rad == 3 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,3,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if( score_rad == 4 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,4,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if(score_rad == 5 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,5,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if(score_rad == 6 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,6,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }else if(score_rad == 7 ) {
+        KernDenseStereo<TDisp, TImg, SANDPatchScore<float,7,ImgAccessRaw > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+    }
+}
+
+template void DenseStereo<unsigned char, unsigned char>(Image<unsigned char>, const Image<unsigned char>, const Image<unsigned char>, unsigned char, float, int);
+template void DenseStereo<char, unsigned char>(Image<char>, const Image<unsigned char>, const Image<unsigned char>, char, float, int);
+
+void DenseStereoSubpix(
+    Image<float> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, float maxDisp, float dispStep, float acceptThresh, int score_rad, bool score_normed
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernDenseStereo<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight,maxDisp,acceptThresh);
+
+    if(score_normed) {
+        if( score_rad == 0 ) {
+            KernDenseStereo<float, unsigned char, SinglePixelSqPatchScore<float,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 1 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,1,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if( score_rad == 2 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,2,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 3 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,3,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if( score_rad == 4 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,4,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 5 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,5,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 6 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,6,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 7 ) {
+            KernDenseStereo<float, unsigned char, SANDPatchScore<float,7,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }
+    }else{
+        if( score_rad == 0 ) {
+            KernDenseStereo<float, unsigned char, SinglePixelSqPatchScore<float,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 1 ) {
+            KernDenseStereo<float, unsigned char, SADPatchScore<float,1,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if( score_rad == 2 ) {
+            KernDenseStereo<float, unsigned char, SADPatchScore<float,2,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 3 ) {
+            KernDenseStereo<float, unsigned char, SADPatchScore<float,3,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if( score_rad == 4 ) {
+            KernDenseStereo<float, unsigned char, SADPatchScore<float,4,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }else if(score_rad == 5 ) {
+            KernDenseStereo<float, unsigned char, SADPatchScore<float,5,ImgAccessBilinear<float> > ><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight, maxDisp, dispStep, acceptThresh);
+        }
+    }
 }
 
 //////////////////////////////////////////////////////

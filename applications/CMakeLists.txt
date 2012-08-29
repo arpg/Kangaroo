@@ -106,6 +106,11 @@ if(Kangaroo_FOUND)
       add_executable( StereoViewer StereoViewer.cpp ${COMMON_HEADERS})
     endif()
 
+    set( BuildSimpleStereo true CACHE "" force )
+    if( BuildSimpleStereo )
+      add_executable( SimpleStereo SimpleStereo.cpp ${COMMON_HEADERS})
+    endif()
+
     set( BuildDenseStereo true CACHE "" force )
     if( BuildDenseStereo )
       add_executable( DenseStereo DenseStereo.cpp ${COMMON_HEADERS})

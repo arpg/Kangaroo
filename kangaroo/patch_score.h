@@ -11,6 +11,8 @@ namespace Gpu
 
 struct ImgAccessRaw
 {
+    typedef int TXY;
+
     template<typename T>
     __host__ __device__ inline static
     T Get(const Image<T>& img, int x, int y) {
@@ -20,6 +22,8 @@ struct ImgAccessRaw
 
 struct ImgAccessClamped
 {
+    typedef int TXY;
+
     template<typename T>
     __host__ __device__ inline static
     T Get(const Image<T>& img, int x, int y) {
@@ -30,6 +34,8 @@ struct ImgAccessClamped
 template<typename Tinterp>
 struct ImgAccessBilinear
 {
+    typedef float TXY;
+
     template<typename T>
     __host__ __device__ inline static
     T Get(const Image<T>& img, float x, float y) {
@@ -40,6 +46,8 @@ struct ImgAccessBilinear
 template<typename Tinterp>
 struct ImgAccessBilinearClamped
 {
+    typedef float TXY;
+
     template<typename T>
     __host__ __device__ inline static
     T Get(const Image<T>& img, float x, float y) {
@@ -72,6 +80,7 @@ To Sum(
 // Mean Absolute Difference
 template<typename To, typename ImgAccess = ImgAccessRaw >
 struct SinglePixelSqPatchScore {
+    typedef typename ImgAccess::TXY TXY;
     static const int width = 1;
     static const int height = 1;
     static const int area = width*height;
@@ -79,8 +88,8 @@ struct SinglePixelSqPatchScore {
     template<typename T>
     __host__ __device__ inline static
     To Score(
-        Image<T> img1, int x1, int y1,
-        Image<T> img2, int x2, int y2
+        Image<T> img1, TXY x1, TXY y1,
+        Image<T> img2, TXY x2, TXY y2
     ) {
         const T i1 = ImgAccess::Get(img1,x1,y1);
         const T i2 = ImgAccess::Get(img2,x2,y2);
@@ -92,6 +101,7 @@ struct SinglePixelSqPatchScore {
 // Sum Absolute Difference
 template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
 struct SADPatchScore {
+    typedef typename ImgAccess::TXY TXY;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -99,8 +109,8 @@ struct SADPatchScore {
     template<typename T>
     __host__ __device__ inline static
     To Score(
-        Image<T> img1, int x1, int y1,
-        Image<T> img2, int x2, int y2
+        Image<T> img1, TXY x1, TXY y1,
+        Image<T> img2, TXY x2, TXY y2
     ) {
         To sum_abs_diff = 0;
 
@@ -119,6 +129,7 @@ struct SADPatchScore {
 // Sum Absolute Difference
 template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
 struct SSDPatchScore {
+    typedef typename ImgAccess::TXY TXY;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -126,8 +137,8 @@ struct SSDPatchScore {
     template<typename T>
     __host__ __device__ inline static
     To Score(
-        Image<T> img1, int x1, int y1,
-        Image<T> img2, int x2, int y2
+        Image<T> img1, TXY x1, TXY y1,
+        Image<T> img2, TXY x2, TXY y2
     ) {
         To sum_sq_diff = 0;
 
@@ -147,6 +158,7 @@ struct SSDPatchScore {
 // Sum Square Normalised Difference
 template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
 struct SSNDPatchScore {
+    typedef typename ImgAccess::TXY TXY;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -154,8 +166,8 @@ struct SSNDPatchScore {
     template<typename T>
     __host__ __device__ inline static
     To Score(
-        Image<T> img1, int x1, int y1,
-        Image<T> img2, int x2, int y2
+        Image<T> img1, TXY x1, TXY y1,
+        Image<T> img2, TXY x2, TXY y2
     ) {
         To sxi = 0;
         To sxi2 = 0;
@@ -194,6 +206,7 @@ struct SSNDPatchScore {
 template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
 struct SSNDLineScore
 {
+    typedef typename ImgAccess::TXY TXY;
     static const int width = 2*rad+1;
     static const int height = 1;
     static const int area = width*height;
@@ -201,8 +214,8 @@ struct SSNDLineScore
     template<typename T>
     __host__ __device__ inline static
     To Score(
-        Image<T> img1, int x1, int y1,
-        Image<T> img2, int x2, int y2
+        Image<T> img1, TXY x1, TXY y1,
+        Image<T> img2, TXY x2, TXY y2
     ) {
         To sxi = 0;
         To sxi2 = 0;
@@ -238,6 +251,7 @@ struct SSNDLineScore
 // Sum Absolute Normalised Difference
 template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
 struct SANDPatchScore {
+    typedef typename ImgAccess::TXY TXY;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -245,8 +259,8 @@ struct SANDPatchScore {
     template<typename T>
     __host__ __device__ inline static
     To Score(
-        Image<T> img1, int x1, int y1,
-        Image<T> img2, int x2, int y2
+        Image<T> img1, TXY x1, TXY y1,
+        Image<T> img2, TXY x2, TXY y2
     ) {
         To sum_abs_diff = 0;
 

@@ -55,7 +55,7 @@ int main( int argc, char* argv[] )
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 4*640*480 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
 //    const int level = 4;
     assert(level <= max_levels);
 
@@ -211,8 +211,13 @@ int main( int argc, char* argv[] )
     Var<bool> run("ui.run", false, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
     Var<int> show_level("ui.show level",0, 0, max_levels-1);
-    Var<int> maxDisp("ui.disp",80, 0, 128);
-    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0.99, 0.99, 1.01, false);
+
+    Var<float> maxDisp("ui.disp",80, 0, 128);
+    Var<float> dispStep("ui.disp step",1, 0.1, 1);
+    Var<int> scoreRad("ui.score rad",1, 0, 5 );
+    Var<bool> scoreNormed("ui.score normed",true, true);
+
+    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);
 
     Var<bool> subpix("ui.subpix", false, true);
     Var<bool> reverse_check("ui.reverse_check", false, true);
@@ -260,16 +265,6 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
     pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
 
-    const int N = 3;
-    for(int i=0; i<N; ++i ) {
-        View& v = CreateDisplay();
-        v.SetAspect((double)w/h);
-        container.AddDisplay(v);
-    }
-    View& view3d = CreateDisplay().SetAspect((double)w/h).SetHandler(new Handler3D(s_cam, AxisNone));
-    container.AddDisplay(view3d);
-
-
     Handler2dImageSelect handler2d(lw,lh);
     ActivateDrawPyramid<unsigned char,max_levels> adleft(dCamImg[0],GL_LUMINANCE8, false, true);
     ActivateDrawImage<float> adDisp(dDisp,GL_LUMINANCE32F_ARB, false, true);
@@ -286,10 +281,12 @@ int main( int argc, char* argv[] )
     graph.AddChild(&glhmvbo);
     graph.AddChild(&history);
 
+    SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
     container[1].SetDrawFunction(boost::ref(adDisp)).SetHandler(&handler2d);
     container[2].SetDrawFunction(boost::ref(adDebug)).SetHandler(new Handler2dImageSelect(lw,lh));
-    view3d.SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam));
+    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam));
+    container[3].SetHandler( new Handler3D(s_cam, AxisNone) );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -326,17 +323,23 @@ int main( int argc, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            // Compute dense stereo
-            DenseStereo(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh);
 
-            if(reverse_check) {
-                ReverseCheck(dDispInt, dCamImg[0][level], dCamImg[1][level] );
-            }
+            if(dispStep == 1 )
+            {
+                // Compute dense stereo
+                DenseStereo<unsigned char,unsigned char>(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh, scoreRad);
 
-            if(subpix) {
-                DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0][level], dCamImg[1][level]);
+                if(reverse_check) {
+                    ReverseCheck(dDispInt, dCamImg[0][level], dCamImg[1][level] );
+                }
+
+                if(subpix) {
+                    DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0][level], dCamImg[1][level]);
+                }else{
+                    ConvertImage<float, unsigned char>(dDisp, dDispInt);
+                }
             }else{
-                ConvertImage<float, unsigned char>(dDisp, dDispInt);
+                DenseStereoSubpix(dDisp, dCamImg[0][level], dCamImg[1][level], maxDisp, dispStep, stereoAcceptThresh, scoreRad, scoreNormed);
             }
 
             for(int i=0; i < domedits; ++i ) {

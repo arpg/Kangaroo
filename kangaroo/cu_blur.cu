@@ -41,4 +41,7 @@ void Blur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char
     KernBlurY<unsigned char,unsigned char><<<gridDim,blockDim>>>(out,temp);
 }
 
+// Larger radius blur
+// http://http.developer.nvidia.com/GPUGems3/gpugems3_ch40.html
+
 }

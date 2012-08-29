@@ -20,6 +20,18 @@ struct InvalidValue<float> {
 };
 
 template<>
+struct InvalidValue<char> {
+    inline __host__ __device__ static float Value() {
+        return 0;
+    }
+
+    inline __host__ __device__ static bool IsValid(unsigned char val) {
+        return !val;
+    }
+};
+
+
+template<>
 struct InvalidValue<unsigned char> {
     inline __host__ __device__ static float Value() {
         return 0;

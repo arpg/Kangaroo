@@ -2,11 +2,10 @@
 
 #include <pangolin/pangolin.h>
 
-inline pangolin::View& SetupPangoGL(int w, int h)
+inline pangolin::View& SetupPangoGL(int w, int h, int ui_width = 180)
 {
     // Setup OpenGL Display (based on GLUT)
-    const int UI_WIDTH = 180;
-    pangolin::CreateGlutWindowAndBind(__FILE__,UI_WIDTH+w,h);
+    pangolin::CreateGlutWindowAndBind(__FILE__,ui_width+w,h);
     glewInit();
 
     // Setup default OpenGL parameters
@@ -23,11 +22,36 @@ inline pangolin::View& SetupPangoGL(int w, int h)
 
     // Tell the base view to arrange its children equally
     pangolin::CreatePanel("ui")
-        .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
+        .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(ui_width));
 
     pangolin::View& container = pangolin::CreateDisplay()
-            .SetBounds(0,1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0)
+            .SetBounds(0,1.0, pangolin::Attach::Pix(ui_width), 1.0)
             .SetLayout(pangolin::LayoutEqual);
 
     return container;
+}
+
+inline void SetupContainer(pangolin::View& container, int num_views, float aspect)
+{
+    for(int i=0; i<num_views; ++i ) {
+        pangolin::View& v = pangolin::CreateDisplay();
+        v.SetAspect(aspect);
+        container.AddDisplay(v);
+    }
+
+    pangolin::RegisterKeyPressCallback('~', [&container](){static bool showpanel=true; showpanel = !showpanel; if(showpanel) { container.SetBounds(0,1,pangolin::Attach::Pix(180), 1); }else{ container.SetBounds(0,1,0, 1); } pangolin::Display("ui").Show(showpanel); } );
+
+    pangolin::RegisterKeyPressCallback('1', [&container](){container[0].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('2', [&container](){container[1].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('3', [&container](){container[2].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('5', [&container](){container[4].ToggleShow();} );
+    pangolin::RegisterKeyPressCallback('6', [&container](){container[5].ToggleShow();} );
+
+    pangolin::RegisterKeyPressCallback('!', [&container](){container[0].SaveRenderNow("screenshot",4);} );
+    pangolin::RegisterKeyPressCallback('@', [&container](){container[1].SaveRenderNow("screenshot",4);} );
+    pangolin::RegisterKeyPressCallback('#', [&container](){container[2].SaveRenderNow("screenshot",4);} );
+    pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
+    pangolin::RegisterKeyPressCallback('%', [&container](){container[4].SaveRenderNow("screenshot",4);} );
+    pangolin::RegisterKeyPressCallback('^', [&container](){container[5].SaveRenderNow("screenshot",4);} );
 }

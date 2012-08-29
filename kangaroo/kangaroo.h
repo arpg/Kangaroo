@@ -38,8 +38,13 @@ void Warp(
 
 //////////////////////////////////////////////////////
 
+template<typename TDisp, typename TImg>
 void DenseStereo(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, int maxDisp, double acceptThresh
+    Image<TDisp> dDisp, const Image<TImg> dCamLeft, const Image<TImg> dCamRight, TDisp maxDisp, float acceptThresh, int score_rad
+);
+
+void DenseStereoSubpix(
+    Image<float> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, float maxDisp, float dispStep, float acceptThresh, int score_rad, bool score_normed
 );
 
 //////////////////////////////////////////////////////
