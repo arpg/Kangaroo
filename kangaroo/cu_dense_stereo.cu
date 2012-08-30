@@ -138,45 +138,35 @@ void DenseStereoSubpix(
 }
 
 //////////////////////////////////////////////////////
-// Check computed disparity is a local minima for reverse match
+// Check Left and Right disparity images match
 //////////////////////////////////////////////////////
 
-template<typename TD, typename TI, typename Score>
-__global__ void KernReverseCheck(
-    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight
+template<typename TD>
+__global__ void KernLeftRightCheck(
+    Image<TD> dispL, Image<TD> dispR, int maxDiff
 ) {
     const uint x = blockIdx.x*blockDim.x + threadIdx.x;
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
-    const int d = dDisp(x,y);
-    const int rx = x - d;
+    if( dispL.InBounds(x,y) ) {
+        const TD dl = dispL(x,y);
 
-    int best = 0;
-    float bestscore = 1E10;
-
-    // Check that this pixel is also a minima for the right image
-    const int rad = 10;
-#pragma unroll
-    for(int i=-rad; i <= rad; ++i) {
-        const float s = Score::Score(dCamLeft, x+i,y, dCamRight, rx,y);
-        if(s < bestscore) {
-            bestscore = s;
-            best = i;
+        if( 0 <= ((int)x-(int)dl) ) {
+            const TD dr = dispR(x - dl, y);
+            if(abs(dl - (-dr)) > maxDiff) {
+                dispL(x,y) = InvalidValue<TD>::Value();
+            }
+        }else{
+            dispL(x,y) = InvalidValue<TD>::Value();
         }
-    }
-
-    // If not, mark match as invalid
-    if(best != 0) {
-        dDisp(x,y) = InvalidValue<TD>::Value();
     }
 }
 
-void ReverseCheck(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
-) {
+void LeftRightCheck(Image<char> dispL, Image<char> dispR, int maxDiff)
+{
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim,gridDim, dDisp);
-    KernReverseCheck<unsigned char, unsigned char, DefaultSafeScoreType><<<gridDim,blockDim>>>(dDisp, dCamLeft, dCamRight);
+    InitDimFromOutputImageOver(blockDim,gridDim, dispL);
+    KernLeftRightCheck<char><<<gridDim,blockDim>>>(dispL, dispR, maxDiff);
 }
 
 //////////////////////////////////////////////////////

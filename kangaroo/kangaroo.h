@@ -49,9 +49,7 @@ void DenseStereoSubpix(
 
 //////////////////////////////////////////////////////
 
-void ReverseCheck(
-    Image<unsigned char> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight
-);
+void LeftRightCheck(Image<char> dispL, Image<char> dispR, int maxDiff = 0);
 
 //////////////////////////////////////////////////////
 
@@ -217,5 +215,8 @@ inline void Blur(Image<unsigned char> in_out, Image<unsigned char> temp )
 {
     Blur(in_out,in_out,temp);
 }
+
+void GaussianBlur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char> temp);
+
 
 }

@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 #include <cstdio>
 #include <cstdlib>
+#include <iomanip>
 
 namespace Gpu
 {
@@ -14,17 +15,34 @@ namespace Gpu
 // Adapted from https://bitbucket.org/ashwin/cudatimer
 class CudaTimer
 {
-private:
-    cudaEvent_t _begEvent;
-    cudaEvent_t _endEvent;
-
 public:
     CudaTimer();
     ~CudaTimer();
     void Start();
     void Stop();
 
+    void SyncTime();
+
     float Elapsed_ms();
+    float Average_ms();
+    float Min_ms();
+    float Max_ms();
+
+    void PrintSummary();
+
+    void Reset();
+
+
+protected:
+    cudaEvent_t _begEvent;
+    cudaEvent_t _endEvent;
+
+    bool newTime;
+    long trials;
+    float timeLast;
+    float timeAvg;
+    float timeMin;
+    float timeMax;
 };
 
 ////////////////////////////////////////
@@ -51,11 +69,11 @@ inline void __safeTimerCall( cudaError err, const char *file, const int line )
 }
 
 inline CudaTimer::CudaTimer()
+    : newTime(false), trials(0), timeLast(0), timeAvg(0), timeMin(1E10), timeMax(-1E10)
 {
     // Create
     SafeTimerCall( cudaEventCreate( &_begEvent ) );
     SafeTimerCall( cudaEventCreate( &_endEvent ) );
-
     return;
 }
 
@@ -72,7 +90,6 @@ inline void CudaTimer::Start()
 {
     // Record start time
     SafeTimerCall( cudaEventRecord( _begEvent, 0 ) );
-
     return;
 }
 
@@ -80,20 +97,59 @@ inline void CudaTimer::Stop()
 {
     // Record end time
     SafeTimerCall( cudaEventRecord( _endEvent, 0 ) );
-
+    newTime = true;
     return;
+}
+
+inline void CudaTimer::SyncTime()
+{
+    if(newTime) {
+        SafeTimerCall( cudaEventSynchronize( _endEvent ) );
+        SafeTimerCall( cudaEventElapsedTime( &timeLast, _begEvent, _endEvent ) );
+        trials++;
+        timeAvg = ((trials-1)*timeAvg + timeLast) / trials;
+        timeMin = std::min(timeMin, timeLast);
+        timeMax = std::max(timeMax, timeLast);
+        newTime = false;
+    }
 }
 
 inline float CudaTimer::Elapsed_ms()
 {
-    // Wait until end event is finished
-    SafeTimerCall( cudaEventSynchronize( _endEvent ) );
+    SyncTime();
+    return timeLast;
+}
 
-    // Time difference
-    float timeVal;
-    SafeTimerCall( cudaEventElapsedTime( &timeVal, _begEvent, _endEvent ) );
+inline float CudaTimer::Average_ms()
+{
+    SyncTime();
+    return timeAvg;
+}
 
-    return timeVal;
+inline float CudaTimer::Min_ms()
+{
+    SyncTime();
+    return timeMin;
+}
+
+inline float CudaTimer::Max_ms()
+{
+    SyncTime();
+    return timeMax;
+}
+
+inline void CudaTimer::PrintSummary()
+{
+    SyncTime();
+    std::cout << std::fixed << std::setprecision(4) << timeLast << "ms (" << timeAvg << " avg, " << timeMin << " min, " << timeMax << " max)" << std::endl;
+}
+
+inline void CudaTimer::Reset()
+{
+    trials = 0;
+    timeAvg = 0;
+    timeMin = 1E10;
+    timeMax = -1E10;
 }
 
 }

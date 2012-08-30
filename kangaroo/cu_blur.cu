@@ -1,5 +1,6 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
+#include "ImageApron.h"
 
 namespace Gpu {
 
@@ -43,5 +44,28 @@ void Blur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char
 
 // Larger radius blur
 // http://http.developer.nvidia.com/GPUGems3/gpugems3_ch40.html
+
+template<typename TO, typename TI, unsigned MAXBW, unsigned MAXBH, unsigned RAD>
+__global__ void KernGaussianBlurX(Image<TO> out, Image<TI> in)
+{
+    const unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    __shared__ ImageApronRows<TI,MAXBW,MAXBH,1> apron;
+    apron.CacheImage(in);
+
+    if(out.InBounds(x,y)) {
+        out(x,y) = apron.GetRelThreadClampX(10,-1);
+    }
+}
+
+void GaussianBlur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char> temp)
+{
+    const int MAX_IMG_WIDTH = 1024;
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, out, out.w,1);
+    KernGaussianBlurX<unsigned char, unsigned char, MAX_IMG_WIDTH, 1, 0><<<gridDim,blockDim>>>(out,in);
+}
+
 
 }

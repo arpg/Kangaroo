@@ -37,12 +37,12 @@ int main( int argc, char* argv[] )
     CameraDevice video = OpenRpgCamera(argc,argv);
 
     // Capture first image
-    std::vector<rpg::ImageWrapper> img;
-    video.Capture(img);
+    std::vector<rpg::ImageWrapper> images;
+    video.Capture(images);
 
     // native width and height (from camera)
-    const unsigned int w = img[0].width();
-    const unsigned int h = img[0].height();
+    const unsigned int w = images[0].width();
+    const unsigned int h = images[0].height();
 
     // Initialise window
     View& container = SetupPangoGL(1024, 768);
@@ -52,8 +52,9 @@ int main( int argc, char* argv[] )
     cudaGLSetGLDevice(0);
 
     // Allocate Camera Images on device for processing
-    Image<unsigned char, TargetDevice, Manage> CamImg[] = {{w,h},{w,h}};
-    Image<unsigned char, TargetDevice, Manage> Img[] = {{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> camImg[] = {{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> temp[] = {{w,h},{w,h}};
 
     Image<char, TargetDevice, Manage> DispInt[] = {{w,h},{w,h}};
     Image<float, TargetDevice, Manage>  Disp[] = {{w,h},{w,h}};
@@ -62,34 +63,34 @@ int main( int argc, char* argv[] )
     Var<bool> run("ui.run", false, true);
 
     Var<float> maxPosDisp("ui.disp",80, 0, 126);
-    Var<float> dispStep("ui.disp step",1, 0.1, 1);
     Var<int> scoreRad("ui.score rad",1, 0, 5 );
-    Var<bool> scoreNormed("ui.score normed",true, true);
+//    Var<float> dispStep("ui.disp step",1, 0.1, 1);
+//    Var<bool> scoreNormed("ui.score normed",true, true);
 
     Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);
 
-    Var<bool> subpix("ui.subpix", false, true);
-    Var<bool> reverse_check("ui.reverse_check", false, true);
+    Var<int> reverse_check("ui.reverse_check", -1, -1, 5);
+//    Var<bool> subpix("ui.subpix", false, true);
 
-    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-    Var<float> gs("ui.gs",2, 1E-3, 5);
-    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+//    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+//    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+//    Var<float> gs("ui.gs",2, 1E-3, 5);
+//    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
-    Var<int> domedits("ui.median its",1, 1, 10);
-    Var<bool> domed9x9("ui.median 9x9", false, true);
-    Var<bool> domed7x7("ui.median 7x7", false, true);
-    Var<bool> domed5x5("ui.median 5x5", false, true);
-    Var<bool> domed3x3("ui.median 3x3", false, true);
-    Var<int> medi("ui.medi",12, 0, 24);
+//    Var<int> domedits("ui.median its",1, 1, 10);
+//    Var<bool> domed9x9("ui.median 9x9", false, true);
+//    Var<bool> domed7x7("ui.median 7x7", false, true);
+//    Var<bool> domed5x5("ui.median 5x5", false, true);
+//    Var<bool> domed3x3("ui.median 3x3", false, true);
+//    Var<int> medi("ui.medi",12, 0, 24);
 
-    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
+//    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
-    ActivateDrawImage<unsigned char> adImgL(CamImg[0],GL_LUMINANCE8, false, true);
-    ActivateDrawImage<unsigned char> adImgR(CamImg[1],GL_LUMINANCE8, false, true);
+    ActivateDrawImage<unsigned char> adImgL(img[0],GL_LUMINANCE8, false, true);
+    ActivateDrawImage<unsigned char> adImgR(img[1],GL_LUMINANCE8, false, true);
 
     ActivateDrawImage<float> adDispL(Disp[0],GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float> adDispR(Disp[1],GL_LUMINANCE32F_ARB, false, true);
@@ -99,17 +100,25 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(boost::ref(adDispL));
     container[3].SetDrawFunction(boost::ref(adDispR));
 
+    CudaTimer timer;
+
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
-            video.Capture(img);
+            video.Capture(images);
             frame++;
 
             for(int i=0; i<2; ++i ) {
-                CamImg[i].MemcpyFromHost(img[i].Image.data, w);
+                camImg[i].MemcpyFromHost(images[i].Image.data, w);
             }
+            timer.Start();
+            for(int i=0; i<2; ++i ) {
+                GaussianBlur(img[i], camImg[i], temp[i]);
+            }
+            timer.Stop();
+            timer.PrintSummary();
         }
 
         if(go || GuiVarHasChanged() ) {
@@ -118,7 +127,7 @@ int main( int argc, char* argv[] )
                 const size_t img2 = 1-i;
                 const char maxDisp = -(2*i-1) * maxPosDisp;
 
-                DenseStereo<char,unsigned char>(DispInt[img1], CamImg[img1], CamImg[img2], maxDisp, stereoAcceptThresh, scoreRad);
+                DenseStereo<char,unsigned char>(DispInt[img1], img[img1], img[img2], maxDisp, stereoAcceptThresh, scoreRad);
 
 //                if(dispStep == 1 )
 //                {
@@ -138,9 +147,18 @@ int main( int argc, char* argv[] )
 //                    DenseStereo(Disp[img1], CamImg[img1], CamImg[img2], maxDisp, dispStep, stereoAcceptThresh, scoreRad, scoreNormed);
 //                }
 
-                ConvertImage<float, char>(Disp[img1], DispInt[img1]);
-                nppiDivC_32f_C1IR(maxDisp,Disp[img1].ptr,Disp[img1].pitch,Disp[img1].Size());
             }
+
+            if(reverse_check >= 0) {
+                LeftRightCheck(DispInt[0], DispInt[1], reverse_check);
+            }
+
+            for(int i=0; i<2; ++i) {
+                ConvertImage<float, char>(Disp[i], DispInt[i]);
+                const char maxDisp = -(2*i-1) * maxPosDisp;
+                nppiDivC_32f_C1IR(maxDisp,Disp[i].ptr,Disp[i].pitch,Disp[i].Size());
+            }
+
 
 
 //            for(int i=0; i < domedits; ++i ) {

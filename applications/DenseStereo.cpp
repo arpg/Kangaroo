@@ -330,7 +330,8 @@ int main( int argc, char* argv[] )
                 DenseStereo<unsigned char,unsigned char>(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh, scoreRad);
 
                 if(reverse_check) {
-                    ReverseCheck(dDispInt, dCamImg[0][level], dCamImg[1][level] );
+                    // Replace with better LeftRightCheck
+//                    ReverseCheck(dDispInt, dCamImg[0][level], dCamImg[1][level] );
                 }
 
                 if(subpix) {

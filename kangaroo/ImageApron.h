@@ -6,65 +6,61 @@
 namespace Gpu
 {
 
-// This class MUST be instantiated as __shared__
-template<typename T, unsigned Top, unsigned Bottom, unsigned Left, unsigned Right, unsigned BLOCKW, unsigned BLOCKH>
-struct ImageApron
+template<typename T, int MAXBW, int MAXBH, int RAD>
+struct ImageApronRows
 {
-public:
-    const static unsigned Width = BLOCKW + Left + Right;
-    const static unsigned Height = BLOCKH + Top + Bottom;
-    const static unsigned Elements = Width * Height;
-    const static unsigned ThreadsInBlock = BLOCKW * BLOCKH;
+    const static int ROWS = (2*RAD+1);
+    const static int MAXEL = MAXBW * (ROWS*MAXBH);
+    T cache[MAXEL];
 
-    // Conservative: how do we work this out properly? Compile time ceil()?
-    const static unsigned Loads = 1 + Elements / (BLOCKW*BLOCKH);
-
-    //! Cache image for block, with block thread (0,0) having pixel (x,y)
-    //! You likely want to set:  x = (blockIdx.x*blockDim.x)
-    //!                          y = (blockIdx.y*blockDim.y)
-    inline __host__ __device__
-    void CacheImage(const Image<T>& img, unsigned int x, unsigned y)
+    inline __device__
+    void CacheImage(const Image<T>& img, unsigned x, unsigned y)
     {
-        const uint tid = threadIdx.y*blockDim.x + threadIdx.x;
-
 #pragma unroll
-        for(int l=0; l<Loads; ++l) {
-            const uint elid = l*ThreadsInBlock + tid;
-            const uint imgx = x - Left + (elid % Width);
-            const uint imgy = y - Top  + (elid / Width);
-            if( 0 <= imgx && imgx < img.w && 0 <= imgy && imgy < img.h ) {
-                cache[elid] = img.Get(imgx,imgy);
-            }else{
-                cache[elid] = InvalidValue<T>::Value();
-            }
+        for(int r=0; r<ROWS; ++r) {
+            const int roffset = r*blockDim.y + threadIdx.y;
+            const int yimg = y - RAD + roffset;
+            const T val = (0 <= yimg && yimg < img.h) ? img.Get(x+threadIdx.x, yimg ) : 0;
+            GetRaw(threadIdx.x, roffset ) = val;
         }
-
-        // Sync since this cache has been loaded by many threads
         __syncthreads();
     }
 
-    inline __host__ __device__
-    T GetRaw(uint x, uint y)
+    inline __device__
+    void CacheImage(const Image<T>& img)
     {
-        return cache[y*Width + x];
+        CacheImage(img, blockIdx.x*blockDim.x, blockIdx.y*blockDim.y);
     }
 
-    //! x and y are relative to block 0,0.
-    inline __host__ __device__
-    T GetRelBlock(uint x, uint y)
+    inline __device__
+    T& GetRaw(int x, int y)
     {
-        return GetRaw(x+Left, y+Top);
+        return cache[y*blockDim.x + x];
     }
 
-    //! x and y are relative to current thread in block.
-    inline __host__ __device__
-    T GetRelThread(uint x, uint y)
+    inline __device__
+    T& GetRelBlock(int x, int y)
     {
-        return GetRelBlock(x+threadIdx.x, y+threadIdx.y);
+        return GetRaw(x, y + blockDim.y*RAD);
     }
 
-protected:
-    T cache[Elements];
+    inline __device__
+    T& GetRelThread(int x, int y)
+    {
+        return GetRelBlock(threadIdx.x + x, threadIdx.y + y);
+    }
+
+    inline __device__
+    T GetRelThreadClampX(int x, int y)
+    {
+        const int elx = threadIdx.x + x;
+        const int ely = threadIdx.y + y;
+        if( 0 <= elx && elx < blockDim.x) {
+            return GetRelBlock(elx, ely);
+        }else{
+            return 0;
+        }
+    }
 };
 
 }
