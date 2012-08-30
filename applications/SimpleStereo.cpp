@@ -85,6 +85,7 @@ int main( int argc, char* argv[] )
 //    Var<int> medi("ui.medi",12, 0, 24);
 
 //    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
+    Var<float> sigma("ui.sigma", 1, 0, 20);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -100,8 +101,6 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(boost::ref(adDispL));
     container[3].SetDrawFunction(boost::ref(adDispR));
 
-    CudaTimer timer;
-
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
         const bool go = frame==0 || run || Pushed(step);
@@ -111,14 +110,8 @@ int main( int argc, char* argv[] )
             frame++;
 
             for(int i=0; i<2; ++i ) {
-                camImg[i].MemcpyFromHost(images[i].Image.data, w);
+                img[i].MemcpyFromHost(images[i].Image.data, w);
             }
-            timer.Start();
-            for(int i=0; i<2; ++i ) {
-                GaussianBlur(img[i], camImg[i], temp[i]);
-            }
-            timer.Stop();
-            timer.PrintSummary();
         }
 
         if(go || GuiVarHasChanged() ) {

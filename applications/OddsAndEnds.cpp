@@ -4,7 +4,7 @@
 
 using namespace std;
 
-int main( int /*argc*/, char* argv[] )
+int OutputBitonicNetwork()
 {
     const int size = 9*9;
 
@@ -27,5 +27,9 @@ int main( int /*argc*/, char* argv[] )
     network.Prune(desired);
     cout << endl << "Pruned sort network (" << network.Size() << " swaps)" << endl;
     network.Print();
+}
 
+int main( int /*argc*/, char* argv[] )
+{
+    OutputBitonicNetwork();
 }

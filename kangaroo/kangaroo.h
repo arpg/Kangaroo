@@ -17,8 +17,18 @@
 namespace Gpu
 {
 
+//////////////////////////////////////////////////////
+
 template<typename To, typename Ti>
 void ConvertImage(Image<To> dOut, const Image<Ti> dIn);
+
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename Tin1, typename Tin2>
+void Add(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2);
+
+template<typename Tout, typename Tin1, typename Tin2, typename Tup>
+void SubtractAdd(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2, Tup offset );
 
 //////////////////////////////////////////////////////
 
@@ -216,7 +226,8 @@ inline void Blur(Image<unsigned char> in_out, Image<unsigned char> temp )
     Blur(in_out,in_out,temp);
 }
 
-void GaussianBlur(Image<unsigned char> out, Image<unsigned char> in, Image<unsigned char> temp);
+template<typename Tout, typename Tin>
+void GaussianBlur(Image<Tout> out, Image<Tin> in, Image<Tout> temp, float sigma);
 
 
 }

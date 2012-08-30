@@ -85,6 +85,12 @@ if( BuildViconAlign )
     target_link_libraries( ViconAlign vrpn )
 endif()
 
+set( BuildGpsConvert true CACHE "" force )
+if( BuildGpsConvert )
+    add_executable( GpsConvert ${COMMON_SRC} GpsConvert.cpp)
+    target_link_libraries( GpsConvert Geographic )
+endif()
+
 
 find_package( Kangaroo )
 if(Kangaroo_FOUND)

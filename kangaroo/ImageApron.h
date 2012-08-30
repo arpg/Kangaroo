@@ -61,6 +61,18 @@ struct ImageApronRows
             return 0;
         }
     }
+
+    inline __device__
+    T GetRelThreadClampY(int x, int y)
+    {
+        const int elx = threadIdx.x + x;
+        const int ely = threadIdx.y + y;
+        if( 0 <= ely && ely < blockDim.y) {
+            return GetRelBlock(elx, ely);
+        }else{
+            return 0;
+        }
+    }
 };
 
 }
