@@ -72,7 +72,7 @@ void DenseStereoSubpix(
 
 //////////////////////////////////////////////////////
 
-void SemiGlobalMatching(Volume<int> volH, Volume<unsigned char> volC, int maxDisp, unsigned P1, unsigned P2);
+void SemiGlobalMatching(Volume<float> volH, Volume<unsigned char> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 //////////////////////////////////////////////////////
 

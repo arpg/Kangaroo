@@ -124,7 +124,7 @@ __global__ void KernCensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T>
 
     const T p = left(x,y);
 
-    const int maxDisp = min(maxDispVal, x);
+    const int maxDisp = min(maxDispVal, x+1);
 
     for(int d=0; d< maxDisp; ++d)
     {
@@ -156,7 +156,7 @@ __global__ void KernCostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned
     Tdisp bestd = 0;
     Tvol bestc = vol(x,y,0);
 
-    const int maxDisp = min(maxDispVal, x);
+    const int maxDisp = min(maxDispVal, x+1);
     for(unsigned d=1; d < maxDisp; ++d) {
         const Tvol c = vol(x,y,d);
         if(c < bestc) {
@@ -176,9 +176,10 @@ void CostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDisp)
     KernCostVolMinimum<Tdisp,Tvol><<<gridDim,blockDim>>>(disp,vol,maxDisp);
 }
 
-template void CostVolMinimum<char,int>(Image<char>,Volume<int>,unsigned);
-template void CostVolMinimum<char,unsigned int>(Image<char>,Volume<unsigned int>,unsigned);
-template void CostVolMinimum<char,unsigned char>(Image<char>,Volume<unsigned char>,unsigned);
+template void CostVolMinimum<>(Image<char>,Volume<float>,unsigned);
+template void CostVolMinimum<>(Image<char>,Volume<int>,unsigned);
+template void CostVolMinimum<>(Image<char>,Volume<unsigned int>,unsigned);
+template void CostVolMinimum<>(Image<char>,Volume<unsigned char>,unsigned);
 
 
 //////////////////////////////////////////////////////

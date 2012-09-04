@@ -55,7 +55,7 @@ int main( int argc, char* argv[] )
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
     Volume<unsigned char, TargetDevice, Manage> vol(w,h,MAXD);
-    Volume<int, TargetDevice, Manage> sgm(w,h,MAXD);
+    Volume<float, TargetDevice, Manage> sgm(w,h,MAXD);
 
     Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
     Image<char, TargetDevice, Manage> DispInt[] = {{w,h},{w,h}};
@@ -87,8 +87,11 @@ int main( int argc, char* argv[] )
     Var<int> medi("ui.medi",12, 0, 24);
 
     Var<bool> dosgm("ui.sgm", true, true);
-    Var<int> sgmP1("ui.P1",1, 1, 100);
-    Var<int> sgmP2("ui.P2",20, 2, 100);
+    Var<float> sgmP1("ui.P1",0, 0, 100);
+    Var<float> sgmP2("ui.P2",0, 0, 1000);
+    Var<bool> dohoriz("ui.horiz", false, true);
+    Var<bool> dovert("ui.vert", false, true);
+    Var<bool> doreverse("ui.reverse", false, true);
 
 //    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 //    Var<float> sigma("ui.sigma", 1, 0, 20);
@@ -109,7 +112,7 @@ int main( int argc, char* argv[] )
 
     CudaTimer cutimer;
 
-    for(unsigned long frame=0; !pangolin::ShouldQuit() && frame < 20;)
+    for(unsigned long frame=0; !pangolin::ShouldQuit() /*&& frame < 20*/;)
     {
         const bool go = frame==0 || run || Pushed(step);
         const bool guichanged = GuiVarHasChanged();
@@ -135,8 +138,8 @@ int main( int argc, char* argv[] )
 
             CensusStereoVolume(vol, census[0], census[1], maxPosDisp);
             if(dosgm) {
-                SemiGlobalMatching(sgm,vol,maxPosDisp,sgmP1,sgmP2);
-                CostVolMinimum<char,int>(DispInt[0],sgm,maxPosDisp);
+                SemiGlobalMatching(sgm,vol,img[0],maxPosDisp,sgmP1,sgmP2,dohoriz,dovert,doreverse);
+                CostVolMinimum<char,float>(DispInt[0],sgm,maxPosDisp);
             }else{
                 CostVolMinimum<char,unsigned char>(DispInt[0],vol,maxPosDisp);
             }
