@@ -59,6 +59,7 @@ __global__ void KernGaussianBlurX(Image<TO> out, Image<TI> in, float g0, float g
 
     __shared__ ImageApronRows<TI,MAXBW,MAXBH,0> apron;
     apron.CacheImage(in);
+    __syncthreads();
 
     if(out.InBounds(x,y)) {
         float pixsum = 0;
@@ -85,6 +86,7 @@ __global__ void KernGaussianBlurY(Image<TO> out, Image<TI> in, float g0, float g
 
     __shared__ ImageApronRows<TI,MAXBW,MAXBH,0> apron;
     apron.CacheImage(in);
+    __syncthreads();
 
     if(out.InBounds(x,y)) {
         float pixsum = 0;
@@ -103,13 +105,12 @@ __global__ void KernGaussianBlurY(Image<TO> out, Image<TI> in, float g0, float g
     }
 }
 
-template<typename Tout, typename Tin, unsigned MAXRAD>
+template<typename Tout, typename Tin, unsigned MAXRAD, unsigned MAXIMGDIM>
 void GaussianBlur(Image<Tout> out, Image<Tin> in, Image<Tout> temp, float sigma)
 {
     if(sigma == 0 ) {
         out.CopyFrom(in);
     }else{
-        const int MAX_IMG_WIDTH_HEIGHT = 1024;
         dim3 blockDim, gridDim;
 
         const float delta = 1;
@@ -117,17 +118,17 @@ void GaussianBlur(Image<Tout> out, Image<Tin> in, Image<Tout> temp, float sigma)
         const float g1 = exp(-0.5 * delta * delta / (sigma * sigma));
 
         InitDimFromOutputImageOver(blockDim,gridDim, out, out.w,1);
-        KernGaussianBlurX<unsigned char, unsigned char, MAX_IMG_WIDTH_HEIGHT, 1, MAXRAD><<<gridDim,blockDim>>>(temp,in, g0, g1);
+        KernGaussianBlurX<unsigned char, unsigned char, MAXIMGDIM, 1, MAXRAD><<<gridDim,blockDim>>>(temp,in, g0, g1);
 
         InitDimFromOutputImageOver(blockDim,gridDim, out, 1, out.h);
-        KernGaussianBlurY<unsigned char, unsigned char, 1, MAX_IMG_WIDTH_HEIGHT, MAXRAD><<<gridDim,blockDim>>>(out,temp, g0, g1);
+        KernGaussianBlurY<unsigned char, unsigned char, 1, MAXIMGDIM, MAXRAD><<<gridDim,blockDim>>>(out,temp, g0, g1);
     }
 }
 
-template void GaussianBlur<unsigned char,unsigned char, 5>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
-template void GaussianBlur<unsigned char,unsigned char, 10>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
-template void GaussianBlur<unsigned char,unsigned char, 15>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
-template void GaussianBlur<unsigned char,unsigned char, 20>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template void GaussianBlur<unsigned char,unsigned char, 5,  1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template void GaussianBlur<unsigned char,unsigned char, 10, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template void GaussianBlur<unsigned char,unsigned char, 15, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template void GaussianBlur<unsigned char,unsigned char, 20, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
 
 
 }

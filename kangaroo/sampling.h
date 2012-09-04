@@ -259,4 +259,22 @@ __device__ R catrom_continuous(const T* img, size_t stride, float x, float y)
     return catrom_discrete<R,T>(img, stride, x-0.5, y-0.5);
 }
 
+template<typename T, typename R>
+R Bilinear(T img, float px, float py)
+{
+    const float ix = floorf(px);
+    const float iy = floorf(py);
+    const float fx = px - ix;
+    const float fy = py - iy;
+    const int ixp = ix+1;
+    const int iyp = iy+1;
+
+    return lerp(
+      lerp( img(ix,iy), img(ixp,iy), fx ),
+      lerp( img(ix,iyp), img(ixp,iyp), fx ),
+      fy
+    );
+}
+
+
 }

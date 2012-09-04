@@ -48,6 +48,16 @@ void Warp(
 
 //////////////////////////////////////////////////////
 
+void Census(Image<unsigned long> census, Image<unsigned char> img);
+
+void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
+
+void CensusStereoVolume(Volume<unsigned char> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
+
+void DenseStereoTest(
+    Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
+);
+
 template<typename TDisp, typename TImg>
 void DenseStereo(
     Image<TDisp> dDisp, const Image<TImg> dCamLeft, const Image<TImg> dCamRight, TDisp maxDisp, float acceptThresh, int score_rad
@@ -226,7 +236,7 @@ inline void Blur(Image<unsigned char> in_out, Image<unsigned char> temp )
     Blur(in_out,in_out,temp);
 }
 
-template<typename Tout, typename Tin>
+template<typename Tout, typename Tin, unsigned MAXRAD, unsigned MAXIMGDIM>
 void GaussianBlur(Image<Tout> out, Image<Tin> in, Image<Tout> temp, float sigma);
 
 

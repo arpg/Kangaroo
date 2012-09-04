@@ -23,7 +23,6 @@ struct ImageApronRows
             const T val = (0 <= yimg && yimg < img.h) ? img.Get(x+threadIdx.x, yimg ) : 0;
             GetRaw(threadIdx.x, roffset ) = val;
         }
-        __syncthreads();
     }
 
     inline __device__

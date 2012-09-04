@@ -214,7 +214,7 @@ int main( int argc, char* argv[] )
 
     Var<float> maxDisp("ui.disp",80, 0, 128);
     Var<float> dispStep("ui.disp step",1, 0.1, 1);
-    Var<int> scoreRad("ui.score rad",1, 0, 5 );
+    Var<int> scoreRad("ui.score rad",1, 0, 7 );
     Var<bool> scoreNormed("ui.score normed",true, true);
 
     Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);

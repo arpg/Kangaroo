@@ -15,14 +15,16 @@ void KernConvertImage(Image<To> dOut, const Image<Ti> dIn)
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
-    dOut(x,y) = ConvertPixel<To,Ti>(dIn(x,y));
+    if(dOut.InBounds(x,y)) {
+        dOut(x,y) = ConvertPixel<To,Ti>(dIn(x,y));
+    }
 }
 
 template<typename To, typename Ti>
 void ConvertImage(Image<To> dOut, const Image<Ti> dIn)
 {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, dOut);
+    InitDimFromOutputImageOver(blockDim, gridDim, dOut);
     KernConvertImage<<<gridDim,blockDim>>>(dOut,dIn);
 }
 
