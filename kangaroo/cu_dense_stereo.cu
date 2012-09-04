@@ -18,7 +18,8 @@ typedef SANDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
 // Census transform, 9x7 window
 //////////////////////////////////////////////////////
 
-__global__ void KernCensus(Image<unsigned long> census, Image<unsigned char> img)
+template<typename Tout, typename Tin>
+__global__ void KernCensus(Image<Tout> census, Image<Tin> img)
 {
     const int WRAD = 4;
     const int HRAD = 3;
@@ -27,14 +28,14 @@ __global__ void KernCensus(Image<unsigned long> census, Image<unsigned char> img
     const uint y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
-        const unsigned char p = img(x,y);
+        const Tin p = img(x,y);
 
-        unsigned long out = 0;
-        unsigned long bit = 1;
+        Tout out = 0;
+        Tout bit = 1;
 
         for(int r=-HRAD; r <= HRAD; ++r) {
             for(int c=-WRAD; c <= WRAD; ++c ) {
-                const unsigned char q = img.GetWithClampedRange(x+c,y+r);
+                const Tin q = img.GetWithClampedRange(x+c,y+r);
                 if( q < p ) {
                     out |= bit;
                 }
@@ -51,7 +52,7 @@ void Census(Image<unsigned long> census, Image<unsigned char> img)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim,img);
-    KernCensus<<<gridDim,blockDim>>>(census,img);
+    KernCensus<unsigned long, unsigned char><<<gridDim,blockDim>>>(census,img);
 }
 
 //////////////////////////////////////////////////////
@@ -62,36 +63,7 @@ template<typename T>
 inline __host__ __device__
 unsigned HammingDistance(T p, T q)
 {
-    const T diff = p^q;
-    unsigned dist = 0;
-
-    T bit = 1;
-    const unsigned bits = sizeof(T)*8;
-#pragma unroll
-    for(unsigned i=0; i<bits; ++i ) {
-//        dist += (diff & (unsigned long)(1<<i)) >> i;
-        if(diff & bit ) dist++;
-        bit = bit << 1;
-    }
-
-//#pragma unroll
-//    for(unsigned i=0; i<63; ++i ) {
-////        dist += (diff & (unsigned long)(1<<i)) >> i;
-//        if(diff & ((unsigned long)1<<i) ) dist++;
-//    }
-
-//#pragma unroll
-//    for(unsigned long bit= ((unsigned long)1)<<63; bit; bit = bit>>1 ) {
-//        if(diff & bit ) dist++;
-//    }
-
-//#pragma unroll
-//    while(diff) {
-//        ++dist;
-//        diff &= diff - 1;
-//    }
-
-    return dist;
+    return __popc(p^q);
 }
 
 template<typename T>
@@ -170,6 +142,43 @@ void CensusStereoVolume(Volume<unsigned char> vol, Image<unsigned long> left, Im
     dim3 gridDim(1, left.h);
     KernCensusStereoVolume<unsigned char, unsigned long><<<gridDim,blockDim>>>(vol,left,right,maxDisp);
 }
+
+//////////////////////////////////////////////////////
+// Cost Volume minimum
+//////////////////////////////////////////////////////
+
+template<typename Tdisp, typename Tvol>
+__global__ void KernCostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDispVal)
+{
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    Tdisp bestd = 0;
+    Tvol bestc = vol(x,y,0);
+
+    const int maxDisp = min(maxDispVal, x);
+    for(unsigned d=1; d < maxDisp; ++d) {
+        const Tvol c = vol(x,y,d);
+        if(c < bestc) {
+            bestc = c;
+            bestd = d;
+        }
+    }
+    disp(x,y) = bestd;
+}
+
+
+template<typename Tdisp, typename Tvol>
+void CostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDisp)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,disp);
+    KernCostVolMinimum<Tdisp,Tvol><<<gridDim,blockDim>>>(disp,vol,maxDisp);
+}
+
+template void CostVolMinimum<char,int>(Image<char>,Volume<int>,unsigned);
+template void CostVolMinimum<char,unsigned int>(Image<char>,Volume<unsigned int>,unsigned);
+template void CostVolMinimum<char,unsigned char>(Image<char>,Volume<unsigned char>,unsigned);
 
 
 //////////////////////////////////////////////////////

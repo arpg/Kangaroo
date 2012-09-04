@@ -54,6 +54,9 @@ void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned lo
 
 void CensusStereoVolume(Volume<unsigned char> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
 
+template<typename Tdisp, typename Tvol>
+void CostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDisp);
+
 void DenseStereoTest(
     Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
 );
@@ -66,6 +69,10 @@ void DenseStereo(
 void DenseStereoSubpix(
     Image<float> dDisp, const Image<unsigned char> dCamLeft, const Image<unsigned char> dCamRight, float maxDisp, float dispStep, float acceptThresh, int score_rad, bool score_normed
 );
+
+//////////////////////////////////////////////////////
+
+void SemiGlobalMatching(Volume<int> volH, Volume<unsigned char> volC, int maxDisp, unsigned P1, unsigned P2);
 
 //////////////////////////////////////////////////////
 

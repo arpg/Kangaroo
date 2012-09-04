@@ -54,7 +54,8 @@ int main( int argc, char* argv[] )
 
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
-    Volume<unsigned char, TargetDevice, Manage> vol[] = {{w,h,MAXD},{w,h,MAXD}};
+    Volume<unsigned char, TargetDevice, Manage> vol(w,h,MAXD);
+    Volume<int, TargetDevice, Manage> sgm(w,h,MAXD);
 
     Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
     Image<char, TargetDevice, Manage> DispInt[] = {{w,h},{w,h}};
@@ -63,7 +64,7 @@ int main( int argc, char* argv[] )
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
 
-    Var<float> maxPosDisp("ui.disp",80, 0, MAXD-1);
+    Var<int> maxPosDisp("ui.disp",80, 0, MAXD-1);
     Var<int> scoreRad("ui.score rad",4, 0, 7 );
 //    Var<float> dispStep("ui.disp step",1, 0.1, 1);
 //    Var<bool> scoreNormed("ui.score normed",true, true);
@@ -84,6 +85,10 @@ int main( int argc, char* argv[] )
     Var<bool> domed5x5("ui.median 5x5", false, true);
     Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
+
+    Var<bool> dosgm("ui.sgm", true, true);
+    Var<int> sgmP1("ui.P1",1, 1, 100);
+    Var<int> sgmP2("ui.P2",20, 2, 100);
 
 //    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 //    Var<float> sigma("ui.sigma", 1, 0, 20);
@@ -128,18 +133,25 @@ int main( int argc, char* argv[] )
                 Census(census[i], img[i]);
             }
 
-            CensusStereoVolume(vol[0], census[0], census[1], maxPosDisp);
-
-            for(int i=0; i<2; ++i) {
-                const size_t img1 = i;
-                const size_t img2 = 1-i;
-                const char maxDisp = -(2*i-1) * maxPosDisp;
-                CensusStereo(DispInt[img1], census[img1], census[img2], maxDisp);
+            CensusStereoVolume(vol, census[0], census[1], maxPosDisp);
+            if(dosgm) {
+                SemiGlobalMatching(sgm,vol,maxPosDisp,sgmP1,sgmP2);
+                CostVolMinimum<char,int>(DispInt[0],sgm,maxPosDisp);
+            }else{
+                CostVolMinimum<char,unsigned char>(DispInt[0],vol,maxPosDisp);
             }
 
-            if(reverse_check >= 0) {
-                LeftRightCheck(DispInt[0], DispInt[1], reverse_check);
-            }
+
+//            for(int i=0; i<2; ++i) {
+//                const size_t img1 = i;
+//                const size_t img2 = 1-i;
+//                const char maxDisp = -(2*i-1) * maxPosDisp;
+//                CensusStereo(DispInt[img1], census[img1], census[img2], maxDisp);
+//            }
+
+//            if(reverse_check >= 0) {
+//                LeftRightCheck(DispInt[0], DispInt[1], reverse_check);
+//            }
 
 //            DenseStereo<char,unsigned char>(DispInt[1], img[0], img[1], maxPosDisp, 0, scoreRad);
 
