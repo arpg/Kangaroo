@@ -24,6 +24,14 @@
 namespace Gpu
 {
 
+struct CudaException : public std::exception
+{
+    CudaException(const std::string& what) : mWhat(what) { }
+    virtual ~CudaException() throw() {}
+    virtual const char* what() const throw() { return mWhat.c_str(); }
+    std::string mWhat;
+};
+
 struct TargetHost
 {
     template<typename T> inline static
@@ -42,7 +50,9 @@ struct TargetDevice
 {
     template<typename T> inline static
     void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t w, size_t h){
-        cudaMallocPitch(devPtr,pitch,w*sizeof(T),h);
+        if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h) != cudaSuccess ) {
+            throw CudaException("Unable to cudaMallocPitch");
+        }
     }
 
     template<typename T> inline static
