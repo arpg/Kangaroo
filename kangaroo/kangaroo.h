@@ -50,12 +50,22 @@ void Warp(
 
 void Census(Image<unsigned long> census, Image<unsigned char> img);
 
+void Census(Image<ulong2> census, Image<unsigned char> img);
+
+//////////////////////////////////////////////////////
+
 void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
 
-void CensusStereoVolume(Volume<unsigned char> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
+void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
+
+void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp);
+
+//////////////////////////////////////////////////////
 
 template<typename Tdisp, typename Tvol>
 void CostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDisp);
+
+//////////////////////////////////////////////////////
 
 void DenseStereoTest(
     Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
@@ -72,7 +82,7 @@ void DenseStereoSubpix(
 
 //////////////////////////////////////////////////////
 
-void SemiGlobalMatching(Volume<float> volH, Volume<unsigned char> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 //////////////////////////////////////////////////////
 

@@ -43,7 +43,7 @@ int main( int argc, char* argv[] )
     // native width and height (from camera)
     const unsigned int w = images[0].width();
     const unsigned int h = images[0].height();
-    const unsigned int MAXD = 128;
+    const unsigned int MAXD = 256;
 
     // Initialise window
     View& container = SetupPangoGL(1024, 768);
@@ -54,11 +54,11 @@ int main( int argc, char* argv[] )
 
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
-    Volume<unsigned char, TargetDevice, Manage> vol(w,h,MAXD);
+    Volume<unsigned short, TargetDevice, Manage> vol(w,h,MAXD);
     Volume<float, TargetDevice, Manage> sgm(w,h,MAXD);
 
-    Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
-    Image<char, TargetDevice, Manage> DispInt[] = {{w,h},{w,h}};
+//    Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
+    Image<ulong2, TargetDevice, Manage> census[] = {{w,h},{w,h}};
     Image<float, TargetDevice, Manage>  Disp[] = {{w,h},{w,h}};
 
     Var<bool> step("ui.step", false, false);
@@ -87,10 +87,10 @@ int main( int argc, char* argv[] )
     Var<int> medi("ui.medi",12, 0, 24);
 
     Var<bool> dosgm("ui.sgm", true, true);
-    Var<float> sgmP1("ui.P1",0, 0, 100);
-    Var<float> sgmP2("ui.P2",0, 0, 1000);
-    Var<bool> dohoriz("ui.horiz", false, true);
-    Var<bool> dovert("ui.vert", false, true);
+    Var<float> sgmP1("ui.P1",1, 0, 100);
+    Var<float> sgmP2("ui.P2",500, 0, 1000);
+    Var<bool> dohoriz("ui.horiz", true, true);
+    Var<bool> dovert("ui.vert", true, true);
     Var<bool> doreverse("ui.reverse", false, true);
 
 //    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
@@ -112,7 +112,7 @@ int main( int argc, char* argv[] )
 
     CudaTimer cutimer;
 
-    for(unsigned long frame=0; !pangolin::ShouldQuit() /*&& frame < 20*/;)
+    for(unsigned long frame=0; !pangolin::ShouldQuit() /*&& frame < 10*/;)
     {
         const bool go = frame==0 || run || Pushed(step);
         const bool guichanged = GuiVarHasChanged();
@@ -139,11 +139,11 @@ int main( int argc, char* argv[] )
             CensusStereoVolume(vol, census[0], census[1], maxPosDisp);
             if(dosgm) {
                 SemiGlobalMatching(sgm,vol,img[0],maxPosDisp,sgmP1,sgmP2,dohoriz,dovert,doreverse);
-                CostVolMinimum<char,float>(DispInt[0],sgm,maxPosDisp);
+                CostVolMinimum<float,float>(Disp[0],sgm,maxPosDisp);
             }else{
-                CostVolMinimum<char,unsigned char>(DispInt[0],vol,maxPosDisp);
+                CostVolMinimum<float,unsigned short>(Disp[0],vol,maxPosDisp);
             }
-
+            nppiDivC_32f_C1IR(maxPosDisp,Disp[0].ptr,Disp[0].pitch,Disp[0].Size());
 
 //            for(int i=0; i<2; ++i) {
 //                const size_t img1 = i;
@@ -158,11 +158,11 @@ int main( int argc, char* argv[] )
 
 //            DenseStereo<char,unsigned char>(DispInt[1], img[0], img[1], maxPosDisp, 0, scoreRad);
 
-            for(int i=0; i<1; ++i) {
-                ConvertImage<float, char>(Disp[i], DispInt[i]);
-                const char maxDisp = maxPosDisp; //-(2*i-1) * maxPosDisp;
-                nppiDivC_32f_C1IR(maxDisp,Disp[i].ptr,Disp[i].pitch,Disp[i].Size());
-            }
+//            for(int i=0; i<1; ++i) {
+////                ConvertImage<float, char>(Disp[i], DispInt[i]);
+//                const char maxDisp = maxPosDisp; //-(2*i-1) * maxPosDisp;
+//                nppiDivC_32f_C1IR(maxDisp,Disp[i].ptr,Disp[i].pitch,Disp[i].Size());
+//            }
 
 //            DenseStereo<char,unsigned char>(DispInt[1], img[0], img[1], maxPosDisp, 0, scoreRad);
 //            ConvertImage<float, char>(Disp[1], DispInt[1]);
