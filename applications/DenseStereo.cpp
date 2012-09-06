@@ -240,7 +240,6 @@ int main( int argc, char* argv[] )
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
     Var<bool> show_heightmap("ui.show heightmap", false, true);
-    Var<bool> cross_section("ui.Cross Section", false, true);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",5, 1, 20);
@@ -260,8 +259,10 @@ int main( int argc, char* argv[] )
     Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
     Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
 
-    Var<bool> costvol_reset("ui.Set Reference", true, false);
-    Var<bool> costvol_add("ui.Add to Costvol", false, true);
+    Var<bool> cross_section("ui.Cross Section", true, true);
+    Var<bool> costvol_reset("ui.Costvol Reset", true, false);
+    Var<bool> costvol_reset_stereo("ui.Costvol Reset Stereo", false, false);
+    Var<bool> costvol_add("ui.Add to Costvol", false, false);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -273,7 +274,7 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
     pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
 
-    Handler2dImageSelect handler2d(lw,lh);
+    Handler2dImageSelect handler2d(lw,lh,level);
     ActivateDrawPyramid<unsigned char,max_levels> adleft(dCamImg[0],GL_LUMINANCE8, false, true);
     ActivateDrawImage<float> adDisp(dDisp,GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float4> adDebug(dDebugf4,GL_RGBA_FLOAT32_APPLE, false, true);
@@ -405,11 +406,21 @@ int main( int argc, char* argv[] )
                 hm.GenerateCbo(cbo_hm);
             }
 
-            if(costvol_add) {
+            if(Pushed(costvol_reset)) {
+                T_wv = T_wc;
+                dImgv.CopyFrom(dCamImg[0][level]);
+                CostVolumeZero(dCostVol);
+            }
+
+            if(Pushed(costvol_reset_stereo)) {
+                T_wv = T_wc;
+                dImgv.CopyFrom(dCamImg[0][level]);
+                CostVolumeFromStereo(dCostVol,dCamImg[0][level], dCamImg[1][level]);
+            }
+
+            if(Pushed(costvol_add)) {
                 const Eigen::Matrix<double,3,4> KT_lv = Kl * (T_wc.inverse() * T_wv).matrix3x4();
-                AddToCostVolume(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), 1.0f / baseline, 0, maxDisp);
-//                const Eigen::Matrix<double,3,4> KT_rv = K * (T_rl*T_wc.inverse() * T_wv).matrix3x4();
-//                AddToCostVolume(dCostVol,dImgv, dCamImg[1][level], KT_rv, K(0,0), K(1,1), K(0,2), K(1,2), 0, 1.0f / baseline, maxDisp);
+                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
             }
 
             if(container[3].IsShown()) {
@@ -436,20 +447,13 @@ int main( int argc, char* argv[] )
         }
 
         if(cross_section) {
-            if(1) {
+            if(0) {
                 DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0][level], dCamImg[1][level], handler2d.GetSelectedPoint(true)[1] + 0.5);
             }else{
                 CostVolumeCrossSection(dDebugf4, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
             }
         }else{
 //            dDebugf4.CopyFrom(dN);
-        }
-
-        if(Pushed(costvol_reset)) {
-            T_wv = T_wc;
-            dImgv.CopyFrom(dCamImg[0][level]);
-            InitCostVolume(dCostVol);
-//            InitCostVolume(dCostVol,dCamImg[0][level], dCamImg[1][level]);
         }
 
         if(Pushed(save_hm)) {

@@ -81,6 +81,7 @@ To Sum(
 template<typename To, typename ImgAccess = ImgAccessRaw >
 struct SinglePixelSqPatchScore {
     typedef typename ImgAccess::TXY TXY;
+    static const int rad = 0;
     static const int width = 1;
     static const int height = 1;
     static const int area = width*height;
@@ -99,9 +100,10 @@ struct SinglePixelSqPatchScore {
 };
 
 // Sum Absolute Difference
-template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
+template<typename To, int RAD=1, typename ImgAccess = ImgAccessRaw >
 struct SADPatchScore {
     typedef typename ImgAccess::TXY TXY;
+    static const int rad = RAD;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -127,9 +129,10 @@ struct SADPatchScore {
 };
 
 // Sum Absolute Difference
-template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
+template<typename To, int RAD=1, typename ImgAccess = ImgAccessRaw >
 struct SSDPatchScore {
     typedef typename ImgAccess::TXY TXY;
+    static const int rad = RAD;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -156,9 +159,10 @@ struct SSDPatchScore {
 };
 
 // Sum Square Normalised Difference
-template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
+template<typename To, int RAD=1, typename ImgAccess = ImgAccessRaw >
 struct SSNDPatchScore {
     typedef typename ImgAccess::TXY TXY;
+    static const int rad = RAD;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -203,10 +207,11 @@ struct SSNDPatchScore {
 };
 
 // Sum Square Normalised Difference for line
-template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
+template<typename To, int RAD=1, typename ImgAccess = ImgAccessRaw >
 struct SSNDLineScore
 {
     typedef typename ImgAccess::TXY TXY;
+    static const int rad = RAD;
     static const int width = 2*rad+1;
     static const int height = 1;
     static const int area = width*height;
@@ -249,9 +254,10 @@ struct SSNDLineScore
 };
 
 // Sum Absolute Normalised Difference
-template<typename To, int rad=1, typename ImgAccess = ImgAccessRaw >
+template<typename To, int RAD=1, typename ImgAccess = ImgAccessRaw >
 struct SANDPatchScore {
     typedef typename ImgAccess::TXY TXY;
+    static const int rad = RAD;
     static const int width = 2*rad+1;
     static const int height = 2*rad+1;
     static const int area = width*height;
@@ -281,8 +287,8 @@ struct SANDPatchScore {
 
         for(int r=-rad; r <=rad; ++r ) {
             for(int c=-rad; c <=rad; ++c ) {
-                const T i1 = ImgAccess::Get(img1,x1+c,y1+r);
-                const T i2 = ImgAccess::Get(img2,x2+c,y2+r);
+                const To i1 = ImgAccess::Get(img1,x1+c,y1+r);
+                const To i2 = ImgAccess::Get(img2,x2+c,y2+r);
                 sum_abs_diff += abs( (i1-mean1) - (i2-mean2) );
             }
         }

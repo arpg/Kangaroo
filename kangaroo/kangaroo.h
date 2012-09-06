@@ -226,14 +226,14 @@ struct __align__(8) CostVolElem
     float sum;
 };
 
-void InitCostVolume(Volume<CostVolElem> costvol );
+void CostVolumeZero(Volume<CostVolElem> costvol );
 
-void InitCostVolume(Volume<CostVolElem> dvol, Image<unsigned char> dimgl, Image<unsigned char> dimgr );
+void CostVolumeFromStereo(Volume<CostVolElem> dvol, Image<unsigned char> dimgl, Image<unsigned char> dimgr );
 
-void AddToCostVolume(Volume<CostVolElem> vol, const Image<unsigned char> imgv,
+void CostVolumeAdd(Volume<CostVolElem> vol, const Image<unsigned char> imgv,
     const Image<unsigned char> imgc, Mat<float,3,4> KT_cv,
     float fu, float fv, float u0, float v0,
-    float minz, float maxz, int levels
+    float baseline, int levels
 );
 
 void CostVolumeCrossSection(

@@ -21,8 +21,8 @@ namespace pangolin
 class ImageSelect
 {
 public:
-    ImageSelect(int w, int h)
-        : img_w(w), img_h(h), selected(false), pixel_scale(1.0)
+    ImageSelect(int w, int h, int level = 0)
+        : img_w(w), img_h(h), level(level), selected(false), pixel_scale(1.0)
     {
         topleft[0] = 0;
         topleft[1] = 0;
@@ -63,8 +63,14 @@ public:
         pixel_scale = scale;
     }
 
+    int Level()
+    {
+        return level;
+    }
+
 protected:
     float img_w, img_h;
+    int level;
     bool selected;
     float topleft[2];
     float pixel_scale;
@@ -73,8 +79,8 @@ protected:
 class Handler2dImageSelect : public Handler, public ImageSelect
 {
 public:
-    Handler2dImageSelect(int w, int h)
-        : ImageSelect(w,h)
+    Handler2dImageSelect(int w, int h, int level=0)
+        : ImageSelect(w,h,level)
     {
     }
 
@@ -104,13 +110,13 @@ public:
     }
 };
 
-void RenderImageSelect(const ImageSelect& is, int imgw, int imgh)
+void RenderImageSelect(const ImageSelect& is, int imgw, int imgh, int inputlevel = 0)
 {
     if(is.IsSelected()) {
         glColor3f(1,0,0);
         Eigen::Vector2d p = is.GetSelectedPoint();
-        p[0] = (p[0]+0.5) * 2.0 / imgw - 1;
-        p[1] = (p[1]+0.5) * 2.0 / imgh - 1;
+        p[0] = (1<<inputlevel) * (p[0]+0.5) * 2.0 / imgw - 1;
+        p[1] = (1<<inputlevel) * (p[1]+0.5) * 2.0 / imgh - 1;
         glDrawCross(p);
         glColor3f(1,1,1);
     }
@@ -227,7 +233,7 @@ public:
         if(imageSelect) {
             const float pixScale = imageSelect->PixelScale();
             RenderToViewport(glTex,flipy,pixScale);
-            RenderImageSelect(*imageSelect, glTex.width, glTex.height);
+            RenderImageSelect(*imageSelect, glTex.width, glTex.height, imageSelect->Level());
         }else{
             glTex.RenderToViewport(flipy);
         }
