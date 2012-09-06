@@ -27,6 +27,8 @@
 
 #include <Node.h>
 
+const int costvoldisp = 50;
+
 using namespace std;
 using namespace pangolin;
 using namespace Gpu;
@@ -177,11 +179,12 @@ int main( int argc, char* argv[] )
     Image<float4, TargetDevice, Manage>  dN(lw,lh);
     Image<unsigned char, TargetDevice,Manage> dScratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
     Image<float4, TargetDevice, Manage>  dDebugf4(lw,lh);
+    Image<float4, TargetDevice, Manage>  dCrossSection(lw,costvoldisp);
     Image<float, TargetDevice, Manage>  dErr(lw,lh);
 
 
     Sophus::SE3 T_wv;
-    Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,80);
+    Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,costvoldisp);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 
 //    HeightmapFusion hm(800,800,2);
@@ -277,7 +280,7 @@ int main( int argc, char* argv[] )
     Handler2dImageSelect handler2d(lw,lh,level);
     ActivateDrawPyramid<unsigned char,max_levels> adleft(dCamImg[0],GL_LUMINANCE8, false, true);
     ActivateDrawImage<float> adDisp(dDisp,GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float4> adDebug(dDebugf4,GL_RGBA_FLOAT32_APPLE, false, true);
+    ActivateDrawImage<float4> adCrossSection(dCrossSection,GL_RGBA_FLOAT32_APPLE, false, true);
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
@@ -293,7 +296,7 @@ int main( int argc, char* argv[] )
     SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
     container[1].SetDrawFunction(boost::ref(adDisp)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(boost::ref(adDebug)).SetHandler(new Handler2dImageSelect(lw,lh));
+    container[2].SetDrawFunction(boost::ref(adCrossSection)).SetHandler(new Handler2dImageSelect(lw,lh));
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam));
     container[3].SetHandler( new Handler3D(s_cam, AxisNone) );
 
@@ -331,26 +334,41 @@ int main( int argc, char* argv[] )
             }
         }
 
-        if(go || GuiVarHasChanged() ) {
-
-            if(dispStep == 1 )
-            {
-                // Compute dense stereo
-                DenseStereo<unsigned char,unsigned char>(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh, scoreRad);
-
-                if(reverse_check) {
-                    // Replace with better LeftRightCheck
-//                    ReverseCheck(dDispInt, dCamImg[0][level], dCamImg[1][level] );
-                }
-
-                if(subpix) {
-                    DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0][level], dCamImg[1][level]);
-                }else{
-                    ConvertImage<float, unsigned char>(dDisp, dDispInt);
-                }
-            }else{
-                DenseStereoSubpix(dDisp, dCamImg[0][level], dCamImg[1][level], maxDisp, dispStep, stereoAcceptThresh, scoreRad, scoreNormed);
+        if(go || GuiVarHasChanged() )
+        {
+            if(Pushed(costvol_reset)) {
+                T_wv = T_wc;
+                dImgv.CopyFrom(dCamImg[0][level]);
+                CostVolumeZero(dCostVol);
             }
+
+            if(Pushed(costvol_reset_stereo)) {
+                T_wv = T_wc;
+                dImgv.CopyFrom(dCamImg[0][level]);
+                CostVolumeFromStereo(dCostVol,dCamImg[0][level], dCamImg[1][level]);
+            }
+
+            if(Pushed(costvol_add)) {
+                const Eigen::Matrix<double,3,4> KT_lv = Kl * (T_wc.inverse() * T_wv).matrix3x4();
+                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
+            }
+
+            // Extract Minima of cost volume
+            CostVolMinimum(dDisp, dCostVol);
+
+//            if(dispStep == 1 )
+//            {
+//                // Compute dense stereo
+//                DenseStereo<unsigned char,unsigned char>(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh, scoreRad);
+
+//                if(subpix) {
+//                    DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0][level], dCamImg[1][level]);
+//                }else{
+//                    ConvertImage<float, unsigned char>(dDisp, dDispInt);
+//                }
+//            }else{
+//                DenseStereoSubpix(dDisp, dCamImg[0][level], dCamImg[1][level], maxDisp, dispStep, stereoAcceptThresh, scoreRad, scoreNormed);
+//            }
 
             for(int i=0; i < domedits; ++i ) {
                 if(domed9x9) MedianFilterRejectNegative9x9(dDisp,dDisp, medi);
@@ -406,23 +424,6 @@ int main( int argc, char* argv[] )
                 hm.GenerateCbo(cbo_hm);
             }
 
-            if(Pushed(costvol_reset)) {
-                T_wv = T_wc;
-                dImgv.CopyFrom(dCamImg[0][level]);
-                CostVolumeZero(dCostVol);
-            }
-
-            if(Pushed(costvol_reset_stereo)) {
-                T_wv = T_wc;
-                dImgv.CopyFrom(dCamImg[0][level]);
-                CostVolumeFromStereo(dCostVol,dCamImg[0][level], dCamImg[1][level]);
-            }
-
-            if(Pushed(costvol_add)) {
-                const Eigen::Matrix<double,3,4> KT_lv = Kl * (T_wc.inverse() * T_wv).matrix3x4();
-                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
-            }
-
             if(container[3].IsShown()) {
                 // Copy point cloud into VBO
                 {
@@ -435,7 +436,8 @@ int main( int argc, char* argv[] )
                 {
                     CudaScopedMappedPtr var(cbo);
                     Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
-                    ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
+//                    ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
+                    ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
                 }
             }
 
@@ -448,12 +450,10 @@ int main( int argc, char* argv[] )
 
         if(cross_section) {
             if(0) {
-                DisparityImageCrossSection(dDebugf4, dDispInt, dCamImg[0][level], dCamImg[1][level], handler2d.GetSelectedPoint(true)[1] + 0.5);
+                DisparityImageCrossSection(dCrossSection, dDispInt, dCamImg[0][level], dCamImg[1][level], handler2d.GetSelectedPoint(true)[1] + 0.5);
             }else{
-                CostVolumeCrossSection(dDebugf4, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
+                CostVolumeCrossSection(dCrossSection, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
             }
-        }else{
-//            dDebugf4.CopyFrom(dN);
         }
 
         if(Pushed(save_hm)) {
@@ -465,7 +465,8 @@ int main( int argc, char* argv[] )
 
         s_cam.Follow(T_wc.matrix(), lockToCam);
 
-        glvbo.SetPose(T_wc.matrix());
+        glvbo.SetPose(T_wv.matrix());
+//        glvbo.SetPose(T_wc.matrix());
         glvbo.SetVisible(show_depthmap);
 
         glGroundPlane.SetPose(PlaneBasis_wp(n_c).matrix());

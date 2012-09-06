@@ -236,9 +236,13 @@ void CostVolumeAdd(Volume<CostVolElem> vol, const Image<unsigned char> imgv,
     float baseline, int levels
 );
 
+void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol);
+
 void CostVolumeCrossSection(
     Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
 );
+
+//////////////////////////////////////////////////////
 
 void FilterDispGrad(
     Image<float> dOut, Image<float> dIn, float threshold

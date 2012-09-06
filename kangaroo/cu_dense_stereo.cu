@@ -572,6 +572,38 @@ void CostVolumeAdd(Volume<CostVolElem> dvol, const Image<unsigned char> dimgv,
 
 //////////////////////////////////////////////////////
 
+template<typename Tdisp>
+__global__ void KernCostVolMinimum(Image<Tdisp> disp, Volume<CostVolElem> vol)
+{
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    Tdisp bestd = 0;
+    float bestc = 1E30;
+
+    unsigned maxDisp = vol.d;
+#pragma unroll
+    for(unsigned d=0; d < maxDisp; ++d) {
+        const CostVolElem elem = vol(x,y,d);
+        const float c = (elem.sum / elem.n);
+        if(c < bestc) {
+            bestc = c;
+            bestd = d;
+        }
+    }
+    disp(x,y) = bestd;
+}
+
+
+void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,disp);
+    KernCostVolMinimum<float><<<gridDim,blockDim>>>(disp,vol);
+}
+
+//////////////////////////////////////////////////////
+
 __global__ void KernCostVolumeCrossSection(
     Image<float4> dScore, Image<CostVolElem> dCostVolSlice
 ) {
