@@ -52,6 +52,8 @@ void Census(Image<unsigned long> census, Image<unsigned char> img);
 
 void Census(Image<ulong2> census, Image<unsigned char> img);
 
+void Census(Image<ulong4> census, Image<unsigned char> img);
+
 //////////////////////////////////////////////////////
 
 void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
@@ -59,6 +61,8 @@ void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned lo
 void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
 
 void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp);
+
+void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp);
 
 //////////////////////////////////////////////////////
 
@@ -158,22 +162,15 @@ LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, Mat<float,3,3> 
 
 //////////////////////////////////////////////////////
 
+template<typename To, typename Ti>
 void BilateralFilter(
-    Image<float> dOut, const Image<float> dIn, float gs, float gr, uint size
+    Image<To> dOut, const Image<Ti> dIn, float gs, float gr, uint size
 );
 
+template<typename To, typename Ti, typename Ti2>
 void BilateralFilter(
-    Image<float> dOut, const Image<unsigned char> dIn, float gs, float gr, uint size
+    Image<To> dOut, const Image<Ti> dIn, const Image<Ti2> dImg, float gs, float gr, float gc, uint size
 );
-
-void BilateralFilter(
-    Image<float> dOut, const Image<unsigned short> dIn, float gs, float gr, uint size
-);
-
-void RobustBilateralFilter(
-    Image<float> dOut, const Image<unsigned char> dIn, float gs, float gr, float go, uint size
-);
-
 //////////////////////////////////////////////////////
 
 void MedianFilter3x3(

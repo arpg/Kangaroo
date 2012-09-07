@@ -58,7 +58,7 @@ int main( int argc, char* argv[] )
     Volume<float, TargetDevice, Manage> sgm(w,h,MAXD);
 
 //    Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
-    Image<ulong2, TargetDevice, Manage> census[] = {{w,h},{w,h}};
+    Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
     Image<float, TargetDevice, Manage>  Disp[] = {{w,h},{w,h}};
 
     Var<bool> step("ui.step", false, false);
@@ -79,6 +79,13 @@ int main( int argc, char* argv[] )
 //    Var<float> gs("ui.gs",2, 1E-3, 5);
 //    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
 
+    Var<bool> dosgm("ui.sgm", true, true);
+    Var<float> sgmP1("ui.P1",1, 0, 100);
+    Var<float> sgmP2("ui.P2",500, 0, 1000);
+    Var<bool> dohoriz("ui.horiz", true, true);
+    Var<bool> dovert("ui.vert", true, true);
+    Var<bool> doreverse("ui.reverse", false, true);
+
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed9x9("ui.median 9x9", false, true);
     Var<bool> domed7x7("ui.median 7x7", false, true);
@@ -86,12 +93,11 @@ int main( int argc, char* argv[] )
     Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
 
-    Var<bool> dosgm("ui.sgm", true, true);
-    Var<float> sgmP1("ui.P1",1, 0, 100);
-    Var<float> sgmP2("ui.P2",500, 0, 1000);
-    Var<bool> dohoriz("ui.horiz", true, true);
-    Var<bool> dovert("ui.vert", true, true);
-    Var<bool> doreverse("ui.reverse", false, true);
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+    Var<float> gs("ui.gs",2, 1E-3, 5);
+    Var<float> gr("ui.gr",0.5, 1E-3, 10);
+    Var<float> gc("ui.gc",10, 1E-3, 20);
 
 //    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 //    Var<float> sigma("ui.sigma", 1, 0, 20);
@@ -176,6 +182,11 @@ int main( int argc, char* argv[] )
                 if(domed7x7) MedianFilterRejectNegative7x7(Disp[0],Disp[0], medi);
                 if(domed5x5) MedianFilterRejectNegative5x5(Disp[0],Disp[0], medi);
                 if(domed3x3) MedianFilter3x3(Disp[0],Disp[0]);
+            }
+
+            if(applyBilateralFilter) {
+                BilateralFilter<float,float,unsigned char>(Disp[1],Disp[0],img[0],gs,gr,gc,bilateralWinSize);
+                Disp[0].CopyFrom(Disp[1]);
             }
 
 //            if(filtgradthresh > 0) {

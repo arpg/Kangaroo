@@ -107,6 +107,73 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
     }
 }
 
+//////////////////////////////////////////////////////
+// Census transform, 16x16 window
+//////////////////////////////////////////////////////
+
+template<typename Tin>
+__global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
+{
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( img.InBounds(x,y) ) {
+        const Tin p = img(x,y);
+
+        ulong4 out = make_ulong4(0,0,0,0);
+        unsigned long bit = 1;
+
+        for(int r=-8; r < -4; ++r) {
+#pragma unroll
+            for(int c=-4; c < 4; ++c ) {
+                const Tin q = img.GetWithClampedRange(x+c,y+r);
+                if( q < p ) {
+                    out.x |= bit;
+                }
+                bit = bit << 1;
+            }
+        }
+
+        bit = 1;
+        for(int r=-4; r < 0; ++r) {
+#pragma unroll
+            for(int c=-4; c < 4; ++c ) {
+                const Tin q = img.GetWithClampedRange(x+c,y+r);
+                if( q < p ) {
+                    out.y |= bit;
+                }
+                bit = bit << 1;
+            }
+        }
+
+        bit = 1;
+        for(int r=0; r < 4; ++r) {
+#pragma unroll
+            for(int c=-4; c < 4; ++c ) {
+                const Tin q = img.GetWithClampedRange(x+c,y+r);
+                if( q < p ) {
+                    out.z |= bit;
+                }
+                bit = bit << 1;
+            }
+        }
+
+        bit = 1;
+        for(int r=4; r < 8; ++r) {
+#pragma unroll
+            for(int c=-4; c < 4; ++c ) {
+                const Tin q = img.GetWithClampedRange(x+c,y+r);
+                if( q < p ) {
+                    out.w |= bit;
+                }
+                bit = bit << 1;
+            }
+        }
+        census(x,y) = out;
+    }
+
+}
+
 
 void Census(Image<unsigned long> census, Image<unsigned char> img)
 {
@@ -120,6 +187,13 @@ void Census(Image<ulong2> census, Image<unsigned char> img)
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim,img);
     KernCensus11x11<unsigned char><<<gridDim,blockDim>>>(census,img);
+}
+
+void Census(Image<ulong4> census, Image<unsigned char> img)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,img);
+    KernCensus16x16<unsigned char><<<gridDim,blockDim>>>(census,img);
 }
 
 //////////////////////////////////////////////////////
@@ -208,6 +282,13 @@ void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ul
     dim3 blockDim(left.w, 1);
     dim3 gridDim(1, left.h);
     KernCensusStereoVolume<unsigned short, ulong2><<<gridDim,blockDim>>>(vol,left,right,maxDisp);
+}
+
+void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp)
+{
+    dim3 blockDim(left.w, 1);
+    dim3 gridDim(1, left.h);
+    KernCensusStereoVolume<unsigned short, ulong4><<<gridDim,blockDim>>>(vol,left,right,maxDisp);
 }
 
 }

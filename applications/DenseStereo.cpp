@@ -27,7 +27,13 @@
 
 #include <Node.h>
 
-const int costvoldisp = 50;
+//#define HM_FUSION
+//#define PLANE_FIT
+//#define COSTVOL_TIME
+#define CENSUS_TRANFORM
+#define SEMIGLOBAL
+
+const int costvoldisp = 80;
 
 using namespace std;
 using namespace pangolin;
@@ -136,6 +142,7 @@ int main( int argc, char* argv[] )
     vector<Sophus::SE3> gtPoseT_wh;
     LoadPosesFromFile(gtPoseT_wh, video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
 
+#ifdef PLANE_FIT
     // Plane Parameters
     // These coordinates need to be below the horizon. This could cause trouble!
     Eigen::Matrix3d U; U << w, 0, w,  h/2, h, h,  1, 1, 1;
@@ -144,6 +151,7 @@ int main( int argc, char* argv[] )
     Eigen::Vector3d z; z << 1/5.0, 1/5.0, 1/5.0;
     Eigen::Vector3d n_c = Qinv*z;
     Eigen::Vector3d n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
+#endif // PLANE_FIT
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -171,22 +179,35 @@ int main( int argc, char* argv[] )
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
 
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
-
     Image<unsigned char, TargetDevice, Manage> dDispInt(lw,lh);
     Image<float, TargetDevice, Manage>  dDisp(lw,lh);
     Image<float, TargetDevice, Manage>  dDispFilt(lw,lh);
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<float4, TargetDevice, Manage>  dN(lw,lh);
-    Image<unsigned char, TargetDevice,Manage> dScratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
     Image<float4, TargetDevice, Manage>  dDebugf4(lw,lh);
     Image<float4, TargetDevice, Manage>  dCrossSection(lw,costvoldisp);
+
+#ifdef CENSUS_TRANFORM
+    Image<unsigned long, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
+    Volume<unsigned short, TargetDevice, Manage> vol(w,h,costvoldisp);
+#endif // CENSUS_TRANFORM
+
+#ifdef SEMIGLOBAL
+    Volume<float, TargetDevice, Manage> sgm(w,h,costvoldisp);
+#endif
+
+#ifdef PLANE_FIT
+    Image<unsigned char, TargetDevice,Manage> dScratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
     Image<float, TargetDevice, Manage>  dErr(lw,lh);
+#endif
 
-
+#ifdef COSTVOL_TIME
     Sophus::SE3 T_wv;
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,costvoldisp);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
+#endif
 
+#ifdef HM_FUSION
 //    HeightmapFusion hm(800,800,2);
 //    HeightmapFusion hm(200,200,10);
     HeightmapFusion hm(100,100,10);
@@ -202,6 +223,7 @@ int main( int argc, char* argv[] )
         Gpu::Image<uint2> dIbo((uint2*)*var,hm.WidthPixels(),hm.HeightPixels());
         GenerateTriangleStripIndexBuffer(dIbo);
     }
+#endif // HM_FUSION
 
     // Stereo transformation (post-rectification)
     Sophus::SE3 T_rl = T_rl_orig;
@@ -224,30 +246,45 @@ int main( int argc, char* argv[] )
     Var<int> show_level("ui.show level",0, 0, max_levels-1);
 
     Var<float> maxDisp("ui.disp",80, 0, 128);
-    Var<float> dispStep("ui.disp step",1, 0.1, 1);
-    Var<int> scoreRad("ui.score rad",1, 0, 7 );
-    Var<bool> scoreNormed("ui.score normed",true, true);
+//    Var<float> dispStep("ui.disp step",1, 0.1, 1);
+//    Var<int> scoreRad("ui.score rad",1, 0, 7 );
+//    Var<bool> scoreNormed("ui.score normed",true, true);
 
-    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);
+//    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);
 
-    Var<bool> subpix("ui.subpix", false, true);
-    Var<bool> reverse_check("ui.reverse_check", false, true);
+//    Var<bool> subpix("ui.subpix", false, true);
+//    Var<bool> reverse_check("ui.reverse_check", false, true);
 
-    Var<bool> fuse("ui.fuse", false, true);
+#ifdef PLANE_FIT
     Var<bool> resetPlane("ui.resetplane", true, false);
+    Var<bool> plane_do("ui.Compute Ground Plane", false, true);
+    Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
+    Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
+#endif // PLANE_FIT
+
+#ifdef HM_FUSION
+    Var<bool> fuse("ui.fuse", false, true);
     Var<bool> save_hm("ui.save heightmap", false, false);
+#endif // HM_FUSION
 
 //    Var<bool> draw_frustrum("ui.show frustrum", false, true);
 //    Var<bool> show_mesh("ui.show mesh", true, true);
 //    Var<bool> show_color("ui.show color", true, true);
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
-    Var<bool> show_heightmap("ui.show heightmap", false, true);
 
-    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-    Var<float> gs("ui.gs",2, 1E-3, 5);
-    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+#ifdef PLANE_FIT
+    Var<bool> show_heightmap("ui.show heightmap", false, true);
+#endif // PLANE_FIT
+
+#ifdef SEMIGLOBAL
+    Var<bool> dosgm("ui.sgm", true, true);
+    Var<float> sgmP1("ui.P1",1, 0, 100);
+    Var<float> sgmP2("ui.P2",500, 0, 1000);
+    Var<bool> dohoriz("ui.horiz", true, true);
+    Var<bool> dovert("ui.vert", true, true);
+    Var<bool> doreverse("ui.reverse", false, true);
+#endif
 
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed9x9("ui.median 9x9", false, true);
@@ -256,16 +293,20 @@ int main( int argc, char* argv[] )
     Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
 
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+    Var<float> gs("ui.gs",2, 1E-3, 5);
+    Var<float> gr("ui.gr",0.5, 1E-3, 10);
+    Var<float> gc("ui.gc",10, 1E-3, 20);
+
     Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 
-    Var<bool> plane_do("ui.Compute Ground Plane", false, true);
-    Var<float> plane_within("ui.Plane Within",20, 0.1, 100);
-    Var<float> plane_c("ui.Plane c", 0.5, 0.0001, 1);
-
+#ifdef COSTVOL_TIME
     Var<bool> cross_section("ui.Cross Section", true, true);
     Var<bool> costvol_reset("ui.Costvol Reset", true, false);
     Var<bool> costvol_reset_stereo("ui.Costvol Reset Stereo", false, false);
     Var<bool> costvol_add("ui.Add to Costvol", false, false);
+#endif
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
@@ -284,14 +325,17 @@ int main( int argc, char* argv[] )
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
-    SceneGraph::GLVbo glhmvbo(&vbo_hm,&ibo_hm,&cbo_hm);
     SceneGraph::GLGrid glGroundPlane;
     SceneGraph::GLCameraHistory history;
     history.LoadFromAbsoluteCartesianFile(video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
     graph.AddChild(&glvbo);
     glvbo.AddChild(&glGroundPlane);
-    graph.AddChild(&glhmvbo);
     graph.AddChild(&history);
+
+#ifdef HM_FUSION
+    SceneGraph::GLVbo glhmvbo(&vbo_hm,&ibo_hm,&cbo_hm);
+    graph.AddChild(&glhmvbo);
+#endif
 
     SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
@@ -331,11 +375,15 @@ int main( int argc, char* argv[] )
                     dCamImg[i][0].CopyFrom(hCamImg[i].SubImage(roi));
                     BoxReduce<unsigned char, max_levels, unsigned int>(dCamImg[i]);
                 }
+#ifdef CENSUS_TRANFORM
+                Census(census[i], dCamImg[i][level]);
+#endif // CENSUS_TRANFORM
             }
         }
 
         if(go || GuiVarHasChanged() )
         {
+#ifdef COSTVOL_TIME
             if(Pushed(costvol_reset)) {
                 T_wv = T_wc;
                 dImgv.CopyFrom(dCamImg[0][level]);
@@ -350,11 +398,25 @@ int main( int argc, char* argv[] )
 
             if(Pushed(costvol_add)) {
                 const Eigen::Matrix<double,3,4> KT_lv = Kl * (T_wc.inverse() * T_wv).matrix3x4();
-                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
+                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), 4*baseline, 0);
             }
 
             // Extract Minima of cost volume
             CostVolMinimum(dDisp, dCostVol);
+#endif // COSTVOL_TIME
+
+#ifdef CENSUS_TRANFORM
+            CensusStereoVolume(vol, census[0], census[1], maxDisp);
+#endif // CENSUS_TRANFORM
+
+#ifdef SEMIGLOBAL
+            if(dosgm) {
+                SemiGlobalMatching(sgm,vol,dCamImg[0][level],maxDisp,sgmP1,sgmP2,dohoriz,dovert,doreverse);
+                CostVolMinimum<float,float>(dDisp,sgm,maxDisp);
+            }else{
+                CostVolMinimum<float,unsigned short>(dDisp,vol,maxDisp);
+            }
+#endif // SEMIGLOBAL
 
 //            if(dispStep == 1 )
 //            {
@@ -382,7 +444,8 @@ int main( int argc, char* argv[] )
             }
 
             if(applyBilateralFilter) {
-                BilateralFilter(dDispFilt,dDisp,gs,gr,bilateralWinSize);
+//                BilateralFilter<float,float>(dDispFilt,dDisp,gs,gr,bilateralWinSize);
+                BilateralFilter<float,float,unsigned char>(dDispFilt,dDisp,dCamImg[0][level],gs,gr,gc,bilateralWinSize);
                 dDisp.CopyFrom(dDispFilt);
             }
 
@@ -394,6 +457,7 @@ int main( int argc, char* argv[] )
                 dDebugf4.CopyFrom(dN);
             }
 
+#ifdef PLANE_FIT
             if(plane_do || resetPlane) {
                 // Fit plane
                 for(int i=0; i<(resetPlane*100+5); ++i )
@@ -409,7 +473,9 @@ int main( int argc, char* argv[] )
                     n_w = project((Eigen::Vector4d)(T_wc.inverse().matrix().transpose() * unproject(n_c)));
                 }
             }
+#endif // PLANE_FIT
 
+#ifdef HM_FUSION
             if(Pushed(resetPlane) ) {
                 Eigen::Matrix4d T_nw = (PlaneBasis_wp(n_c).inverse() * T_wc.inverse()).matrix();
 //                T_nw.block<2,1>(0,3) += Eigen::Vector2d(hm.WidthMeters()/2, hm.HeightMeters() /*/2*/);
@@ -424,6 +490,11 @@ int main( int argc, char* argv[] )
                 hm.GenerateCbo(cbo_hm);
             }
 
+            if(Pushed(save_hm)) {
+                hm.SaveModel("test");
+            }
+#endif // HM_FUSION
+
             if(container[3].IsShown()) {
                 // Copy point cloud into VBO
                 {
@@ -436,8 +507,8 @@ int main( int argc, char* argv[] )
                 {
                     CudaScopedMappedPtr var(cbo);
                     Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
-//                    ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
-                    ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
+                    ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
+//                    ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
                 }
             }
 
@@ -448,6 +519,7 @@ int main( int argc, char* argv[] )
             adleft.SetLevel(show_level);
         }
 
+#ifdef COSTVOL_TIME
         if(cross_section) {
             if(0) {
                 DisparityImageCrossSection(dCrossSection, dDispInt, dCamImg[0][level], dCamImg[1][level], handler2d.GetSelectedPoint(true)[1] + 0.5);
@@ -455,25 +527,27 @@ int main( int argc, char* argv[] )
                 CostVolumeCrossSection(dCrossSection, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
             }
         }
-
-        if(Pushed(save_hm)) {
-            hm.SaveModel("test");
-        }
+#endif // COSTVOL_TIME
 
         /////////////////////////////////////////////////////////////
         // Setup Drawing
 
         s_cam.Follow(T_wc.matrix(), lockToCam);
 
-        glvbo.SetPose(T_wv.matrix());
-//        glvbo.SetPose(T_wc.matrix());
+//        glvbo.SetPose(T_wv.matrix());
+        glvbo.SetPose(T_wc.matrix());
         glvbo.SetVisible(show_depthmap);
 
+
+#ifdef PLANE_FIT
         glGroundPlane.SetPose(PlaneBasis_wp(n_c).matrix());
         glGroundPlane.SetVisible(plane_do);
+#endif // PLANE_FIT
 
+#ifdef HM_FUSION
         glhmvbo.SetPose((Eigen::Matrix4d)hm.T_hw().inverse());
         glhmvbo.SetVisible(show_heightmap);
+#endif // HM_FUSION
 
         history.SetNumberToShow(frame);
         history.SetVisible(show_history);

@@ -211,7 +211,7 @@ int main( int /*argc*/, char* argv[] )
 
             if(applyBilateralFilter) {
                 FilterBadKinectData(dKinectf2,dKinect);
-                BilateralFilter(dKinectf,dKinectf2,gs,gr,bilateralWinSize);
+                BilateralFilter<float,float>(dKinectf,dKinectf2,gs,gr,bilateralWinSize);
             }else{
                 FilterBadKinectData(dKinectf,dKinect);
             }

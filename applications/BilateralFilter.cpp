@@ -95,7 +95,6 @@ int main( int /*argc*/, char* argv[] )
     Var<int> bilateralWinSize("ui.size",10, 1, 20);
     Var<float> bigs("ui.gs",5, 1E-3, 5);
     Var<float> bigr("ui.gr",20, 1E-3, 200);
-    Var<float> bigo("ui.go",0, 0, 1);
 
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed5x5("ui.median 5x5", true, true);
@@ -111,7 +110,7 @@ int main( int /*argc*/, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            RobustBilateralFilter(dImgFilt,dImg,bigs,bigr,bigo,bilateralWinSize);
+            BilateralFilter<float,unsigned char>(dImgFilt,dImg,bigs,bigr,bilateralWinSize);
 //            ConvertImage<float,unsigned char>(dImgFilt,dImg);
 
             for(int i=0; i < domedits; ++i ) {
