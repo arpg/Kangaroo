@@ -181,6 +181,7 @@ int main( int argc, char* argv[] )
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
     Image<unsigned char, TargetDevice, Manage> dDispInt(lw,lh);
     Image<float, TargetDevice, Manage>  dDisp(lw,lh);
+    Image<float, TargetHost, Manage>  hDisp(lw,lh);
     Image<float, TargetDevice, Manage>  dDispFilt(lw,lh);
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<float4, TargetDevice, Manage>  dN(lw,lh);
@@ -242,6 +243,8 @@ int main( int argc, char* argv[] )
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);
+    Var<bool> save_dm("ui.save_dm", false);
+    Var<bool> record("ui.record_dm", false,false);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
     Var<int> show_level("ui.show level",0, 0, max_levels-1);
 
@@ -349,7 +352,7 @@ int main( int argc, char* argv[] )
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
-            video.Capture(img);
+            if(frame>0) video.Capture(img);
 
             if(frame < gtPoseT_wh.size()) {
                 T_wc = gtPoseT_wh[frame];
@@ -449,6 +452,25 @@ int main( int argc, char* argv[] )
                 dDisp.CopyFrom(dDispFilt);
             }
 
+            if(go && save_dm) {
+                hDisp.CopyFrom(dDisp);
+
+                // file info
+                string sFilePrefix = "disp/depth-";
+                char   Index[10];
+                sprintf( Index, "%05d", frame );
+
+                // save in PDM format
+                string sFileName = sFilePrefix + Index + ".pdm";
+                ofstream bFile( sFileName.c_str(), ios::out | ios::binary );
+                bFile << "P7" << std::endl;
+                bFile << w << " " << h << std::endl;
+                unsigned int nSize = sizeof(float) * w * h;
+                bFile << nSize << std::endl;
+                bFile.write( (const char*)hDisp.ptr, nSize );
+                bFile.close();
+            }
+
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, dDisp, baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
 
@@ -528,6 +550,14 @@ int main( int argc, char* argv[] )
             }
         }
 #endif // COSTVOL_TIME
+
+        if(Pushed(record)) {
+            // Start recording next frame
+            frame = 0;
+            video.InitDriver("FileReader");
+            video.Capture(img);
+            save_dm = true;
+        }
 
         /////////////////////////////////////////////////////////////
         // Setup Drawing
