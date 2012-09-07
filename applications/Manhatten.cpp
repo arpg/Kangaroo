@@ -15,6 +15,7 @@
 #include "common/CameraModelPyramid.h"
 
 #include <kangaroo/kangaroo.h>
+#include <SceneGraph/SceneGraph.h>
 
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>
@@ -23,6 +24,7 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 using namespace mvl;
+using namespace SceneGraph;
 
 int main( int argc, char* argv[] )
 {
@@ -63,12 +65,20 @@ int main( int argc, char* argv[] )
 
     ActivateDrawImage<unsigned char> adImgL(img[0],GL_LUMINANCE8, false, true);
     ActivateDrawImage<unsigned char> adImgR(img[1],GL_LUMINANCE8, false, true);
-    ActivateDrawImage<float4> adDebug0(debug[0],GL_RGBA_FLOAT32_APPLE, false, true);
     ActivateDrawImage<float4> adDebug1(debug[1],GL_RGBA_FLOAT32_APPLE, false, true);
+
+    pangolin::OpenGlRenderState s_cam(
+        ProjectionMatrixRDF_TopLeft(w,h,K(0,0),K(1,1),K(0,2),K(1,2),0.1,10000),
+        IdentityMatrix(GlModelViewStack)
+    );
+
+    GLSceneGraph glgraph;
+    GLAxis glaxis;
+    glgraph.AddChild(&glaxis);
 
     container[0].SetDrawFunction(boost::ref(adImgL));
     container[1].SetDrawFunction(boost::ref(adImgR));
-    container[2].SetDrawFunction(boost::ref(adDebug0));
+    container[2].SetDrawFunction(ActivateDrawFunctor(glgraph,s_cam));
     container[3].SetDrawFunction(boost::ref(adDebug1));
 
     Var<bool> step("ui.step", false, false);
@@ -76,13 +86,12 @@ int main( int argc, char* argv[] )
 
     Var<int> blur("ui.blur",3,0,10);
     Var<bool> opt("ui.optimise", false);
-    Var<float> cut("ui.cut",0.01,0,0.2);
+    Var<float> cut("ui.cut",0.1,0,0.2);
     Var<float> min_grad("ui.min grad",0.01,0,0.02);
     Var<float> scale("ui.scale",100,1,1E4);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
-
 
     Sophus::SO3 R;
 
@@ -118,7 +127,7 @@ int main( int argc, char* argv[] )
                     R = R * Sophus::SO3::exp(x);
                 }
             }
-
+        glaxis.SetPose(Sophus::SE3(R.inverse(),Eigen::Vector3d(0,0,2)).matrix());
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
