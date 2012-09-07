@@ -41,64 +41,67 @@ template<typename To, typename Ti, int BLOCK_X, int BLOCK_Y>
 __global__ void KernMedianFilter3x3(Image<To> dOut, Image<Ti> dIn )
 {
     const int tx = threadIdx.x, ty = threadIdx.y;
+    const int x = blockIdx.x * blockDim.x + tx;
+    const int y = blockIdx.y * blockDim.y + ty;
 
-    // guards: is at boundary?
-    bool is_x_top = (tx == 0), is_x_bot = (tx == BLOCK_X-1);
-    bool is_y_top = (ty == 0), is_y_bot = (ty == BLOCK_Y-1);
+    if(dOut.InBounds(x,y)) {
 
-    __shared__ Ti smem[BLOCK_X+2][BLOCK_Y+2];
-    // clear out shared memory (zero padding)
-    if (is_x_top)           SMEM(tx-1, ty  ) = 0;
-    else if (is_x_bot)      SMEM(tx+1, ty  ) = 0;
-    if (is_y_top) {         SMEM(tx  , ty-1) = 0;
-        if (is_x_top)       SMEM(tx-1, ty-1) = 0;
-        else if (is_x_bot)  SMEM(tx+1, ty-1) = 0;
-    } else if (is_y_bot) {  SMEM(tx  , ty+1) = 0;
-        if (is_x_top)       SMEM(tx-1, ty+1) = 0;
-        else if (is_x_bot)  SMEM(tx+1, ty+1) = 0;
+        // guards: is at boundary?
+        bool is_x_top = (tx == 0), is_x_bot = (tx == BLOCK_X-1);
+        bool is_y_top = (ty == 0), is_y_bot = (ty == BLOCK_Y-1);
+
+        __shared__ Ti smem[BLOCK_X+2][BLOCK_Y+2];
+        // clear out shared memory (zero padding)
+        if (is_x_top)           SMEM(tx-1, ty  ) = 0;
+        else if (is_x_bot)      SMEM(tx+1, ty  ) = 0;
+        if (is_y_top) {         SMEM(tx  , ty-1) = 0;
+            if (is_x_top)       SMEM(tx-1, ty-1) = 0;
+            else if (is_x_bot)  SMEM(tx+1, ty-1) = 0;
+        } else if (is_y_bot) {  SMEM(tx  , ty+1) = 0;
+            if (is_x_top)       SMEM(tx-1, ty+1) = 0;
+            else if (is_x_bot)  SMEM(tx+1, ty+1) = 0;
+        }
+
+        // guards: is at boundary and still more image?
+        is_x_top &= (x > 0); is_x_bot &= (x < dOut.w - 1);
+        is_y_top &= (y > 0); is_y_bot &= (y < dOut.h - 1);
+
+        // each thread pulls from image
+                                SMEM(tx  , ty  ) = dIn(x  , y  ); // self
+        if (is_x_top)           SMEM(tx-1, ty  ) = dIn(x-1, y  );
+        else if (is_x_bot)      SMEM(tx+1, ty  ) = dIn(x+1, y  );
+        if (is_y_top) {         SMEM(tx  , ty-1) = dIn(x  , y-1);
+            if (is_x_top)       SMEM(tx-1, ty-1) = dIn(x-1, y-1);
+            else if (is_x_bot)  SMEM(tx+1, ty-1) = dIn(x+1, y-1);
+        } else if (is_y_bot) {  SMEM(tx  , ty+1) = dIn(x  , y+1);
+            if (is_x_top)       SMEM(tx-1, ty+1) = dIn(x-1, y+1);
+            else if (is_x_bot)  SMEM(tx+1, ty+1) = dIn(x+1, y+1);
+        }
+        __syncthreads();
+
+        // pull top six from shared memory
+        Ti v[6] = { SMEM(tx-1, ty-1), SMEM(tx  , ty-1), SMEM(tx+1, ty-1),
+                       SMEM(tx-1, ty  ), SMEM(tx  , ty  ), SMEM(tx+1, ty  ) };
+
+        // with each pass, remove min and max values and add new value
+        mnmx6(v[0], v[1], v[2], v[3], v[4], v[5]);
+        v[5] = SMEM(tx-1, ty+1); // add new contestant
+        mnmx5(v[1], v[2], v[3], v[4], v[5]);
+        v[5] = SMEM(tx  , ty+1);
+        mnmx4(v[2], v[3], v[4], v[5]);
+        v[5] = SMEM(tx+1, ty+1);
+        mnmx3(v[3], v[4], v[5]);
+
+        // pick the middle one
+        dOut(x,y) = v[4];
     }
-
-    // guards: is at boundary and still more image?
-    int x = blockIdx.x * blockDim.x + tx;
-    int y = blockIdx.y * blockDim.y + ty;
-    is_x_top &= (x > 0); is_x_bot &= (x < dOut.w - 1);
-    is_y_top &= (y > 0); is_y_bot &= (y < dOut.h - 1);
-
-    // each thread pulls from image
-                            SMEM(tx  , ty  ) = dIn(x  , y  ); // self
-    if (is_x_top)           SMEM(tx-1, ty  ) = dIn(x-1, y  );
-    else if (is_x_bot)      SMEM(tx+1, ty  ) = dIn(x+1, y  );
-    if (is_y_top) {         SMEM(tx  , ty-1) = dIn(x  , y-1);
-        if (is_x_top)       SMEM(tx-1, ty-1) = dIn(x-1, y-1);
-        else if (is_x_bot)  SMEM(tx+1, ty-1) = dIn(x+1, y-1);
-    } else if (is_y_bot) {  SMEM(tx  , ty+1) = dIn(x  , y+1);
-        if (is_x_top)       SMEM(tx-1, ty+1) = dIn(x-1, y+1);
-        else if (is_x_bot)  SMEM(tx+1, ty+1) = dIn(x+1, y+1);
-    }
-    __syncthreads();
-
-    // pull top six from shared memory
-    Ti v[6] = { SMEM(tx-1, ty-1), SMEM(tx  , ty-1), SMEM(tx+1, ty-1),
-                   SMEM(tx-1, ty  ), SMEM(tx  , ty  ), SMEM(tx+1, ty  ) };
-
-    // with each pass, remove min and max values and add new value
-    mnmx6(v[0], v[1], v[2], v[3], v[4], v[5]);
-    v[5] = SMEM(tx-1, ty+1); // add new contestant
-    mnmx5(v[1], v[2], v[3], v[4], v[5]);
-    v[5] = SMEM(tx  , ty+1);
-    mnmx4(v[2], v[3], v[4], v[5]);
-    v[5] = SMEM(tx+1, ty+1);
-    mnmx3(v[3], v[4], v[5]);
-
-    // pick the middle one
-    dOut(x,y) = v[4];
 }
 
 void MedianFilter3x3(
     Image<float> dOut, Image<float> dIn
 ) {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim,gridDim, dOut, 16, 16);
+    InitDimFromOutputImageOver(blockDim,gridDim, dOut, 16, 16);
     KernMedianFilter3x3<float,float,16,16><<<gridDim,blockDim>>>(dOut, dIn);
 }
 

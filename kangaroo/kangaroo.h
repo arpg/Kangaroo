@@ -257,5 +257,13 @@ inline void Blur(Image<unsigned char> in_out, Image<unsigned char> temp )
 template<typename Tout, typename Tin, unsigned MAXRAD, unsigned MAXIMGDIM>
 void GaussianBlur(Image<Tout> out, Image<Tin> in, Image<Tout> temp, float sigma);
 
+//////////////////////////////////////////////////////
+
+LeastSquaresSystem<float,3> ManhattenLineCost(
+    Image<float4> out, Image<float4> out2, const Image<unsigned char> in,
+    Mat<float,3,3> Rhat, float fu, float fv, float u0, float v0,
+    float cut, float scale, float min_grad,
+    Image<unsigned char> dWorkspace
+);
 
 }

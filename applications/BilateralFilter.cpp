@@ -140,7 +140,6 @@ int main( int /*argc*/, char* argv[] )
         texf << dImgFilt;
         texf.RenderToViewportFlipY();
 
-        pangolin::RenderViews();
         pangolin::FinishGlutFrame();
     }
 }

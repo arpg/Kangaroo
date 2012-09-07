@@ -463,8 +463,8 @@ int main( int argc, char* argv[] )
                 for(int i=0; i<(resetPlane*100+5); ++i )
                 {
                     Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
-                    Eigen::FullPivLU<Eigen::MatrixXd> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
-                    Eigen::Matrix<double,Eigen::Dynamic,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,3,1>)lss.JTy );
+                    Eigen::FullPivLU<Eigen::Matrix3d> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
+                    Eigen::Vector3d x = -1.0 * lu_JTJ.solve( (Eigen::Vector3d)lss.JTy );
                     if( x.norm() > 1 ) x = x / x.norm();
                     for(int i=0; i<3; ++i ) {
                         z(i) *= exp(x(i));

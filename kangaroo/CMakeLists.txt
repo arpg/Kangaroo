@@ -26,6 +26,7 @@ list(APPEND SRC_CU
     cu_median.cu cu_normals.cu cu_openni.cu cu_plane_fit.cu
     cu_resample.cu cu_heightmap.cu cu_blur.cu cu_operations.cu
     cu_census.cu cu_semi_global_matching.cu
+    cu_manhatten.cu
 )
 
 include_directories( ${Boost_INCLUDE_DIRS} )
