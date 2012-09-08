@@ -4,6 +4,7 @@
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
+#include <pangolin/glsl.h>
 #include <npp.h>
 
 #include <fiducials/drawing.h>
@@ -34,6 +35,8 @@ int main( int argc, char* argv[] )
     const unsigned int w = img[0].width();
     const unsigned int h = img[0].height();
 
+    cout << "Image has dimensions: " << w << "x" << h << endl;
+
     // Initialise window
     View& container = SetupPangoGLWithCuda(1024, 768);
     SetupContainer(container, 2, (float)w/h);
@@ -44,19 +47,16 @@ int main( int argc, char* argv[] )
 
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetDevice, Manage> dImg(w,h);
-    Image<float, TargetDevice, Manage> dImgFilt(w,h);
+    Image<int,TargetDevice,Manage> dRowPrefixSum(w,h);
+    Image<int,TargetDevice,Manage> dRowPrefixSumT(h,w);
+    Image<int,TargetDevice,Manage> dIntegralImage(h,w);
+    Image<float,TargetDevice,Manage> dBox(h,w);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);
-    Var<int> bilateralWinSize("ui.size",10, 1, 20);
-    Var<float> bigs("ui.gs",5, 1E-3, 5);
-    Var<float> bigr("ui.gr",20, 1E-3, 200);
+    Var<int> rad("ui.radius",10, 1, 20);
 
-    Var<int> domedits("ui.median its",1, 1, 10);
-    Var<bool> domed5x5("ui.median 5x5", true, true);
-    Var<bool> domed3x3("ui.median 3x3", false, true);
-
-    for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
+    for(unsigned long frame=0; !pangolin::ShouldQuit() /*&& frame < 100*/; ++frame)
     {
         const bool go = (frame==0) || run || Pushed(step);
 
@@ -66,21 +66,10 @@ int main( int argc, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            BilateralFilter<float,unsigned char>(dImgFilt,dImg,bigs,bigr,bilateralWinSize);
-//            ConvertImage<float,unsigned char>(dImgFilt,dImg);
-
-            for(int i=0; i < domedits; ++i ) {
-                if(domed3x3) {
-                    MedianFilter3x3(dImgFilt,dImgFilt);
-                }
-
-                if(domed5x5) {
-                    MedianFilter5x5(dImgFilt,dImgFilt);
-                }
-            }
-
-            // normalise dImgFilt
-            nppiDivC_32f_C1IR(255,dImgFilt.ptr,dImgFilt.pitch,dImgFilt.Size());
+            PrefixSumRows<int,unsigned char>(dRowPrefixSum, dImg);
+            Transpose<int,int>(dRowPrefixSumT,dRowPrefixSum);
+            PrefixSumRows<int,int>(dIntegralImage, dRowPrefixSumT);
+            BoxFilterIntegralImage<float,int>(dBox,dIntegralImage,rad);
         }
 
         /////////////////////////////////////////////////////////////
@@ -96,8 +85,10 @@ int main( int argc, char* argv[] )
 
         if(container[1].IsShown()) {
             container[1].Activate();
-            texf << dImgFilt;
+            texf << dBox;
+            GlSlUtilities::Scale(1/255.0f);
             texf.RenderToViewportFlipY();
+            GlSlUtilities::UseNone();
         }
 
         pangolin::FinishGlutFrame();

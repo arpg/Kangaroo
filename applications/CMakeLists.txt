@@ -132,6 +132,11 @@ if(Kangaroo_FOUND)
       add_executable( BilateralFilter BilateralFilter.cpp ${COMMON_HEADERS})
     endif()
 
+    set( BuildGuidedFilter true CACHE "" force )
+    if( BuildGuidedFilter )
+      add_executable( GuidedFilter GuidedFilter.cpp ${COMMON_HEADERS})
+    endif()
+
     set( BuildManhatten true CACHE "" force )
     if( BuildManhatten )
       add_executable( Manhatten Manhatten.cpp ${COMMON_HEADERS})

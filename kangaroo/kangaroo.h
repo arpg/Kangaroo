@@ -273,4 +273,15 @@ LeastSquaresSystem<float,3> ManhattenLineCost(
     Image<unsigned char> dWorkspace
 );
 
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename Tin>
+void Transpose(Image<Tout> out, Image<Tin> in);
+
+template<typename Tout, typename Tin>
+void PrefixSumRows(Image<Tout> out, Image<Tin> in);
+
+template<typename Tout, typename Tin>
+void BoxFilterIntegralImage(Image<Tout> out, Image<Tin> IntegralImageT, int rad);
+
 }

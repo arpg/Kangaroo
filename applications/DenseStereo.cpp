@@ -42,21 +42,9 @@ using namespace Gpu;
 int main( int argc, char* argv[] )
 {
     // Initialise window
-    View& container = SetupPangoGL(1024, 768);
-
-    // Initialise CUDA, allowing it to use OpenGL context
-    if( cudaGLSetGLDevice(0) != cudaSuccess ) {
-        cerr << "Unable to get CUDA Device" << endl;
-        return -1;
-    }
-    const unsigned bytes_per_mb = 1024*1000;
+    View& container = SetupPangoGLWithCuda(1024, 768);
     size_t cu_mem_start, cu_mem_end, cu_mem_total;
     cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
-    cout << cu_mem_start/bytes_per_mb << " MB Video Memory Available." << endl;
-    if( cu_mem_start < (100 * bytes_per_mb) ) {
-        cerr << "Not enough memory to proceed." << endl;
-        return -1;
-    }
     glClearColor(1,1,1,0);
 
     // Open video device
@@ -236,10 +224,8 @@ int main( int argc, char* argv[] )
 
     const double baseline = T_rl.translation().norm();
 
-    {
-        cudaMemGetInfo( &cu_mem_end, &cu_mem_total );
-        cout << "CuTotal: " << cu_mem_total/bytes_per_mb << ", Available: " << cu_mem_end/bytes_per_mb << ", Used: " << (cu_mem_start-cu_mem_end)/bytes_per_mb << endl;
-    }
+    cudaMemGetInfo( &cu_mem_end, &cu_mem_total );
+    cout << "CuTotal: " << cu_mem_total/(1024*1024) << ", Available: " << cu_mem_end/(1024*1024) << ", Used: " << (cu_mem_start-cu_mem_end)/(1024*1024) << endl;
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);

@@ -12,8 +12,8 @@ namespace Gpu
 template<typename Tout, typename Tin1, typename Tin2>
 __global__ void KernAdd(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2)
 {
-    const unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if(out.InBounds(x,y)) {
         out(x,y) = ConvertPixel<Tout,Tin1>(in1(x,y)) + ConvertPixel<Tout,Tin2>(in2(x,y));
@@ -35,8 +35,8 @@ void Add(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2 )
 template<typename Tout, typename Tin1, typename Tin2, typename Tup>
 __global__ void KernSubtractAdd(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2, Tup offset)
 {
-    const unsigned x = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if(out.InBounds(x,y)) {
         const Tup v1 = offset + ConvertPixel<Tup,Tin1>(in1(x,y));

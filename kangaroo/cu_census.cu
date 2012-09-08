@@ -19,8 +19,8 @@ __global__ void KernCensus9x7(Image<Tout> census, Image<Tin> img)
     const int WRAD = 4;
     const int HRAD = 3;
 
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
         const Tin p = img(x,y);
@@ -35,7 +35,7 @@ __global__ void KernCensus9x7(Image<Tout> census, Image<Tin> img)
                 if( q < p ) {
                     out |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -53,8 +53,8 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
     const int WRAD = 5;
     const int HRAD = 5;
 
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
         const Tin p = img(x,y);
@@ -69,7 +69,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
                 if( q < p ) {
                     out.x |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -79,7 +79,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
             if( q < p ) {
                 out.x |= bit;
             }
-            bit = bit << 1;
+            bit <<= 1;
         }
 
         bit = 1;
@@ -89,7 +89,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
             if( q < p ) {
                 out.y |= bit;
             }
-            bit = bit << 1;
+            bit <<= 1;
         }
 
         for(int r=1; r <= HRAD; ++r) {
@@ -99,7 +99,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
                 if( q < p ) {
                     out.y |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -114,8 +114,8 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
 template<typename Tin>
 __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
 {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
         const Tin p = img(x,y);
@@ -130,7 +130,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.x |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -142,7 +142,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.y |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -154,7 +154,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.z |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -166,7 +166,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.w |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
         census(x,y) = out;
