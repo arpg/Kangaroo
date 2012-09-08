@@ -28,9 +28,9 @@
 #include <Node.h>
 
 //#define HM_FUSION
-//#define PLANE_FIT
-//#define COSTVOL_TIME
-#define CENSUS_TRANFORM
+#define PLANE_FIT
+#define COSTVOL_TIME
+//#define CENSUS_TRANFORM
 #define SEMIGLOBAL
 
 const int costvoldisp = 80;
@@ -276,9 +276,9 @@ int main( int argc, char* argv[] )
     Var<bool> show_history("ui.show history", true, true);
     Var<bool> show_depthmap("ui.show depthmap", true, true);
 
-#ifdef PLANE_FIT
+#ifdef HM_FUSION
     Var<bool> show_heightmap("ui.show heightmap", false, true);
-#endif // PLANE_FIT
+#endif // HM_FUSION
 
 #ifdef SEMIGLOBAL
     Var<bool> dosgm("ui.sgm", true, true);
@@ -401,7 +401,7 @@ int main( int argc, char* argv[] )
 
             if(Pushed(costvol_add)) {
                 const Eigen::Matrix<double,3,4> KT_lv = Kl * (T_wc.inverse() * T_wv).matrix3x4();
-                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), 4*baseline, 0);
+                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
             }
 
             // Extract Minima of cost volume
@@ -414,10 +414,11 @@ int main( int argc, char* argv[] )
 
 #ifdef SEMIGLOBAL
             if(dosgm) {
-                SemiGlobalMatching(sgm,vol,dCamImg[0][level],maxDisp,sgmP1,sgmP2,dohoriz,dovert,doreverse);
-                CostVolMinimum<float,float>(dDisp,sgm,maxDisp);
+                SemiGlobalMatching(sgm,dCostVol,dImgv,dCostVol.d,sgmP1,sgmP2,dohoriz,dovert,doreverse);
+//                SemiGlobalMatching(sgm,vol,dCamImg[0][level],dCostVol.d,sgmP1,sgmP2,dohoriz,dovert,doreverse);
+                CostVolMinimum<float,float>(dDisp,sgm,dCostVol.d);
             }else{
-                CostVolMinimum<float,unsigned short>(dDisp,vol,maxDisp);
+//                CostVolMinimum<float,unsigned short>(dDisp,vol,maxDisp);
             }
 #endif // SEMIGLOBAL
 
@@ -529,8 +530,11 @@ int main( int argc, char* argv[] )
                 {
                     CudaScopedMappedPtr var(cbo);
                     Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
+#ifdef COSTVOL_TIME
+                    ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
+#else
                     ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
-//                    ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
+#endif
                 }
             }
 
@@ -564,9 +568,12 @@ int main( int argc, char* argv[] )
 
         s_cam.Follow(T_wc.matrix(), lockToCam);
 
-//        glvbo.SetPose(T_wv.matrix());
-        glvbo.SetPose(T_wc.matrix());
+        glvbo.SetPose(T_wv.matrix());
+#ifdef COSTVOL_TIME
         glvbo.SetVisible(show_depthmap);
+#else
+        glvbo.SetPose(T_wc.matrix());
+#endif
 
 
 #ifdef PLANE_FIT

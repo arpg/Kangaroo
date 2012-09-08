@@ -86,10 +86,6 @@ void DenseStereoSubpix(
 
 //////////////////////////////////////////////////////
 
-void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
-
-//////////////////////////////////////////////////////
-
 void LeftRightCheck(Image<char> dispL, Image<char> dispR, int maxDiff = 0);
 
 //////////////////////////////////////////////////////
@@ -219,6 +215,11 @@ void GenerateWorldVboAndImageFromHeightmap(Image<float4> dVbo, Image<unsigned ch
 
 struct __align__(8) CostVolElem
 {
+    inline __host__ __device__
+    operator float() {
+        return n > 0 ? sum / n : 1E30;
+    }
+
     int n;
     float sum;
 };
@@ -238,6 +239,12 @@ void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol);
 void CostVolumeCrossSection(
     Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
 );
+
+//////////////////////////////////////////////////////
+
+void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+
+void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 //////////////////////////////////////////////////////
 
