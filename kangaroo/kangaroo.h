@@ -24,11 +24,23 @@ void ConvertImage(Image<To> dOut, const Image<Ti> dIn);
 
 //////////////////////////////////////////////////////
 
-template<typename Tout, typename Tin1, typename Tin2>
-void Add(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2);
+template<typename Tout, typename Tin, typename Tup>
+void ElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, Tup s, Tup offset=0);
 
 template<typename Tout, typename Tin1, typename Tin2, typename Tup>
-void SubtractAdd(Image<Tout> out, Image<Tin1> in1, Image<Tin2> in2, Tup offset );
+void ElementwiseAdd(Image<Tout> c, Image<Tin1> a, Image<Tin2> b, Tup sa=1, Tup sb=1, Tup offset=0 );
+
+template<typename Tout, typename Tin1, typename Tin2, typename Tup>
+void ElementwiseMultiply(Image<Tout> c, Image<Tin1> a, Image<Tin2> b, Tup scalar=1, Tup offset=0 );
+
+template<typename Tout, typename Tin1, typename Tin2, typename Tup>
+void ElementwiseDivision(Image<Tout> c, const Image<Tin1> a, const Image<Tin2> b, Tup sa=0, Tup sb=0, Tup scalar=1, Tup offset=0);
+
+template<typename Tout, typename Tin, typename Tup>
+void ElementwiseSquare(Image<Tout> b, const Image<Tin> a, Tup scalar=1, Tup offset=0 );
+
+template<typename Tout, typename Tin1, typename Tin2, typename Tin3, typename Tup>
+void ElementwiseMultiplyAdd(Image<Tout> d, const Image<Tin1> a, const Image<Tin2> b, const Image<Tin3> c, Tup sab=1, Tup sc=1, Tup offset=0);
 
 //////////////////////////////////////////////////////
 
@@ -283,5 +295,20 @@ void PrefixSumRows(Image<Tout> out, Image<Tin> in);
 
 template<typename Tout, typename Tin>
 void BoxFilterIntegralImage(Image<Tout> out, Image<Tin> IntegralImageT, int rad);
+
+template<typename Tout, typename Tin, typename TSum>
+void BoxFilter(Image<Tout> out, Image<Tin> in, Image<unsigned char> scratch, int rad)
+{
+    Image<TSum> RowPrefixSum = scratch.AlignedImage<TSum>(in.w, in.h);
+    PrefixSumRows<TSum,Tin>(RowPrefixSum, in);
+
+    Image<TSum> RowPrefixSumT = out.template AlignedImage<TSum>(in.h, in.w);
+    Transpose<TSum,TSum>(RowPrefixSumT,RowPrefixSum);
+
+    Image<TSum> IntegralImageT = scratch.template AlignedImage<TSum>(in.w, in.h);
+    PrefixSumRows<TSum,TSum>(IntegralImageT, RowPrefixSumT);
+
+    BoxFilterIntegralImage<Tout,TSum>(out,IntegralImageT,rad);
+}
 
 }
