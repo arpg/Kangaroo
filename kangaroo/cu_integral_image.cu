@@ -54,7 +54,7 @@ template void Transpose(Image<float>,Image<float>);
 
 template<typename Tout, typename Tin>
 inline __device__
-void PrefixSum(Tout *output, Tin *input, int n)
+void PrefixSum(Tout* output, Tin* input, int w, int nextpow2)
 {
     SharedMemory<Tout> shared;
     Tout* temp = shared.getPointer();
@@ -64,10 +64,10 @@ void PrefixSum(Tout *output, Tin *input, int n)
     const int tdx2 = 2*tdx;
     const int tdx2p = tdx2 + 1;
 
-    temp[tdx2] =  tdx2 < n ? input[tdx2] : 0;
-    temp[tdx2p] = tdx2p < n ? input[tdx2p] : 0;
+    temp[tdx2] =  tdx2 < w ? input[tdx2] : 0;
+    temp[tdx2p] = tdx2p < w ? input[tdx2p] : 0;
 
-    for(int d = n>>1; d > 0; d >>= 1) {
+    for(int d = nextpow2>>1; d > 0; d >>= 1) {
         __syncthreads();
         if(tdx < d)
         {
@@ -78,14 +78,14 @@ void PrefixSum(Tout *output, Tin *input, int n)
         offset *= 2;
     }
 
-    if(tdx == 0) temp[n - 1] = 0;
+    if(tdx == 0) temp[nextpow2 - 1] = 0;
 
-    for(int d = 1; d < n; d *= 2) {
+    for(int d = 1; d < nextpow2; d *= 2) {
         offset >>= 1;
 
         __syncthreads();
 
-        if(tdx < d)
+        if(tdx < d )
         {
             int ai = offset*(tdx2p)-1;
             int bi = offset*(tdx2+2)-1;
@@ -97,23 +97,24 @@ void PrefixSum(Tout *output, Tin *input, int n)
 
     __syncthreads();
 
-    if(tdx2 < n)  output[tdx2] = temp[tdx2];
-    if(tdx2p < n) output[tdx2p] = temp[tdx2p];
+    if(tdx2 < w)  output[tdx2] = temp[tdx2];
+    if(tdx2p < w) output[tdx2p] = temp[tdx2p];
 }
 
 template<typename Tout, typename Tin>
 __global__ void KernPrefixSumRows(Image<Tout> out, Image<Tin> in)
 {
     const int row = blockIdx.y;
-    PrefixSum<Tout,Tin>(out.RowPtr(row), in.RowPtr(row), out.w );
+    PrefixSum<Tout,Tin>(out.RowPtr(row), in.RowPtr(row), in.w, 2*blockDim.x );
 }
 
 template<typename Tout, typename Tin>
 void PrefixSumRows(Image<Tout> out, Image<Tin> in)
 {
-    const dim3 blockDim = dim3( ceil(in.w/2.0f), 1);
+    dim3 blockDim = dim3( 1, 1);
+    while(blockDim.x < ceil(in.w/2.0f)) blockDim.x <<= 1;
     const dim3 gridDim =  dim3( 1, in.h );
-    KernPrefixSumRows<<<gridDim,blockDim,sizeof(Tout)*in.w>>>(out,in);
+    KernPrefixSumRows<<<gridDim,blockDim,2*sizeof(Tout)*blockDim.x>>>(out,in);
 }
 
 // Instantiate useful versions

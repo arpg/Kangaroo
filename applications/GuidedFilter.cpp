@@ -82,7 +82,10 @@ int main( int argc, char* argv[] )
             P.CopyFrom(I);
         }
 
-        if(go || GuiVarHasChanged() ) {            
+        if(go || GuiVarHasChanged() ) {
+            // Guided Image Filtering (ECCV 2010)
+            // Kaiming He, Jian Sun, and Xiaoou Tang
+
             // mean_I = boxfilter(I, r) ./ N;
             BoxFilter<float,float,float>(meanI,I,Scratch,rad);
 
