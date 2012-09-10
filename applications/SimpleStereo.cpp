@@ -70,12 +70,13 @@ int main( int argc, char* argv[] )
     Image<float, TargetDevice, Manage> b(w,h);
     Image<float, TargetDevice, Manage> meana(w,h);
     Image<float, TargetDevice, Manage> meanb(w,h);
-//    Image<float, TargetDevice, Manage> q(w,h);
+    Image<float, TargetDevice, Manage> temp(w,h);
     Image<unsigned char, TargetDevice, Manage> Scratch(w*sizeof(float),h);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
+    Var<bool> subpix("ui.subpix", true, true);
     Var<bool> filter("ui.filter", true, true);
 
     Var<float> alpha("ui.alpha", 0.9, 0,1);
@@ -89,12 +90,24 @@ int main( int argc, char* argv[] )
 //    Var<float> scale("ui.scale",1, 0.1, 100);
 
     Var<bool> leftrightcheck("ui.left-right check", true, true);
-    Var<int> maxdispdiff("ui.maxdispdiff",0, 0, 5);
+    Var<int> maxdispdiff("ui.maxdispdiff",1, 0, 5);
 
     Var<bool> smooth("ui.smooth", false, true);
     Var<float> eps2("ui.eps2",0.01*0.01, 0, 0.01);
     Var<int> rad2("ui.radius2",9, 1, 20);
 
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",5, 1, 20);
+    Var<float> gs("ui.gs",5, 1E-3, 10);
+    Var<float> gr("ui.gr",6, 1E-3, 10);
+    Var<float> gc("ui.gc",0.01, 1E-4, 0.1);
+
+    Var<int> domedits("ui.median its",1, 1, 10);
+    Var<bool> domed9x9("ui.median 9x9", false, true);
+    Var<bool> domed7x7("ui.median 7x7", false, true);
+    Var<bool> domed5x5("ui.median 5x5", false, true);
+//    Var<bool> domed3x3("ui.median 3x3", false, true);
+    Var<int> medi("ui.medi",12, 0, 24);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -104,8 +117,8 @@ int main( int argc, char* argv[] )
 
     ActivateDrawImage<float> adDispL(disp[0],GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float> adDispR(disp[1],GL_LUMINANCE32F_ARB, false, true);
-    adDispL.SetImageScale(1.0f/MAXD);
-    adDispR.SetImageScale(1.0f/MAXD);
+//    adDispL.SetImageScale(1.0f/MAXD);
+//    adDispR.SetImageScale(1.0f/MAXD);
 
     container[0].SetDrawFunction(boost::ref(adImgL));
     container[1].SetDrawFunction(boost::ref(adImgR));
@@ -191,11 +204,16 @@ int main( int argc, char* argv[] )
                 }
             }
 
-            CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
-            CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
+            if(subpix) {
+                CostVolMinimumSubpix(disp[0],vol[0], maxdisp);
+                CostVolMinimumSubpix(disp[1],vol[1], maxdisp);
+            }else{
+                CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
+                CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
+            }
 
             if(filter && smooth) {
-                Image<float, TargetDevice, Manage>& I = img[0];
+                Image<float> I = img[0];
                 Image<float> P = disp[0];
                 Image<float> q = disp[0];
 
@@ -225,10 +243,28 @@ int main( int argc, char* argv[] )
                 ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
             }
 
-            if(leftrightcheck) {
-                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
-                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
+            for(int di=0; di<2; ++di) {
+                for(int i=0; i < domedits; ++i ) {
+                    if(domed9x9) MedianFilterRejectNegative9x9(disp[di],disp[di], medi);
+                    if(domed7x7) MedianFilterRejectNegative7x7(disp[di],disp[di], medi);
+                    if(domed5x5) MedianFilterRejectNegative5x5(disp[di],disp[di], medi);
+                }
             }
+
+            if(applyBilateralFilter) {
+                Image<float> I = img[0];
+                Image<float> P = disp[0];
+                temp.CopyFrom(P);
+                BilateralFilter<float,float,float>(P,temp,I,gs,gr,gc,bilateralWinSize);
+            }
+
+            if(leftrightcheck ) {
+                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
+                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
+            }
+
+            ElementwiseScaleBias<float,float,float>(disp[0],disp[0],1.0f/maxdisp);
+            ElementwiseScaleBias<float,float,float>(disp[1],disp[1],1.0f/maxdisp);
 
         }
 

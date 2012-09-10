@@ -55,6 +55,63 @@ template void CostVolMinimum<>(Image<char>,Volume<unsigned char>,unsigned);
 template void CostVolMinimum<>(Image<float>,Volume<float>,unsigned);
 template void CostVolMinimum<>(Image<float>,Volume<unsigned short>,unsigned);
 
+//////////////////////////////////////////////////////
+// Cost Volume minimum subpix refinement
+//////////////////////////////////////////////////////
+
+template<typename Tdisp, typename Tvol>
+__global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDispVal)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    Tdisp bestd = 0;
+    Tvol bestc = vol(x,y,0);
+
+    const int maxDisp = min(maxDispVal, x+1);
+    for(int d=1; d < maxDisp; ++d) {
+        const Tvol c = vol(x,y,d);
+        if(c < bestc) {
+            bestc = c;
+            bestd = d;
+        }
+    }
+
+    Tdisp out = bestd;
+
+    if( 0 < bestd && bestd < maxDisp-1) {
+        // Fit parabola to neighbours
+        const float d1 = bestd+1;
+        const float d2 = bestd;
+        const float d3 = bestd-1;
+        const float s1 = vol(x,y,d1);
+        const float s2 = bestc;
+        const float s3 = vol(x,y,d3);
+
+        // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
+        const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
+        const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
+        const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
+        const float subpixdisp = -B / (2*A);
+
+        // Minima of parabola
+
+        // Check that minima is sensible. Otherwise assume bad data.
+        if( d3 < subpixdisp && subpixdisp < d1 ) {
+            out = subpixdisp;
+        }
+    }
+
+    disp(x,y) = out;
+}
+
+void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,disp);
+    KernCostVolMinimumSubpix<float,float><<<gridDim,blockDim>>>(disp,vol,maxDisp);
+}
+
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo
@@ -372,11 +429,11 @@ __global__ void KernLeftRightCheck(
 
     if( dispL.InBounds(x,y) ) {
         const TD dl = dispL(x,y);
-        const int xr = x + sd*dl;
+        const TD xr = x + sd*dl;
 
-        if( 0 <= xr ) {
+        if( 0 <= xr && xr < dispR.w) {
             const TD dr = dispR(xr, y);
-            if(abs(dl - dr) > maxDiff) {
+            if(!isfinite(dr) || abs(dl - dr) > maxDiff) {
                 dispL(x,y) = InvalidValue<TD>::Value();
             }
         }else{
