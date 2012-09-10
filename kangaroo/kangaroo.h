@@ -98,7 +98,9 @@ void DenseStereoSubpix(
 
 //////////////////////////////////////////////////////
 
-void LeftRightCheck(Image<char> dispL, Image<char> dispR, int maxDiff = 0);
+void LeftRightCheck(Image<char> dispL, Image<char> dispR, int sd = -1, int maxDiff = 0);
+
+void LeftRightCheck(Image<float> dispL, Image<float> dispR, float sd = -1, float maxDiff = 0.5);
 
 //////////////////////////////////////////////////////
 
@@ -225,7 +227,7 @@ void GenerateWorldVboAndImageFromHeightmap(Image<float4> dVbo, Image<unsigned ch
 
 //////////////////////////////////////////////////////
 
-void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float alpha, float r1, float r2 );
+void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float sd, float alpha, float r1, float r2 );
 
 struct __align__(8) CostVolElem
 {

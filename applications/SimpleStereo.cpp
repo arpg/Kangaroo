@@ -76,7 +76,7 @@ int main( int argc, char* argv[] )
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
-    Var<bool> filter("ui.filter", false, true);
+    Var<bool> filter("ui.filter", true, true);
 
     Var<float> alpha("ui.alpha", 0.9, 0,1);
     Var<float> r1("ui.r1", 0.0028, 0,0.01);
@@ -85,8 +85,16 @@ int main( int argc, char* argv[] )
     Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
     Var<int> rad("ui.radius",9, 1, 20);
 
-    Var<int> showd("ui.showd",10, 0, MAXD-1);
-    Var<float> scale("ui.scale",1, 0.1, 100);
+//    Var<int> showd("ui.showd",10, 0, MAXD-1);
+//    Var<float> scale("ui.scale",1, 0.1, 100);
+
+    Var<bool> leftrightcheck("ui.left-right check", true, true);
+    Var<int> maxdispdiff("ui.maxdispdiff",0, 0, 5);
+
+    Var<bool> smooth("ui.smooth", false, true);
+    Var<float> eps2("ui.eps2",0.01*0.01, 0, 0.01);
+    Var<int> rad2("ui.radius2",9, 1, 20);
+
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -95,8 +103,9 @@ int main( int argc, char* argv[] )
     ActivateDrawImage<float> adImgR(img[1],GL_LUMINANCE32F_ARB, false, true);
 
     ActivateDrawImage<float> adDispL(disp[0],GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> adDispR(vol[1].ImageXY(10),GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> adDispR(disp[1],GL_LUMINANCE32F_ARB, false, true);
     adDispL.SetImageScale(1.0f/MAXD);
+    adDispR.SetImageScale(1.0f/MAXD);
 
     container[0].SetDrawFunction(boost::ref(adImgL));
     container[1].SetDrawFunction(boost::ref(adImgR));
@@ -127,12 +136,12 @@ int main( int argc, char* argv[] )
         }
 
         if(go || guichanged ) {
-            CostVolumeFromStereoTruncatedAbsAndGrad(vol[0], img[0], img[1], alpha, r1, r2);
+            CostVolumeFromStereoTruncatedAbsAndGrad(vol[0], img[0], img[1], -1, alpha, r1, r2);
+            CostVolumeFromStereoTruncatedAbsAndGrad(vol[1], img[1], img[0], +1, alpha, r1, r2);
 
             if(filter) {
                 // Filter Cost volume
-//                for(int v=0; v<1; ++v)
-                const int v =0;
+                for(int v=0; v<2; ++v)
                 {
                     Image<float, TargetDevice, Manage>& I = img[v];
 
@@ -152,7 +161,7 @@ int main( int argc, char* argv[] )
                     for(int d=0; d<maxdisp; ++d)
                     {
                         Image<float> P = vol[v].ImageXY(d);
-                        Image<float> q = vol[1].ImageXY(d);
+                        Image<float> q = vol[v].ImageXY(d);
 
                         // mean_p = boxfilter(p, r) ./ N;
                         BoxFilter<float,float,float>(meanP,P,Scratch,rad);
@@ -182,13 +191,51 @@ int main( int argc, char* argv[] )
                 }
             }
 
-            CostVolMinimum<float,float>(disp[0],vol[1], maxdisp);
+            CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
+            CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
+
+            if(filter && smooth) {
+                Image<float, TargetDevice, Manage>& I = img[0];
+                Image<float> P = disp[0];
+                Image<float> q = disp[0];
+
+                // mean_p = boxfilter(p, r) ./ N;
+                BoxFilter<float,float,float>(meanP,P,Scratch,rad2);
+
+                // mean_Ip = boxfilter(I.*p, r) ./ N;
+                ElementwiseMultiply<float,float,float,float>(IP,I,P);
+                BoxFilter<float,float,float>(meanIP,IP,Scratch,rad2);
+
+                // cov_Ip = mean_Ip - mean_I .* mean_p; % this is the covariance of (I, p) in each local patch.
+                ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
+
+                // a = cov_Ip ./ (var_I + eps); % Eqn. (5) in the paper;
+                ElementwiseDivision<float,float,float,float>(a, covIP, varI, 0, eps2);
+
+                // b = mean_p - a .* mean_I; % Eqn. (6) in the paper;
+                ElementwiseMultiplyAdd<float,float,float,float,float>(b, a,meanI,meanP,-1);
+
+                // mean_a = boxfilter(a, r) ./ N;
+                BoxFilter<float,float,float>(meana,a,Scratch,rad2);
+
+                // mean_b = boxfilter(b, r) ./ N;
+                BoxFilter<float,float,float>(meanb,b,Scratch,rad2);
+
+                // q = mean_a .* I + mean_b; % Eqn. (8) in the paper;
+                ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
+            }
+
+            if(leftrightcheck) {
+                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
+                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
+            }
+
         }
 
 //        adDispL.SetImageScale(scale);
-        adDispR.SetImageScale(scale);
+//        adDispR.SetImageScale(scale);
 //        adDispL.SetImage(vol[0].ImageXY(showd));
-        adDispR.SetImage(vol[1].ImageXY(showd));
+//        adDispR.SetImage(vol[0].ImageXY(showd));
 
         /////////////////////////////////////////////////////////////
         // Draw

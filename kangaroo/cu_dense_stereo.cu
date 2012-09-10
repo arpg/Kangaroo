@@ -365,17 +365,18 @@ void DenseStereoTest(
 
 template<typename TD>
 __global__ void KernLeftRightCheck(
-    Image<TD> dispL, Image<TD> dispR, int maxDiff
+    Image<TD> dispL, Image<TD> dispR, float sd, float maxDiff
 ) {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( dispL.InBounds(x,y) ) {
         const TD dl = dispL(x,y);
+        const int xr = x + sd*dl;
 
-        if( 0 <= ((int)x-(int)dl) ) {
-            const TD dr = dispR(x - dl, y);
-            if(abs(dl - (-dr)) > maxDiff) {
+        if( 0 <= xr ) {
+            const TD dr = dispR(xr, y);
+            if(abs(dl - dr) > maxDiff) {
                 dispL(x,y) = InvalidValue<TD>::Value();
             }
         }else{
@@ -384,11 +385,18 @@ __global__ void KernLeftRightCheck(
     }
 }
 
-void LeftRightCheck(Image<char> dispL, Image<char> dispR, int maxDiff)
+void LeftRightCheck(Image<char> dispL, Image<char> dispR, int sd, int maxDiff)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim, dispL);
-    KernLeftRightCheck<char><<<gridDim,blockDim>>>(dispL, dispR, maxDiff);
+    KernLeftRightCheck<char><<<gridDim,blockDim>>>(dispL, dispR, sd, maxDiff);
+}
+
+void LeftRightCheck(Image<float> dispL, Image<float> dispR, float sd, float maxDiff)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, dispL);
+    KernLeftRightCheck<float><<<gridDim,blockDim>>>(dispL, dispR, sd, maxDiff);
 }
 
 //////////////////////////////////////////////////////
@@ -659,28 +667,29 @@ void FilterDispGrad(
 
 template<typename Tout, typename Tin>
 __global__ void KernCostVolumeFromStereoTruncatedAbsAndGrad(
-    Volume<Tout> dvol, Image<Tin> dimgl, Image<Tin> dimgr,
+    Volume<Tout> dvol, Image<Tin> dimgl, Image<Tin> dimgr, float sd,
     float alpha, float r1, float r2
 ) {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
     const int d = blockIdx.z*blockDim.z + threadIdx.z;
 
-    if( u-d >= 0) {
-        const float absI = abs( (float)dimgr(u-d,v) - (float)dimgl(u,v));
-        const float absGrad = abs( dimgr.template GetCentralDiffDx<float>(u-d,v) - dimgl.template GetCentralDiffDx<float>(u,v) );
+    const int r = u + sd*d;
+    if( 0 <= r && r < dimgr.w ) {
+        const float absI = abs( (float)dimgr(r,v) - (float)dimgl(u,v));
+        const float absGrad = abs( dimgr.template GetCentralDiffDx<float>(r,v) - dimgl.template GetCentralDiffDx<float>(u,v) );
         const Tout cost = (1.0f-alpha)*min(absI,r1) + alpha*min(absGrad,r2);
         dvol(u,v,d) = cost;
     }else{
-        dvol(u,v,d) = 10;
+        dvol(u,v,d) = (1.0f-alpha)*r1 + alpha*r2;
     }
 }
 
-void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float alpha, float r1, float r2 )
+void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float sd, float alpha, float r1, float r2 )
 {
     dim3 blockDim(8,8,8);
     dim3 gridDim( ceil(dvol.w / (float)blockDim.x), ceil(dvol.h / (float)blockDim.y), ceil(dvol.d / (float)blockDim.z) );
-    KernCostVolumeFromStereoTruncatedAbsAndGrad<float,float><<<gridDim,blockDim>>>(dvol,dimgl,dimgr,alpha,r1,r2);
+    KernCostVolumeFromStereoTruncatedAbsAndGrad<float,float><<<gridDim,blockDim>>>(dvol,dimgl,dimgr,sd, alpha,r1,r2);
 }
 
 
