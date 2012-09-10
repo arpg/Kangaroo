@@ -56,21 +56,9 @@ int main( int argc, char* argv[] )
     Volume<float, TargetDevice, Manage> vol[] = {{w,h,MAXD},{w,h,MAXD},{w,h,MAXD}};
     Image<float, TargetDevice, Manage>  disp[] = {{w,h},{w,h}};
 
-//    Image<float, TargetDevice, Manage> I(w,h);
-//    Image<float, TargetDevice, Manage> P(w,h);
-    Image<float, TargetDevice, Manage> II(w,h);
-    Image<float, TargetDevice, Manage> IP(w,h);
     Image<float, TargetDevice, Manage> meanI(w,h);
-    Image<float, TargetDevice, Manage> meanP(w,h);
-    Image<float, TargetDevice, Manage> meanII(w,h);
-    Image<float, TargetDevice, Manage> meanIP(w,h);
-    Image<float, TargetDevice, Manage> covIP(w,h);
     Image<float, TargetDevice, Manage> varI(w,h);
-    Image<float, TargetDevice, Manage> a(w,h);
-    Image<float, TargetDevice, Manage> b(w,h);
-    Image<float, TargetDevice, Manage> meana(w,h);
-    Image<float, TargetDevice, Manage> meanb(w,h);
-    Image<float, TargetDevice, Manage> temp(w,h);
+    Image<float, TargetDevice, Manage> temp[] = {{w,h},{w,h},{w,h},{w,h},{w,h}};
     Image<unsigned char, TargetDevice, Manage> Scratch(w*sizeof(float),h);
 
     Var<bool> step("ui.step", false, false);
@@ -90,15 +78,11 @@ int main( int argc, char* argv[] )
 //    Var<float> scale("ui.scale",1, 0.1, 100);
 
     Var<bool> leftrightcheck("ui.left-right check", true, true);
-    Var<int> maxdispdiff("ui.maxdispdiff",1, 0, 5);
-
-    Var<bool> smooth("ui.smooth", false, true);
-    Var<float> eps2("ui.eps2",0.01*0.01, 0, 0.01);
-    Var<int> rad2("ui.radius2",9, 1, 20);
+    Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
 
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-    Var<float> gs("ui.gs",5, 1E-3, 10);
+    Var<int> bilateralWinSize("ui.size",18, 1, 20);
+    Var<float> gs("ui.gs",10, 1E-3, 10);
     Var<float> gr("ui.gr",6, 1E-3, 10);
     Var<float> gc("ui.gc",0.01, 1E-4, 0.1);
 
@@ -117,8 +101,6 @@ int main( int argc, char* argv[] )
 
     ActivateDrawImage<float> adDispL(disp[0],GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float> adDispR(disp[1],GL_LUMINANCE32F_ARB, false, true);
-//    adDispL.SetImageScale(1.0f/MAXD);
-//    adDispR.SetImageScale(1.0f/MAXD);
 
     container[0].SetDrawFunction(boost::ref(adImgL));
     container[1].SetDrawFunction(boost::ref(adImgR));
@@ -157,49 +139,13 @@ int main( int argc, char* argv[] )
                 for(int v=0; v<2; ++v)
                 {
                     Image<float, TargetDevice, Manage>& I = img[v];
-
-                    // Filter guide image
-                    {
-                        // mean_I = boxfilter(I, r) ./ N;
-                        BoxFilter<float,float,float>(meanI,I,Scratch,rad);
-
-                        // mean_II = boxfilter(I.*I, r) ./ N;
-                        ElementwiseSquare<float,float,float>(II,I);
-                        BoxFilter<float,float,float>(meanII,II,Scratch,rad);
-
-                        // var_I = mean_II - mean_I .* mean_I;
-                        ElementwiseMultiplyAdd<float,float,float,float,float>(varI, meanI, meanI, meanII,-1);
-                    }
+                    ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
 
                     for(int d=0; d<maxdisp; ++d)
                     {
                         Image<float> P = vol[v].ImageXY(d);
-                        Image<float> q = vol[v].ImageXY(d);
-
-                        // mean_p = boxfilter(p, r) ./ N;
-                        BoxFilter<float,float,float>(meanP,P,Scratch,rad);
-
-                        // mean_Ip = boxfilter(I.*p, r) ./ N;
-                        ElementwiseMultiply<float,float,float,float>(IP,I,P);
-                        BoxFilter<float,float,float>(meanIP,IP,Scratch,rad);
-
-                        // cov_Ip = mean_Ip - mean_I .* mean_p; % this is the covariance of (I, p) in each local patch.
-                        ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
-
-                        // a = cov_Ip ./ (var_I + eps); % Eqn. (5) in the paper;
-                        ElementwiseDivision<float,float,float,float>(a, covIP, varI, 0, eps);
-
-                        // b = mean_p - a .* mean_I; % Eqn. (6) in the paper;
-                        ElementwiseMultiplyAdd<float,float,float,float,float>(b, a,meanI,meanP,-1);
-
-                        // mean_a = boxfilter(a, r) ./ N;
-                        BoxFilter<float,float,float>(meana,a,Scratch,rad);
-
-                        // mean_b = boxfilter(b, r) ./ N;
-                        BoxFilter<float,float,float>(meanb,b,Scratch,rad);
-
-                        // q = mean_a .* I + mean_b; % Eqn. (8) in the paper;
-                        ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
+                        ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
+                        GuidedFilter(P,temp[0],varI,temp[1],meanI,I,Scratch,temp[2],temp[3],temp[4],rad,eps);
                     }
                 }
             }
@@ -212,37 +158,6 @@ int main( int argc, char* argv[] )
                 CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
             }
 
-            if(filter && smooth) {
-                Image<float> I = img[0];
-                Image<float> P = disp[0];
-                Image<float> q = disp[0];
-
-                // mean_p = boxfilter(p, r) ./ N;
-                BoxFilter<float,float,float>(meanP,P,Scratch,rad2);
-
-                // mean_Ip = boxfilter(I.*p, r) ./ N;
-                ElementwiseMultiply<float,float,float,float>(IP,I,P);
-                BoxFilter<float,float,float>(meanIP,IP,Scratch,rad2);
-
-                // cov_Ip = mean_Ip - mean_I .* mean_p; % this is the covariance of (I, p) in each local patch.
-                ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
-
-                // a = cov_Ip ./ (var_I + eps); % Eqn. (5) in the paper;
-                ElementwiseDivision<float,float,float,float>(a, covIP, varI, 0, eps2);
-
-                // b = mean_p - a .* mean_I; % Eqn. (6) in the paper;
-                ElementwiseMultiplyAdd<float,float,float,float,float>(b, a,meanI,meanP,-1);
-
-                // mean_a = boxfilter(a, r) ./ N;
-                BoxFilter<float,float,float>(meana,a,Scratch,rad2);
-
-                // mean_b = boxfilter(b, r) ./ N;
-                BoxFilter<float,float,float>(meanb,b,Scratch,rad2);
-
-                // q = mean_a .* I + mean_b; % Eqn. (8) in the paper;
-                ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
-            }
-
             for(int di=0; di<2; ++di) {
                 for(int i=0; i < domedits; ++i ) {
                     if(domed9x9) MedianFilterRejectNegative9x9(disp[di],disp[di], medi);
@@ -252,26 +167,18 @@ int main( int argc, char* argv[] )
             }
 
             if(applyBilateralFilter) {
-                Image<float> I = img[0];
-                Image<float> P = disp[0];
-                temp.CopyFrom(P);
-                BilateralFilter<float,float,float>(P,temp,I,gs,gr,gc,bilateralWinSize);
+                temp[0].CopyFrom(disp[0]);
+                BilateralFilter<float,float,float>(disp[0],temp[0],img[0],gs,gr,gc,bilateralWinSize);
             }
 
             if(leftrightcheck ) {
                 LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
                 LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
             }
-
-            ElementwiseScaleBias<float,float,float>(disp[0],disp[0],1.0f/maxdisp);
-            ElementwiseScaleBias<float,float,float>(disp[1],disp[1],1.0f/maxdisp);
-
         }
 
-//        adDispL.SetImageScale(scale);
-//        adDispR.SetImageScale(scale);
-//        adDispL.SetImage(vol[0].ImageXY(showd));
-//        adDispR.SetImage(vol[0].ImageXY(showd));
+        adDispL.SetImageScale(1.0f/maxdisp);
+        adDispR.SetImageScale(1.0f/maxdisp);
 
         /////////////////////////////////////////////////////////////
         // Draw
