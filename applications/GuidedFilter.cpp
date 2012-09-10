@@ -64,7 +64,6 @@ int main( int argc, char* argv[] )
     Image<float, TargetDevice, Manage> q(w,h);
 
     Image<unsigned char, TargetDevice, Manage> Scratch(w*sizeof(int),h);
-    Image<float,TargetDevice,Manage> Box(h,w);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);

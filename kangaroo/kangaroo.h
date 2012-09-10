@@ -225,6 +225,8 @@ void GenerateWorldVboAndImageFromHeightmap(Image<float4> dVbo, Image<unsigned ch
 
 //////////////////////////////////////////////////////
 
+void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float alpha, float r1, float r2 );
+
 struct __align__(8) CostVolElem
 {
     inline __host__ __device__
@@ -305,7 +307,7 @@ void BoxFilter(Image<Tout> out, Image<Tin> in, Image<unsigned char> scratch, int
     Image<TSum> RowPrefixSumT = out.template AlignedImage<TSum>(in.h, in.w);
     Transpose<TSum,TSum>(RowPrefixSumT,RowPrefixSum);
 
-    Image<TSum> IntegralImageT = scratch.template AlignedImage<TSum>(in.w, in.h);
+    Image<TSum> IntegralImageT = scratch.template AlignedImage<TSum>(in.h, in.w);
     PrefixSumRows<TSum,TSum>(IntegralImageT, RowPrefixSumT);
 
     BoxFilterIntegralImage<Tout,TSum>(out,IntegralImageT,rad);

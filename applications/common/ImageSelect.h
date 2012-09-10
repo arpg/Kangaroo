@@ -170,8 +170,8 @@ template<typename T>
 class ActivateDrawImage
 {
 public:
-    ActivateDrawImage(const Gpu::Image<T,Gpu::TargetDevice> image, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
-        :image(image), glTex(image.w,image.h,internal_format,sampling_linear), flipy(flipy)
+    ActivateDrawImage(Gpu::Image<T,Gpu::TargetDevice> image, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
+        :image(image), glTex(image.w,image.h,internal_format,sampling_linear), flipy(flipy), pixScale(1)
     {
     }
 
@@ -191,16 +191,28 @@ public:
             RenderToViewport(glTex,flipy,pixScale);
             RenderImageSelect(*imageSelect, glTex.width, glTex.height);
         }else{
-            glTex.RenderToViewport(flipy);
+            RenderToViewport(glTex,flipy,pixScale);
         }
 
         glPopAttrib();
     }
 
+    void SetImage(Gpu::Image<T,Gpu::TargetDevice> image) {
+        this->image.ptr = image.ptr;
+        this->image.pitch = image.pitch;
+        this->image.w = image.w;
+        this->image.h = image.h;
+    }
+
+    void SetImageScale(float scale) {
+        pixScale = scale;
+    }
+
 protected:    
-    const Gpu::Image<T,Gpu::TargetDevice> image;
+    Gpu::Image<T,Gpu::TargetDevice> image;
     pangolin::GlTextureCudaArray glTex;
     bool flipy;
+    float pixScale;
 
 private:
     // Private copy constructor

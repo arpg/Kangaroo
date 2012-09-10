@@ -651,5 +651,38 @@ void FilterDispGrad(
     KernFilterDispGrad<float,float><<<gridDim,blockDim>>>(dOut, dIn, threshold);
 }
 
+//////////////////////////////////////////////////////
+// Cost volume with truncated grad and abs. diff. score
+// Fast Cost-Volume Filtering for Visual Correspondence and Beyond
+// Christoph Rhemann, Asmaa Hosni, Michael Bleyer, Carsten Rother, Margrit Gelautz
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename Tin>
+__global__ void KernCostVolumeFromStereoTruncatedAbsAndGrad(
+    Volume<Tout> dvol, Image<Tin> dimgl, Image<Tin> dimgr,
+    float alpha, float r1, float r2
+) {
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const int d = blockIdx.z*blockDim.z + threadIdx.z;
+
+    if( u-d >= 0) {
+        const float absI = abs( (float)dimgr(u-d,v) - (float)dimgl(u,v));
+        const float absGrad = abs( dimgr.template GetCentralDiffDx<float>(u-d,v) - dimgl.template GetCentralDiffDx<float>(u,v) );
+        const Tout cost = (1.0f-alpha)*min(absI,r1) + alpha*min(absGrad,r2);
+        dvol(u,v,d) = cost;
+    }else{
+        dvol(u,v,d) = 10;
+    }
+}
+
+void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float alpha, float r1, float r2 )
+{
+    dim3 blockDim(8,8,8);
+    dim3 gridDim( ceil(dvol.w / (float)blockDim.x), ceil(dvol.h / (float)blockDim.y), ceil(dvol.d / (float)blockDim.z) );
+    KernCostVolumeFromStereoTruncatedAbsAndGrad<float,float><<<gridDim,blockDim>>>(dvol,dimgl,dimgr,alpha,r1,r2);
+}
+
+
 
 }
