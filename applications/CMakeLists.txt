@@ -61,7 +61,7 @@ if( BuildCameraViewer )
     target_link_libraries( CameraViewer )
 endif()
 
-set( BuildTriggerTest false CACHE "" force )
+set( BuildTriggerTest true CACHE "" force )
 if( BuildTriggerTest )
     add_executable( TriggerTest ${COMMON_SRC} TriggerTest.cpp)
     target_link_libraries( TriggerTest ${SimpleGui_LIBRARIES} )

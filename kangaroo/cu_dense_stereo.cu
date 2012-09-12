@@ -433,7 +433,7 @@ __global__ void KernLeftRightCheck(
 
         if( 0 <= xr && xr < dispR.w) {
             const TD dr = dispR(xr, y);
-            if(!isfinite(dr) || abs(dl - dr) > maxDiff) {
+            if(!InvalidValue<TD>::IsValid(dr) || abs(dl - dr) > maxDiff) {
                 dispL(x,y) = InvalidValue<TD>::Value();
             }
         }else{
@@ -670,7 +670,7 @@ void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol)
 //////////////////////////////////////////////////////
 
 __global__ void KernCostVolumeCrossSection(
-    Image<float4> dScore, Image<CostVolElem> dCostVolSlice
+    Image<float> dScore, Image<CostVolElem> dCostVolSlice
 ) {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int d = blockIdx.y*blockDim.y + threadIdx.y;
@@ -679,14 +679,14 @@ __global__ void KernCostVolumeCrossSection(
     {
         CostVolElem elem = dCostVolSlice(x,d);
         const float score = (elem.sum / elem.n) / 255.0f;
-        dScore(x,d) = make_float4(score,score,score,1);
+        dScore(x,d) = score;
     }else{
-        dScore(x,d) = make_float4(1,0,0,1);
+        dScore(x,d) = 0.0f / 0.0f;
     }
 }
 
 void CostVolumeCrossSection(
-    Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
+    Image<float> dScore, Volume<CostVolElem> dCostVol, int y
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dScore);

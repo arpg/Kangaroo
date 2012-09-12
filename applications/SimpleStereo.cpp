@@ -63,6 +63,7 @@ int main( int argc, char* argv[] )
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
+
     Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> filter("ui.filter", true, true);

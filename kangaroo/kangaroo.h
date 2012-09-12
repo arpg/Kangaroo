@@ -70,11 +70,8 @@ void Census(Image<ulong4> census, Image<unsigned char> img);
 
 void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
 
-void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp);
-
-void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp);
-
-void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp);
+template<typename Tvol, typename T>
+void CensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T> right, int maxDisp, float sd);
 
 //////////////////////////////////////////////////////
 
@@ -255,7 +252,7 @@ void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol);
 void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp);
 
 void CostVolumeCrossSection(
-    Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
+    Image<float> dScore, Volume<CostVolElem> dCostVol, int y
 );
 
 //////////////////////////////////////////////////////

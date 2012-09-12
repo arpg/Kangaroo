@@ -187,8 +187,8 @@ public:
         ImageSelect* imageSelect = dynamic_cast<ImageSelect*>(view.handler);
 
         if(imageSelect) {
-            const float pixScale = imageSelect->PixelScale();
-            RenderToViewport(glTex,flipy,pixScale);
+            const float doScale = pixScale * imageSelect->PixelScale();
+            RenderToViewport(glTex,flipy,doScale);
             RenderImageSelect(*imageSelect, glTex.width, glTex.height);
         }else{
             RenderToViewport(glTex,flipy,pixScale);

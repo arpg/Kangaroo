@@ -29,11 +29,10 @@
 
 //#define HM_FUSION
 #define PLANE_FIT
-#define COSTVOL_TIME
-//#define CENSUS_TRANFORM
-#define SEMIGLOBAL
+//#define COSTVOL_TIME
+#define CENSUS_TRANFORM
 
-const int costvoldisp = 80;
+const int MAXD = 80;
 
 using namespace std;
 using namespace pangolin;
@@ -51,12 +50,12 @@ int main( int argc, char* argv[] )
     CameraDevice video = OpenRpgCamera(argc,argv);
 
     // Capture first image
-    std::vector<rpg::ImageWrapper> img;
-    video.Capture(img);
+    std::vector<rpg::ImageWrapper> images;
+    video.Capture(images);
 
     // native width and height (from camera)
-    const unsigned int nw = img[0].width();
-    const unsigned int nh = img[0].height();
+    const unsigned int nw = images[0].width();
+    const unsigned int nh = images[0].height();
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
@@ -120,7 +119,7 @@ int main( int argc, char* argv[] )
     }
 
     // Check we received at least two images
-    if(img.size() < 2) {
+    if(images.size() < 2) {
         std::cerr << "Failed to capture first stereo pair from camera" << std::endl;
         return -1;
     }
@@ -166,33 +165,30 @@ int main( int argc, char* argv[] )
     Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
 
-    Pyramid<unsigned char, max_levels, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
-    Image<unsigned char, TargetDevice, Manage> dDispInt(lw,lh);
-    Image<float, TargetDevice, Manage>  dDisp(lw,lh);
-    Image<float, TargetHost, Manage>  hDisp(lw,lh);
-    Image<float, TargetDevice, Manage>  dDispFilt(lw,lh);
+    Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
+
+    Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
+    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{w,h,MAXD}};
+    Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
+    Image<float, TargetDevice, Manage> meanI(lw,lh);
+    Image<float, TargetDevice, Manage> varI(lw,lh);
+    Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
+
+    Image<float, TargetHost, Manage>     hDisp(lw,lh);
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<float4, TargetDevice, Manage>  dN(lw,lh);
     Image<float4, TargetDevice, Manage>  dDebugf4(lw,lh);
-    Image<float4, TargetDevice, Manage>  dCrossSection(lw,costvoldisp);
+    Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
+    Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
+    Image<float, TargetDevice, Manage>  Err(lw,lh);
 
 #ifdef CENSUS_TRANFORM
-    Image<unsigned long, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
-    Volume<unsigned short, TargetDevice, Manage> vol(w,h,costvoldisp);
+    Image<ulong4, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 #endif // CENSUS_TRANFORM
-
-#ifdef SEMIGLOBAL
-    Volume<float, TargetDevice, Manage> sgm(w,h,costvoldisp);
-#endif
-
-#ifdef PLANE_FIT
-    Image<unsigned char, TargetDevice,Manage> dScratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
-    Image<float, TargetDevice, Manage>  dErr(lw,lh);
-#endif
 
 #ifdef COSTVOL_TIME
     Sophus::SE3 T_wv;
-    Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,costvoldisp);
+    Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,MAXD);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 #endif
 
@@ -233,16 +229,38 @@ int main( int argc, char* argv[] )
     Var<bool> record("ui.record_dm", false,false);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
     Var<int> show_level("ui.show level",0, 0, max_levels-1);
+    Var<int> show_slice("ui.show slice",MAXD/2, 0, MAXD-1);
 
-    Var<float> maxDisp("ui.disp",80, 0, 128);
-//    Var<float> dispStep("ui.disp step",1, 0.1, 1);
-//    Var<int> scoreRad("ui.score rad",1, 0, 7 );
-//    Var<bool> scoreNormed("ui.score normed",true, true);
+    Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
+    Var<bool> subpix("ui.subpix", true, true);
 
-//    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);
+    Var<bool> use_census("ui.use census", false, true);
 
-//    Var<bool> subpix("ui.subpix", false, true);
-//    Var<bool> reverse_check("ui.reverse_check", false, true);
+    Var<float> alpha("ui.alpha", 0.9, 0,1);
+    Var<float> r1("ui.r1", 0.0028, 0,0.01);
+    Var<float> r2("ui.r2", 0.008, 0,0.01);
+
+    Var<bool> filter("ui.filter", true, true);
+    Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
+    Var<int> rad("ui.radius",9, 1, 20);
+
+    Var<bool> leftrightcheck("ui.left-right check", true, true);
+    Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
+
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",18, 1, 20);
+    Var<float> gs("ui.gs",10, 1E-3, 10);
+    Var<float> gr("ui.gr",6, 1E-3, 10);
+    Var<float> gc("ui.gc",0.01, 1E-4, 0.1);
+
+    Var<int> domedits("ui.median its",1, 1, 10);
+    Var<bool> domed9x9("ui.median 9x9", false, true);
+    Var<bool> domed7x7("ui.median 7x7", false, true);
+    Var<bool> domed5x5("ui.median 5x5", false, true);
+    Var<int> medi("ui.medi",12, 0, 24);
+
+    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
+
 
 #ifdef PLANE_FIT
     Var<bool> resetPlane("ui.resetplane", true, false);
@@ -266,30 +284,6 @@ int main( int argc, char* argv[] )
     Var<bool> show_heightmap("ui.show heightmap", false, true);
 #endif // HM_FUSION
 
-#ifdef SEMIGLOBAL
-    Var<bool> dosgm("ui.sgm", true, true);
-    Var<float> sgmP1("ui.P1",1, 0, 100);
-    Var<float> sgmP2("ui.P2",500, 0, 1000);
-    Var<bool> dohoriz("ui.horiz", true, true);
-    Var<bool> dovert("ui.vert", true, true);
-    Var<bool> doreverse("ui.reverse", false, true);
-#endif
-
-    Var<int> domedits("ui.median its",1, 1, 10);
-    Var<bool> domed9x9("ui.median 9x9", false, true);
-    Var<bool> domed7x7("ui.median 7x7", false, true);
-    Var<bool> domed5x5("ui.median 5x5", false, true);
-    Var<bool> domed3x3("ui.median 3x3", false, true);
-    Var<int> medi("ui.medi",12, 0, 24);
-
-    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-    Var<float> gs("ui.gs",2, 1E-3, 5);
-    Var<float> gr("ui.gr",0.5, 1E-3, 10);
-    Var<float> gc("ui.gc",10, 1E-3, 20);
-
-    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
-
 #ifdef COSTVOL_TIME
     Var<bool> cross_section("ui.Cross Section", true, true);
     Var<bool> costvol_reset("ui.Costvol Reset", true, false);
@@ -308,9 +302,10 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
 
     Handler2dImageSelect handler2d(lw,lh,level);
-    ActivateDrawPyramid<unsigned char,max_levels> adleft(dCamImg[0],GL_LUMINANCE8, false, true);
-    ActivateDrawImage<float> adDisp(dDisp,GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float4> adCrossSection(dCrossSection,GL_RGBA_FLOAT32_APPLE, false, true);
+    ActivateDrawPyramid<unsigned char,max_levels> adleft(img_pyr[0],GL_LUMINANCE8, false, true);
+    ActivateDrawImage<float> adisp(disp[0],GL_LUMINANCE32F_ARB, false, true);
+//    ActivateDrawImage<float> adCrossSection(dCrossSection,GL_RGBA_FLOAT32_APPLE, false, true);
+    ActivateDrawImage<float> adVol(vol[0].ImageXY(show_slice),GL_LUMINANCE32F_ARB, false, true);
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
@@ -328,8 +323,9 @@ int main( int argc, char* argv[] )
 
     SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(adDisp)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(boost::ref(adCrossSection)).SetHandler(new Handler2dImageSelect(lw,lh));
+    container[1].SetDrawFunction(boost::ref(adisp)).SetHandler(&handler2d);
+//    container[2].SetDrawFunction(boost::ref(adCrossSection)).SetHandler(new Handler2dImageSelect(lw,lh));
+    container[2].SetDrawFunction(boost::ref(adVol)).SetHandler(&handler2d);
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam));
     container[3].SetHandler( new Handler3D(s_cam, AxisNone) );
 
@@ -338,7 +334,7 @@ int main( int argc, char* argv[] )
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
-            if(frame>0) video.Capture(img);
+            if(frame>0) video.Capture(images);
 
             if(frame < gtPoseT_wh.size()) {
                 T_wc = gtPoseT_wh[frame];
@@ -349,7 +345,7 @@ int main( int argc, char* argv[] )
             /////////////////////////////////////////////////////////////
             // Upload images to device (Warp / Decimate if necessery)
             for(int i=0; i<2; ++i ) {
-                hCamImg[i].ptr = img[i].Image.data;
+                hCamImg[i].ptr = images[i].Image.data;
 
                 if(rectify) {
 //                    dTemp[0].CopyFrom(hCamImg[i].SubImage(roi));
@@ -361,86 +357,111 @@ int main( int argc, char* argv[] )
 //                        Warp(dCamImg[i], dTemp[0], dLookup[i]);
 //                    }
                 }else{
-                    dCamImg[i][0].CopyFrom(hCamImg[i].SubImage(roi));
-                    BoxReduce<unsigned char, max_levels, unsigned int>(dCamImg[i]);
+                    img_pyr[i][0].CopyFrom(hCamImg[i].SubImage(roi));
+//                    img_pyr[i][0].MemcpyFromHost(images[i].Image.data + roi.y*images[i].width() + roi.x);
+                    BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
+                    ElementwiseScaleBias<float,unsigned char>(img[i], img_pyr[i][level],1.0f/255.0f);
                 }
-#ifdef CENSUS_TRANFORM
-                Census(census[i], dCamImg[i][level]);
-#endif // CENSUS_TRANFORM
+                Census(census[i], img_pyr[i][level]);
             }
         }
 
         if(go || GuiVarHasChanged() )
         {
+            if(use_census) {
+                CensusStereoVolume<float, ulong4>(vol[0], census[0], census[1], maxdisp, -1);
+                if(leftrightcheck) CensusStereoVolume<float, ulong4>(vol[1], census[1], census[0], maxdisp, +1);
+            }else{
+                CostVolumeFromStereoTruncatedAbsAndGrad(vol[0], img[0], img[1], -1, alpha, r1, r2);
+                if(leftrightcheck) CostVolumeFromStereoTruncatedAbsAndGrad(vol[1], img[1], img[0], +1, alpha, r1, r2);
+            }
+
+
+            if(filter) {
+                // Filter Cost volume
+                for(int v=0; v<(leftrightcheck?2:1); ++v)
+                {
+                    Image<float, TargetDevice, Manage>& I = img[v];
+                    ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
+
+                    for(int d=0; d<maxdisp; ++d)
+                    {
+                        Image<float> P = vol[v].ImageXY(d);
+                        ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
+                        GuidedFilter(P,temp[0],varI,temp[1],meanI,I,Scratch,temp[2],temp[3],temp[4],rad,eps);
+                    }
+                }
+            }
+
+            if(applyBilateralFilter) {
+                // Filter Cost volume
+                for(int v=0; v<(leftrightcheck?2:1); ++v)
+                {
+                    Image<float, TargetDevice, Manage>& I = img[v];
+
+                    for(int d=0; d<maxdisp; ++d)
+                    {
+                        Image<float> P = vol[v].ImageXY(d);
+                        temp[0].CopyFrom(P);
+                        BilateralFilter<float,float,float>(P,temp[0],I,gs,gr,gc,bilateralWinSize);
+                    }
+                }
+            }
+
+            if(subpix) {
+                CostVolMinimumSubpix(disp[0],vol[0], maxdisp);
+                if(leftrightcheck) CostVolMinimumSubpix(disp[1],vol[1], maxdisp);
+            }else{
+                CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
+                if(leftrightcheck) CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
+            }
+
+            for(int di=0; di<(leftrightcheck?2:1); ++di) {
+                for(int i=0; i < domedits; ++i ) {
+                    if(domed9x9) MedianFilterRejectNegative9x9(disp[di],disp[di], medi);
+                    if(domed7x7) MedianFilterRejectNegative7x7(disp[di],disp[di], medi);
+                    if(domed5x5) MedianFilterRejectNegative5x5(disp[di],disp[di], medi);
+                }
+            }
+
+//            if(applyBilateralFilter) {
+//                temp[0].CopyFrom(disp[0]);
+//                BilateralFilter<float,float,float>(disp[0],temp[0],img[0],gs,gr,gc,bilateralWinSize);
+//            }
+
+            if(leftrightcheck ) {
+                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
+                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
+            }
+
+            if(filtgradthresh > 0) {
+                FilterDispGrad(disp[0], disp[0], filtgradthresh);
+            }
+
 #ifdef COSTVOL_TIME
             if(Pushed(costvol_reset)) {
                 T_wv = T_wc;
-                dImgv.CopyFrom(dCamImg[0][level]);
+                dImgv.CopyFrom(img_pyr[0][level]);
                 CostVolumeZero(dCostVol);
             }
 
             if(Pushed(costvol_reset_stereo)) {
                 T_wv = T_wc;
-                dImgv.CopyFrom(dCamImg[0][level]);
-                CostVolumeFromStereo(dCostVol,dCamImg[0][level], dCamImg[1][level]);
+                dImgv.CopyFrom(img_pyr[0][level]);
+                CostVolumeFromStereo(dCostVol,img_pyr[0][level], img_pyr[1][level]);
             }
 
             if(Pushed(costvol_add)) {
                 const Eigen::Matrix<double,3,4> KT_lv = Kl * (T_wc.inverse() * T_wv).matrix3x4();
-                CostVolumeAdd(dCostVol,dImgv, dCamImg[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
+                CostVolumeAdd(dCostVol,dImgv, img_pyr[0][level], KT_lv, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2), baseline, 0);
             }
 
             // Extract Minima of cost volume
-            CostVolMinimum(dDisp, dCostVol);
+//            CostVolMinimum(disp[0], dCostVol);
 #endif // COSTVOL_TIME
 
-#ifdef CENSUS_TRANFORM
-            CensusStereoVolume(vol, census[0], census[1], maxDisp);
-#endif // CENSUS_TRANFORM
-
-#ifdef SEMIGLOBAL
-            if(dosgm) {
-                SemiGlobalMatching(sgm,dCostVol,dImgv,dCostVol.d,sgmP1,sgmP2,dohoriz,dovert,doreverse);
-//                SemiGlobalMatching(sgm,vol,dCamImg[0][level],dCostVol.d,sgmP1,sgmP2,dohoriz,dovert,doreverse);
-                CostVolMinimum<float,float>(dDisp,sgm,dCostVol.d);
-            }else{
-//                CostVolMinimum<float,unsigned short>(dDisp,vol,maxDisp);
-            }
-#endif // SEMIGLOBAL
-
-//            if(dispStep == 1 )
-//            {
-//                // Compute dense stereo
-//                DenseStereo<unsigned char,unsigned char>(dDispInt, dCamImg[0][level], dCamImg[1][level], maxDisp, stereoAcceptThresh, scoreRad);
-
-//                if(subpix) {
-//                    DenseStereoSubpixelRefine(dDisp, dDispInt, dCamImg[0][level], dCamImg[1][level]);
-//                }else{
-//                    ConvertImage<float, unsigned char>(dDisp, dDispInt);
-//                }
-//            }else{
-//                DenseStereoSubpix(dDisp, dCamImg[0][level], dCamImg[1][level], maxDisp, dispStep, stereoAcceptThresh, scoreRad, scoreNormed);
-//            }
-
-            for(int i=0; i < domedits; ++i ) {
-                if(domed9x9) MedianFilterRejectNegative9x9(dDisp,dDisp, medi);
-                if(domed7x7) MedianFilterRejectNegative7x7(dDisp,dDisp, medi);
-                if(domed5x5) MedianFilterRejectNegative5x5(dDisp,dDisp, medi);
-                if(domed3x3) MedianFilter3x3(dDisp,dDisp);
-            }
-
-            if(filtgradthresh > 0) {
-                FilterDispGrad(dDisp, dDisp, filtgradthresh);
-            }
-
-            if(applyBilateralFilter) {
-//                BilateralFilter<float,float>(dDispFilt,dDisp,gs,gr,bilateralWinSize);
-                BilateralFilter<float,float,unsigned char>(dDispFilt,dDisp,dCamImg[0][level],gs,gr,gc,bilateralWinSize);
-                dDisp.CopyFrom(dDispFilt);
-            }
-
             if(go && save_dm) {
-                hDisp.CopyFrom(dDisp);
+                hDisp.CopyFrom(disp[0]);
 
                 // file info
                 string sFilePrefix = "disp/depth-";
@@ -459,19 +480,14 @@ int main( int argc, char* argv[] )
             }
 
             // Generate point cloud from disparity image
-            DisparityImageToVbo(d3d, dDisp, baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
-
-            if(container[2].IsShown()) {
-                NormalsFromVbo(dN, d3d);
-                dDebugf4.CopyFrom(dN);
-            }
+            DisparityImageToVbo(d3d, disp[0], baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
 
 #ifdef PLANE_FIT
             if(plane_do || resetPlane) {
                 // Fit plane
                 for(int i=0; i<(resetPlane*100+5); ++i )
                 {
-                    Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, dScratch, dErr, plane_within, plane_c);
+                    Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, Scratch, Err, plane_within, plane_c);
                     Eigen::FullPivLU<Eigen::Matrix3d> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
                     Eigen::Vector3d x = -1.0 * lu_JTJ.solve( (Eigen::Vector3d)lss.JTy );
                     if( x.norm() > 1 ) x = x / x.norm();
@@ -494,7 +510,7 @@ int main( int argc, char* argv[] )
 
             //calcualte the camera to heightmap transform
             if(fuse) {
-                hm.Fuse(d3d, dCamImg[0][level], T_wc);
+                hm.Fuse(d3d, img_pyr[0][level], T_wc);
                 hm.GenerateVbo(vbo_hm);
                 hm.GenerateCbo(cbo_hm);
             }
@@ -502,6 +518,8 @@ int main( int argc, char* argv[] )
             if(Pushed(save_hm)) {
                 hm.SaveModel("test");
             }
+#else
+            resetPlane = false;
 #endif // HM_FUSION
 
             if(container[3].IsShown()) {
@@ -519,25 +537,20 @@ int main( int argc, char* argv[] )
 #ifdef COSTVOL_TIME
                     ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
 #else
-                    ConvertImage<uchar4,unsigned char>(dCbo, dCamImg[0][level]);
+                    ConvertImage<uchar4,unsigned char>(dCbo, img_pyr[0][level]);
 #endif
                 }
             }
 
-            // normalise dDisp
-            nppiDivC_32f_C1IR(maxDisp,dDisp.ptr,dDisp.pitch,dDisp.Size());
-
             // Update texture views
+            adisp.SetImageScale(1.0f/maxdisp);
             adleft.SetLevel(show_level);
+            adVol.SetImage(vol[0].ImageXY(show_slice));
         }
 
 #ifdef COSTVOL_TIME
         if(cross_section) {
-            if(0) {
-                DisparityImageCrossSection(dCrossSection, dDispInt, dCamImg[0][level], dCamImg[1][level], handler2d.GetSelectedPoint(true)[1] + 0.5);
-            }else{
-                CostVolumeCrossSection(dCrossSection, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
-            }
+            CostVolumeCrossSection(dCrossSection, dCostVol, handler2d.GetSelectedPoint(true)[1] + 0.5);
         }
 #endif // COSTVOL_TIME
 
@@ -545,7 +558,7 @@ int main( int argc, char* argv[] )
             // Start recording next frame
             frame = 0;
             video.InitDriver("FileReader");
-            video.Capture(img);
+            video.Capture(images);
             save_dm = true;
         }
 
@@ -554,8 +567,8 @@ int main( int argc, char* argv[] )
 
         s_cam.Follow(T_wc.matrix(), lockToCam);
 
-        glvbo.SetPose(T_wv.matrix());
 #ifdef COSTVOL_TIME
+        glvbo.SetPose(T_wv.matrix());
         glvbo.SetVisible(show_depthmap);
 #else
         glvbo.SetPose(T_wc.matrix());
