@@ -249,7 +249,7 @@ void CostVolumeAdd(Volume<CostVolElem> vol, const Image<unsigned char> imgv,
 
 void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol);
 
-void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp);
+void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp, float sd);
 
 void CostVolumeCrossSection(
     Image<float> dScore, Volume<CostVolElem> dCostVol, int y

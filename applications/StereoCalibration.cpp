@@ -54,20 +54,9 @@ public:
     {
     }
 
-    void InitCamera()
+    void InitCamera(int argc, char** argv)
     {
-//        InitRpgCamera( camera,
-//        //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-//        //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//                "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
-//        //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
-//        );
-
-        InitPangoCamera( camera,
-            "file:[stream=0,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI",
-            "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
-        );
+        OpenRpgCamera(argc,argv);
 
         camera.Capture(img);
         width = img[0].width();
@@ -105,8 +94,8 @@ public:
         for(int i=0; i<2; ++i) {
             tracker[i] = new Tracker(width,height);
             tracker[i]->target.GenerateRandom(60,unit*USwp*25/(842.0),unit*USwp*75/(842.0),unit*USwp*40/(842.0),Eigen::Vector2d(unit*USwp,unit*UShp));
-//            tracker[i]->target.SaveEPS("stereo.eps");
         }
+        tracker[0]->target.SaveRotatedEPS("stereo.eps", 1.0/unit);
     }
 
     void OptimiseRun()
@@ -122,9 +111,9 @@ public:
         }
     }
 
-    int Run()
+    int Run(int argc, char** argv)
     {
-        InitCamera();
+        InitCamera(argc,argv);
         InitTrackers();
 
         // Create Graphics Context using Glut
@@ -279,5 +268,5 @@ public:
 
 int main (int argc, char** argv){
     Application app;
-    return app.Run();
+    return app.Run(argc,argv);
 }

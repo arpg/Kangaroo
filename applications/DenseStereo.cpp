@@ -28,9 +28,8 @@
 #include <Node.h>
 
 //#define HM_FUSION
-#define PLANE_FIT
+//#define PLANE_FIT
 //#define COSTVOL_TIME
-#define CENSUS_TRANFORM
 
 const int MAXD = 80;
 
@@ -176,15 +175,12 @@ int main( int argc, char* argv[] )
 
     Image<float, TargetHost, Manage>     hDisp(lw,lh);
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
-    Image<float4, TargetDevice, Manage>  dN(lw,lh);
-    Image<float4, TargetDevice, Manage>  dDebugf4(lw,lh);
     Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
     Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
     Image<float, TargetDevice, Manage>  Err(lw,lh);
 
-#ifdef CENSUS_TRANFORM
-    Image<ulong4, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
-#endif // CENSUS_TRANFORM
+    typedef ulong4 census_t;
+    Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
 #ifdef COSTVOL_TIME
     Sophus::SE3 T_wv;
@@ -309,12 +305,16 @@ int main( int argc, char* argv[] )
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
-    SceneGraph::GLGrid glGroundPlane;
+
     SceneGraph::GLCameraHistory history;
     history.LoadFromAbsoluteCartesianFile(video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
     graph.AddChild(&glvbo);
-    glvbo.AddChild(&glGroundPlane);
     graph.AddChild(&history);
+
+#ifdef PLANE_FIT
+    SceneGraph::GLGrid glGroundPlane;
+    glvbo.AddChild(&glGroundPlane);
+#endif
 
 #ifdef HM_FUSION
     SceneGraph::GLVbo glhmvbo(&vbo_hm,&ibo_hm,&cbo_hm);
@@ -369,8 +369,8 @@ int main( int argc, char* argv[] )
         if(go || GuiVarHasChanged() )
         {
             if(use_census) {
-                CensusStereoVolume<float, ulong4>(vol[0], census[0], census[1], maxdisp, -1);
-                if(leftrightcheck) CensusStereoVolume<float, ulong4>(vol[1], census[1], census[0], maxdisp, +1);
+                CensusStereoVolume<float, census_t>(vol[0], census[0], census[1], maxdisp, -1);
+                if(leftrightcheck) CensusStereoVolume<float, census_t>(vol[1], census[1], census[0], maxdisp, +1);
             }else{
                 CostVolumeFromStereoTruncatedAbsAndGrad(vol[0], img[0], img[1], -1, alpha, r1, r2);
                 if(leftrightcheck) CostVolumeFromStereoTruncatedAbsAndGrad(vol[1], img[1], img[0], +1, alpha, r1, r2);
@@ -409,8 +409,8 @@ int main( int argc, char* argv[] )
             }
 
             if(subpix) {
-                CostVolMinimumSubpix(disp[0],vol[0], maxdisp);
-                if(leftrightcheck) CostVolMinimumSubpix(disp[1],vol[1], maxdisp);
+                CostVolMinimumSubpix(disp[0],vol[0], maxdisp,-1);
+                if(leftrightcheck) CostVolMinimumSubpix(disp[1],vol[1], maxdisp,+1);
             }else{
                 CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
                 if(leftrightcheck) CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
@@ -518,9 +518,9 @@ int main( int argc, char* argv[] )
             if(Pushed(save_hm)) {
                 hm.SaveModel("test");
             }
-#else
+#elif PLANE_FIT
             resetPlane = false;
-#endif // HM_FUSION
+#endif
 
             if(container[3].IsShown()) {
                 // Copy point cloud into VBO

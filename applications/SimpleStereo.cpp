@@ -152,8 +152,8 @@ int main( int argc, char* argv[] )
             }
 
             if(subpix) {
-                CostVolMinimumSubpix(disp[0],vol[0], maxdisp);
-                CostVolMinimumSubpix(disp[1],vol[1], maxdisp);
+                CostVolMinimumSubpix(disp[0],vol[0], maxdisp, -1);
+                CostVolMinimumSubpix(disp[1],vol[1], maxdisp, +1);
             }else{
                 CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
                 CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);

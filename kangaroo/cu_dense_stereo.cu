@@ -60,26 +60,29 @@ template void CostVolMinimum<>(Image<float>,Volume<unsigned short>,unsigned);
 //////////////////////////////////////////////////////
 
 template<typename Tdisp, typename Tvol>
-__global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDispVal)
+__global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDispVal, float sd)
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     Tdisp bestd = 0;
-    Tvol bestc = vol(x,y,0);
+    Tvol bestc = 1E10;
 
-    const int maxDisp = min(maxDispVal, x+1);
-    for(int d=1; d < maxDisp; ++d) {
-        const Tvol c = vol(x,y,d);
-        if(c < bestc) {
-            bestc = c;
-            bestd = d;
+    for(int d=0; d < maxDispVal; ++d) {
+        const int xr = x + sd*d;
+        if(0 <= xr && xr < vol.w) {
+            const Tvol c = vol(x,y,d);
+            if(c < bestc) {
+                bestc = c;
+                bestd = d;
+            }
         }
     }
 
     Tdisp out = bestd;
 
-    if( 0 < bestd && bestd < maxDisp-1) {
+    const int bestxr = x + sd*bestd;
+    if( 0 < bestxr && bestxr < vol.w-1) {
         // Fit parabola to neighbours
         const float d1 = bestd+1;
         const float d2 = bestd;
@@ -105,11 +108,11 @@ __global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, un
     disp(x,y) = out;
 }
 
-void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp)
+void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp, float sd)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim,disp);
-    KernCostVolMinimumSubpix<float,float><<<gridDim,blockDim>>>(disp,vol,maxDisp);
+    KernCostVolMinimumSubpix<float,float><<<gridDim,blockDim>>>(disp,vol,maxDisp,sd);
 }
 
 
