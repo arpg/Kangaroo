@@ -14,6 +14,7 @@
 #include "common/RpgCameraOpen.h"
 #include "common/StereoIntrinsicsOptimisation.h"
 #include "common/BaselineFromCamModel.h"
+#include "common/SaveMvlCamModel.h"
 
 using namespace std;
 using namespace Eigen;
@@ -56,7 +57,8 @@ public:
 
     void InitCamera(int argc, char** argv)
     {
-        camera = OpenRpgCamera(argc,argv);
+        //camera = OpenRpgCamera(argc,argv);
+        camera.InitDriver( "Flycap" );
 
         camera.Capture(img);
         width = img[0].width();
@@ -68,8 +70,8 @@ public:
 //        camParams = MatlabCamera( width,height, camParamsVec);
 
         mvl::CameraModel cam[] = {
-            camera.GetProperty("DataSourceDir") + "/lcmod.xml",
-            camera.GetProperty("DataSourceDir") + "/rcmod.xml"
+            (std::string)"/home/rpg/Data/Flea3/lcmod.xml",
+            (std::string)"/home/rpg/Data/Flea3/rcmod.xml"
         };
 
         camParams = MatlabCamera( width,height,
@@ -101,21 +103,17 @@ public:
 
     void InitTrackers()
     {
-        // Setup Tracker objects
-        // Unit hell!
-        const double ppi = 72; // Points Per Inch
-        const double USwp = 11 * ppi;
-        const double UShp = 8.5 * ppi;
-        const double mpi = 0.0254; // meters per inch
-        const double mpp = mpi / ppi; // meters per point
-        const double unit = mpp; //1; //mpp;
+        // Create Target in Meters
+        const Eigen::Vector2d targetSizeMeters = Eigen::Vector2d(11,8.5) * 0.0254;
+        const double trad = targetSizeMeters[0]/40;
 
         // Setup Trackers
         for(int i=0; i<2; ++i) {
             tracker[i] = new Tracker(width,height);
-            tracker[i]->target.GenerateRandom(60,unit*USwp*25/(842.0),unit*USwp*75/(842.0),unit*USwp*40/(842.0),Eigen::Vector2d(unit*USwp,unit*UShp));
+            //tracker[i]->target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);
+            tracker[i]->target.LoadEPS("/home/rpg/Code/Builds/Kangaroo/applications/stereo.eps", 72/0.0254);
         }
-        tracker[0]->target.SaveRotatedEPS("stereo.eps", 1.0/unit);
+//        tracker[0]->target.SaveRotatedEPS("stereo.eps", 72/0.0254);
     }
 
     void OptimiseRun()
@@ -174,14 +172,15 @@ public:
         // Run Optimisation Loop
         boost::thread optThread( boost::bind( &Application::OptimiseRun, this ) );
 
-        Var<bool> run("ui.Run", true, true);
-        Var<bool> step("ui.Step", false, false);
         Var<bool> save_kf("ui.Save Keyframe", false, false);
+        Var<bool> save_cam_model("ui.Save Camera Model", false, false);
+
+        pangolin::RegisterKeyPressCallback(' ', [&save_kf](){save_kf = true;} );
 
         // Run main loop
         for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
         {
-            const bool go = frame==0 || run || Pushed(step);
+            const bool go = frame==0 || true;
 
             if(go) {
                 // Capture camera images
@@ -195,6 +194,10 @@ public:
             }
             for(int i=0; i<2; ++i) {
                 trackerThreads[i].join();
+            }
+
+            if(Pushed(save_cam_model)) {
+                SaveCamModelLeftRightVisionConvention("/home/rpg/Data/Flea3/_", camParams, T_rl.inverse().matrix());
             }
 
             if( Pushed(save_kf) ) {

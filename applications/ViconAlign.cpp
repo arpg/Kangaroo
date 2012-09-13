@@ -29,7 +29,7 @@ using namespace std;
 using namespace pangolin;
 using namespace Eigen;
 
-#include <boost/thread.hpp>
+//#include <boost/thread.hpp>
 
 inline double Tic()
 {

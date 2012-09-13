@@ -84,9 +84,8 @@ endif()
 
 set( BuildViconAlign true CACHE "" force )
 if( BuildViconAlign )
-    include_directories(${CCAMERAMODEL_INCLUDE_DIR})
     add_executable( ViconAlign ${COMMON_SRC} ViconAlign.cpp)
-    target_link_libraries( ViconAlign ${CCAMERAMODEL_LIBRARIES} vrpn )
+    target_link_libraries( ViconAlign vrpn )
 endif()
 
 set( BuildGpsConvert true CACHE "" force )
