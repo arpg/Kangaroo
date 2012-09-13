@@ -25,6 +25,9 @@ FIND_PACKAGE(SceneGraph REQUIRED)
 INCLUDE_DIRECTORIES(${SceneGraph_INCLUDE_DIRS})
 LINK_LIBRARIES(${SceneGraph_LIBRARIES})
 
+# https://github.com/obiou/FPL.git
+FIND_PACKAGE(CCAMERAMODEL QUIET)
+
 find_package( RPG REQUIRED )
 include_directories( ${RPG_INCLUDE_DIRS} )
 LINK_LIBRARIES(${RPG_LIBRARIES})
@@ -81,8 +84,9 @@ endif()
 
 set( BuildViconAlign true CACHE "" force )
 if( BuildViconAlign )
+    include_directories(${CCAMERAMODEL_INCLUDE_DIR})
     add_executable( ViconAlign ${COMMON_SRC} ViconAlign.cpp)
-    target_link_libraries( ViconAlign vrpn )
+    target_link_libraries( ViconAlign ${CCAMERAMODEL_LIBRARIES} vrpn )
 endif()
 
 set( BuildGpsConvert true CACHE "" force )

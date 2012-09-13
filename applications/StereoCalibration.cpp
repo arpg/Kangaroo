@@ -5,15 +5,15 @@
 #include <CVars/CVar.h>
 
 #include <RPG/Devices/Camera/CameraDevice.h>
-#include "common/RpgCameraOpen.h"
 
 #include <fiducials/tracker.h>
 #include <fiducials/drawing.h>
 
 #include <pangolin/pangolin.h>
 
+#include "common/RpgCameraOpen.h"
 #include "common/StereoIntrinsicsOptimisation.h"
-#include "common/DisplayUtils.h"
+#include "common/BaselineFromCamModel.h"
 
 using namespace std;
 using namespace Eigen;
@@ -56,27 +56,47 @@ public:
 
     void InitCamera(int argc, char** argv)
     {
-        OpenRpgCamera(argc,argv);
+        camera = OpenRpgCamera(argc,argv);
 
         camera.Capture(img);
         width = img[0].width();
         height = img[0].height();
 
         // Setup camera parameters
-        VectorXd camParamsVec(6); // = Var<Matrix<double,9,1> >("cam_params");
-        camParamsVec << 0.558526, 0.747774, 0.484397, 0.494393, -0.249261, 0.0825967;
-        camParams = MatlabCamera( width,height, camParamsVec);
+//        VectorXd camParamsVec(6); // = Var<Matrix<double,9,1> >("cam_params");
+//        camParamsVec << 0.558526, 0.747774, 0.484397, 0.494393, -0.249261, 0.0825967;
+//        camParams = MatlabCamera( width,height, camParamsVec);
 
-        // Setup stereo baseline
-        Eigen::Matrix3d R_rl;
-        R_rl << 0.999995,   0.00188482,  -0.00251896,
-                -0.0018812,     0.999997,   0.00144025,
-                0.00252166,  -0.00143551,     0.999996;
+        mvl::CameraModel cam[] = {
+            camera.GetProperty("DataSourceDir") + "/lcmod.xml",
+            camera.GetProperty("DataSourceDir") + "/rcmod.xml"
+        };
 
-        Eigen::Vector3d l_r;
-        l_r <<    -0.203528, -0.000750334, 0.00403201;
+        camParams = MatlabCamera( width,height,
+            cam[0].GetModel()->warped.fx, cam[0].GetModel()->warped.fy,
+            cam[0].GetModel()->warped.cx, cam[0].GetModel()->warped.cy,
+            cam[0].GetModel()->warped.kappa1, cam[0].GetModel()->warped.kappa2, cam[0].GetModel()->warped.tau1, cam[0].GetModel()->warped.tau2, cam[0].GetModel()->warped.kappa3
+        );
 
-        T_rl = Sophus::SE3(R_rl, l_r);
+        Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
+        Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
+        Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();
+        T_vis_ro.block<3,3>(0,0) = RDFvision.transpose() * RDFrobot;
+        Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
+        T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
+
+        T_rl = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
+
+//        // Setup stereo baseline
+//        Eigen::Matrix3d R_rl;
+//        R_rl << 0.999995,   0.00188482,  -0.00251896,
+//                -0.0018812,     0.999997,   0.00144025,
+//                0.00252166,  -0.00143551,     0.999996;
+
+//        Eigen::Vector3d l_r;
+//        l_r <<    -0.203528, -0.000750334, 0.00403201;
+
+//        T_rl = Sophus::SE3(R_rl, l_r);
     }
 
     void InitTrackers()

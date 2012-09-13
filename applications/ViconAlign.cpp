@@ -11,24 +11,23 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <unsupported/Eigen/OpenGLSupport>
 
-#define USE_VICON 1
-//#define USE_COLOUR 1
-//#define USE_USHORT 1
-
 #ifdef HAVE_FPL
 #include <CameraModel.h>
 #include <CCameraModel/GridCalibrator.h>
 using namespace CCameraModel;
 #endif
 
+#include "common/ViconTracker.h"
+#include "common/RpgCameraOpen.h"
+#include "common/BaseDisplay.h"
+
+#include <Mvlpp/Mvl.h>
+#include <Mvlpp/Cameras.h>
+
+
 using namespace std;
 using namespace pangolin;
 using namespace Eigen;
-
-const int PANEL_WIDTH = 200;
-
-#ifdef USE_VICON
-#include "common/ViconTracker.h"
 
 #include <boost/thread.hpp>
 
@@ -163,7 +162,6 @@ void OptimiseTargetVicon(
         T_wt = T_wt * Sophus::SE3::exp(-1.0 * JTy.segment<6>(6));
     }
 }
-#endif
 
 template<typename T, int R, int C>
 std::istream& operator>> (std::istream& is, Eigen::Matrix<T,R,C>& o){
@@ -206,9 +204,8 @@ std::istream& operator>> (std::istream& is, Sophus::SE3& o){
     return is;
 }
 
-int main( int /*argc*/, char* argv[] )
+int main( int argc, char* argv[] )
 {
-#ifdef USE_VICON
     ViconTracking vicon("KINECT","192.168.10.1");
     std::vector<Observation> vicon_obs;
 
@@ -217,18 +214,12 @@ int main( int /*argc*/, char* argv[] )
 
     // Target to World transform
     Sophus::SE3 T_wt;
-#endif
 
-    // Setup Video
-    Var<string> video_uri("video_uri", "convert:[fmt=GRAY8]//openni:[img1=rgb]//");
-
-    const std::string ui_file = "input.log";
-    VideoRecordRepeat video(video_uri, "store.pvn", 1024*1024*200);
-    InputRecordRepeat input("vicon.");
-    input.LoadBuffer(ui_file);
-
-    const unsigned w = video.Width();
-    const unsigned h = video.Height();
+    CameraDevice video = OpenRpgCamera(argc,argv);
+    std::vector<rpg::ImageWrapper> images;
+    video.Capture(images);
+    const unsigned w = images[0].width();
+    const unsigned h = images[0].height();
 
     // Setup Tracker and associated target
     Tracker tracker(w,h);
@@ -249,13 +240,6 @@ int main( int /*argc*/, char* argv[] )
     // Save Target in points
     tracker.target.SaveRotatedEPS("target.eps",72/0.0254);
 
-    // Create Glut window
-    pangolin::CreateGlutWindowAndBind("Main",2*w+PANEL_WIDTH,h);
-    glEnable (GL_BLEND);
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_LINE_SMOOTH);
-    glHint(GL_LINE_SMOOTH_HINT,GL_NICEST);
-
     // Pangolin 3D Render state
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrixRDF_TopLeft(640,480,420,420,320,240,1E-3,1E6),
@@ -263,109 +247,67 @@ int main( int /*argc*/, char* argv[] )
     );
     pangolin::Handler3D handler(s_cam);
 
-    // Create viewport for video with fixed aspect
-    View& vPanel = pangolin::CreatePanel("ui").SetBounds(1.0,0.0,0,Attach::Pix(PANEL_WIDTH));
-    View& vVideo = pangolin::CreateDisplay().SetAspect((float)w/h);
-    View& v3D    = pangolin::CreateDisplay().SetAspect((float)w/h).SetHandler(&handler);
-#ifdef USE_VICON
-    View& v3D2   = pangolin::CreateDisplay().SetAspect((float)w/h).SetHandler(&handler);
-#endif
+    // Create Glut window
+    View& container = SetupPangoGL(1024, 768);
 
-    Display("Container")
-            .SetBounds(1.0,0.0,Attach::Pix(PANEL_WIDTH),1.0,false)
-            .SetLayout(LayoutEqual)
-            .AddDisplay(vVideo)
-            .AddDisplay(v3D)
-#ifdef USE_VICON
-            .AddDisplay(v3D2)
-#endif
-            ;
+    // Create viewport for video with fixed aspect
+    View& vVideo = container[0];
+    View& v3D = container[1];
+    View& v3D2 = container[2];
+    v3D.SetHandler(&handler);
+    v3D2.SetHandler(&handler);
 
     // OpenGl Texture for video frame
-    GlTexture texRGB(w,h,GL_RGBA8);
     GlTexture tex(w,h,GL_LUMINANCE8);
 
-    // Declare Image buffers
-#ifdef USE_COLOUR
-    unsigned char Irgb[w*h*3];
-#elif USE_USHORT
-    unsigned char Irgb[w*h*sizeof(unsigned short)];
-#endif
-    unsigned char I[w*h];
-
     // Camera parameters
-    Matrix<double,9,1> cam_params; // = Var<Matrix<double,9,1> >("cam_params");
-    cam_params << 0.808936, 1.06675, 0.495884, 0.520504, 0.180668, -0.354284, -0.00169838, 0.000600873, 0.0;
+//    Matrix<double,9,1> cam_params; // = Var<Matrix<double,9,1> >("cam_params");
+//    cam_params << 0.808936, 1.06675, 0.495884, 0.520504, 0.180668, -0.354284, -0.00169838, 0.000600873, 0.0;
     //  FovCamera cam( w,h, w*cam_params[0],h*cam_params[1], w*cam_params[2],h*cam_params[3], cam_params[4] );
-    MatlabCamera cam( w,h, w*cam_params[0],h*cam_params[1], w*cam_params[2],h*cam_params[3], cam_params[4], cam_params[5], cam_params[6], cam_params[7], cam_params[8]);
+    //MatlabCamera cam( w,h, w*cam_params[0],h*cam_params[1], w*cam_params[2],h*cam_params[3], cam_params[4], cam_params[5], cam_params[6], cam_params[7], cam_params[8]);
+    mvl::CameraModel cammodel(video.GetProperty("DataSourceDir") + "/lcmod.xml");
+    MatlabCamera cam( w,h, cammodel.GetModel()->warped.fx, cammodel.GetModel()->warped.fy, cammodel.GetModel()->warped.cx, cammodel.GetModel()->warped.cy, cammodel.GetModel()->warped.kappa1, cammodel.GetModel()->warped.kappa2, cammodel.GetModel()->warped.tau1, cammodel.GetModel()->warped.tau2, cammodel.GetModel()->warped.kappa3 );
 
     // Variables
-    Var<bool> record("ui.Record",false,false);
-    Var<bool> play("ui.Play",false,false);
-    Var<bool> source("ui.Source",false,false);
+    Var<bool> step("ui.step", false, false);
+    Var<bool> run("ui.run", false, true);
 
     Var<bool> disp_thresh("ui.Display Thresh",false);
     Var<bool> lock_to_cam("ui.AR",false);
     Var<bool> add_image("ui.add Image",false,false);
-#ifdef HAVE_FPL
-    Var<bool> minimise("ui.minimise calib",false,false);
-#endif
     Var<bool> guess("ui.guess calib",false,false);
     Var<bool> minimise_vicon("ui.minimise vicon",false,false);
     Var<bool> reset("ui.reset",false,false);
 
-    Var<Sophus::SE3> vicon_T_wf("vicon.T_wf");
-
 #ifdef HAVE_FPL
+    Var<bool> minimise("ui.minimise calib",false,false);
     Eigen::MatrixXd pattern = tracker.TargetPattern3D();
-    GridCalibrator calibrator(
-                //      "Arctan", size.x, size.y, pattern
-                "PinholeRadTan", size.x, size.y, pattern
-                );
+    GridCalibrator calibrator("PinholeRadTan", w, h, pattern);
 #endif
+
+    Var<Sophus::SE3> vicon_T_wf("vicon.T_wf");
 
     double rms = 0;
     Var<double> var_rms("ui.rms");
 
-    for(int frame=0; !pangolin::ShouldQuit(); ++frame)
+    for(int frame=0; !pangolin::ShouldQuit();)
     {
+        const bool go = frame==0 || run || Pushed(step);
+
         var_rms = rms;
 
         Viewport::DisableScissor();
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-#if (USE_COLOUR || USE_USHORT )
-        video.GrabNewest(Irgb,true);
-//        rgb_to_grey.convert(Irgb,I);
-#else
-        video.GrabNewest(I,true);
-#endif
-        input.SetIndex(video.FrameId());
-
-        if(!video.IsPlaying()) {
-            vicon_T_wf = vicon.T_wf();
-            input.UpdateVariable(vicon_T_wf);
+        if(go) {
+            if(frame>0) video.Capture(images);
+            frame++;
         }
+
+        vicon_T_wf = vicon.T_wf();
 
         const bool tracking_good =
-                tracker.ProcessFrame(cam,I);
-
-        if(pangolin::Pushed(record)) {
-            video.Record();
-            input.Record();
-        }
-
-        if(pangolin::Pushed(play)) {
-            video.Play(true);
-            input.PlayBuffer(0,input.Size()-1);
-            input.SaveBuffer(ui_file);
-        }
-
-        if(pangolin::Pushed(source)) {
-            video.Source();
-            input.Stop();
-            input.SaveBuffer(ui_file);
-        }
+                tracker.ProcessFrame(cam,images[0].Image.data);
 
         if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
             Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
@@ -393,10 +335,8 @@ int main( int /*argc*/, char* argv[] )
               calibrator.add_view(obs, visibleCircles);
 #endif
 
-#ifdef USE_VICON
               vicon_obs.push_back((Observation){obs,((Sophus::SE3)vicon_T_wf).inverse() });
               cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
-#endif // USE_VICON
             }
         }
 
@@ -406,10 +346,10 @@ int main( int /*argc*/, char* argv[] )
             calibrator.save("camparams.txt");
 
             cout <<
-                    calibrator.get_camera_copy()->get<double>("fx") / size.x << " " <<
-                    calibrator.get_camera_copy()->get<double>("fy") / size.y << " " <<
-                    calibrator.get_camera_copy()->get<double>("cx") / size.x << " " <<
-                    calibrator.get_camera_copy()->get<double>("cy") / size.y << " " <<
+                    calibrator.get_camera_copy()->get<double>("fx") / w << " " <<
+                    calibrator.get_camera_copy()->get<double>("fy") / h << " " <<
+                    calibrator.get_camera_copy()->get<double>("cx") / w << " " <<
+                    calibrator.get_camera_copy()->get<double>("cy") / h << " " <<
                     calibrator.get_camera_copy()->get<double>("k1") << " " <<
                     calibrator.get_camera_copy()->get<double>("k2") << " " <<
                     calibrator.get_camera_copy()->get<double>("p1") << " " <<
@@ -441,16 +381,8 @@ int main( int /*argc*/, char* argv[] )
         vVideo.ActivateScissorAndClear();
 
         if(!disp_thresh) {
-#ifdef USE_COLOUR
-            texRGB.Upload(Irgb,GL_RGB,GL_UNSIGNED_BYTE);
-#elif USE_USHORT
-            glPixelTransferScale(100);
-            texRGB.Upload(Irgb,GL_LUMINANCE,GL_UNSIGNED_SHORT);
-            glPixelTransferScale(1);
-#else
-            texRGB.Upload(I,GL_LUMINANCE,GL_UNSIGNED_BYTE);
-#endif
-            texRGB.RenderToViewportFlipY();
+            tex.Upload(images[0].Image.data,GL_LUMINANCE,GL_UNSIGNED_BYTE);
+            tex.RenderToViewportFlipY();
         }else{
             tex.Upload(tracker.tI.get(),GL_LUMINANCE,GL_UNSIGNED_BYTE);
             tex.RenderToViewportFlipY();
@@ -478,7 +410,6 @@ int main( int /*argc*/, char* argv[] )
             DrawFrustrum(cam.Kinv(),w,h,tracker.T_hw.inverse(),0.1);
         }
 
-#ifdef USE_VICON
         v3D2.ActivateScissorAndClear(s_cam);
 
         glColor3f(0.5,0.5,0.5);
@@ -507,8 +438,6 @@ int main( int /*argc*/, char* argv[] )
         }
 
         glUnsetFrameOfReference();
-
-#endif // USE_VICON
 
         // Process window events via GLUT
         FinishGlutFrame();

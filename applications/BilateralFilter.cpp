@@ -10,7 +10,7 @@
 
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
-#include "common/BaseDisplay.h"
+#include "common/BaseDisplayCuda.h"
 
 #include <kangaroo/kangaroo.h>
 

@@ -18,7 +18,7 @@
 #include "common/DisplayUtils.h"
 #include "common/ScanlineRectify.h"
 #include "common/ImageSelect.h"
-#include "common/BaseDisplay.h"
+#include "common/BaseDisplayCuda.h"
 #include "common/HeightmapFusion.h"
 #include "common/CameraModelPyramid.h"
 #include "common/LoadPosesFromFile.h"
@@ -94,7 +94,6 @@ int main( int argc, char* argv[] )
     cout << "Processing dimensions: " << lw << "x" << lh << endl;
     cout << "Offset: " << roi.x << "x" << roi.y << endl;
 
-    // OpenGL's Right Down Forward coordinate systems
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
     Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();

@@ -18,7 +18,7 @@
 #include "common/DisplayUtils.h"
 #include "common/ScanlineRectify.h"
 #include "common/ImageSelect.h"
-#include "common/BaseDisplay.h"
+#include "common/BaseDisplayCuda.h"
 #include "common/HeightmapFusion.h"
 #include "common/CameraModelPyramid.h"
 #include "common/LoadPosesFromFile.h"
