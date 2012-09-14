@@ -42,12 +42,26 @@ int main( int argc, char* argv[] )
     // Tell the base view to arrange its children equally
     DisplayBase().SetLayout(LayoutEqual);
 
-    for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
+    bool run = false;
+    bool step = false;
+
+    pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+
+    for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
+        const bool go = run || Pushed(step);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        camera.Capture(img);
+        if(go) {
+            if(frame>0) {
+                camera.Capture(img);
+            }
+            frame++;
+        }
+
         for(int i=0; i<N; ++i ) {
             view[i]->Activate();
             tex.Upload(img[i].Image.data,GL_LUMINANCE, GL_UNSIGNED_BYTE);
