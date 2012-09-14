@@ -264,7 +264,7 @@ int main( int argc, char* argv[] )
 
     // Variables
     Var<bool> step("ui.step", false, false);
-    Var<bool> run("ui.run", false, true);
+    Var<bool> run("ui.run", true, true);
 
     Var<bool> disp_thresh("ui.Display Thresh",false);
     Var<bool> lock_to_cam("ui.AR",false);
@@ -283,6 +283,10 @@ int main( int argc, char* argv[] )
 
     double rms = 0;
     Var<double> var_rms("ui.rms");
+
+    pangolin::RegisterKeyPressCallback(' ',  [&add_image](){add_image = true;} );
+    pangolin::RegisterKeyPressCallback('\\', [&minimise_vicon](){minimise_vicon = true;} );
+    pangolin::RegisterKeyPressCallback('r',  [&reset](){reset = true;} );
 
     for(int frame=0; !pangolin::ShouldQuit();)
     {
@@ -305,7 +309,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
             Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
-            Eigen::Matrix3d RDFvicon; RDFvicon << 1,0,0,  0,0,-1,   0,1,0;
+            Eigen::Matrix3d RDFvicon; RDFvicon << 0,1,0,  0,0,1,   1,0,0;
             T_cf = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
 //            T_cf = Sophus::SE3();
             T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
