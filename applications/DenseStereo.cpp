@@ -32,7 +32,7 @@
 //#define PLANE_FIT
 //#define COSTVOL_TIME
 
-const int MAXD = 80;
+const int MAXD = 128;
 
 using namespace std;
 using namespace pangolin;
@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
+    const int level = GetLevelFromMaxPixels( nw, nh, 2*640*480 );
 //    const int level = 4;
     assert(level <= max_levels);
 
@@ -168,7 +168,7 @@ int main( int argc, char* argv[] )
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
 
     Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
-    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{lw,lh,MAXD}};
+    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD}};
     Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
     Image<float, TargetDevice, Manage> meanI(lw,lh);
     Image<float, TargetDevice, Manage> varI(lw,lh);
@@ -290,9 +290,13 @@ int main( int argc, char* argv[] )
     Var<bool> costvol_add("ui.Add to Costvol", false, false);
 #endif
 
+    int jump_frames = 0;
+
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback(']', [&jump_frames](){jump_frames=100;} );
+    pangolin::RegisterKeyPressCallback('}', [&jump_frames](){jump_frames=1000;} );
     pangolin::RegisterKeyPressCallback('~', [&container](){static bool showpanel=true; showpanel = !showpanel; if(showpanel) { container.SetBounds(0,1,Attach::Pix(180), 1); }else{ container.SetBounds(0,1,0, 1); } Display("ui").Show(showpanel); } );
     pangolin::RegisterKeyPressCallback('1', [&container](){container[0].ToggleShow();} );
     pangolin::RegisterKeyPressCallback('2', [&container](){container[1].ToggleShow();} );
@@ -302,6 +306,7 @@ int main( int argc, char* argv[] )
 
     Handler2dImageSelect handler2d(lw,lh,level);
     ActivateDrawPyramid<unsigned char,max_levels> adleft(img_pyr[0],GL_LUMINANCE8, false, true);
+    ActivateDrawPyramid<unsigned char,max_levels> adright(img_pyr[1],GL_LUMINANCE8, false, true);
     ActivateDrawImage<float> adisp(disp[0],GL_LUMINANCE32F_ARB, false, true);
 //    ActivateDrawImage<float> adCrossSection(dCrossSection,GL_RGBA_FLOAT32_APPLE, false, true);
     ActivateDrawImage<float> adVol(vol[0].ImageXY(show_slice),GL_LUMINANCE32F_ARB, false, true);
@@ -324,17 +329,21 @@ int main( int argc, char* argv[] )
     graph.AddChild(&glhmvbo);
 #endif
 
-    SetupContainer(container, 4, (float)w/h);
+    SetupContainer(container, 5, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(adisp)).SetHandler(&handler2d);
-//    container[2].SetDrawFunction(boost::ref(adCrossSection)).SetHandler(new Handler2dImageSelect(lw,lh));
-    container[2].SetDrawFunction(boost::ref(adVol)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam));
-    container[3].SetHandler( new Handler3D(s_cam, AxisNone) );
+    container[1].SetDrawFunction(boost::ref(adright)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(boost::ref(adisp)).SetHandler(&handler2d);
+    container[3].SetDrawFunction(boost::ref(adVol)).SetHandler(&handler2d);
+    container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
+                .SetHandler( new Handler3D(s_cam, AxisNone) );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
-        const bool go = frame==0 || run || Pushed(step);
+        const bool go = frame==0 || jump_frames > 0 || run || Pushed(step);
+
+        for(; jump_frames > 0; jump_frames--) {
+            video.Capture(images);
+        }
 
         if(go) {
             if(frame>0) video.Capture(images);
@@ -543,6 +552,7 @@ int main( int argc, char* argv[] )
             // Update texture views
             adisp.SetImageScale(1.0f/maxdisp);
             adleft.SetLevel(show_level);
+            adright.SetLevel(show_level);
             adVol.SetImage(vol[0].ImageXY(show_slice));
         }
 
