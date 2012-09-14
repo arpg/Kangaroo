@@ -138,6 +138,15 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 
+LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
+        const Image<unsigned char> dImgl,
+        const Image<unsigned char> dImgr, const Image<float> dDispr,
+        const Mat<float,3,4> KT_lr, float c,
+        float baseline, float fu, float fv, float u0, float v0,
+        Image<unsigned char> dWorkspace, Image<float4> dDebug,
+        const bool bDiscLimit = false
+        );
+
 LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     const Image<float4> dPl,
     const Image<float4> dPr, const Image<float4> dNr,

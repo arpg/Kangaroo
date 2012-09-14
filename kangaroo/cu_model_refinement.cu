@@ -92,6 +92,100 @@ void BuildPoseRefinementFromDepthmapSystem(
 }
 
 template<typename Ti>
+__device__ inline
+void BuildPoseRefinementFromDepthmapSystemESM(
+    const unsigned int u,  const unsigned int v, const float4 Pr4,
+    const Image<Ti>& dImgl, const Image<Ti>& dImgr,
+    const float fu, const float fv, const float u0, const float v0,
+    const Mat<float,3,4>& KT_lr, float c,
+    LeastSquaresSystem<float,6>& lss, Image<float4> dDebug, const bool bDiscLimit
+) {
+    const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
+    Mat<float,3> KPr;
+
+    KPr(0) = fu*Pr(0) + u0*Pr(2);
+    KPr(1) = fv*Pr(1) + v0*Pr(2);
+    KPr(2) = Pr(2);
+
+    const Mat<float,3> KPl = KT_lr * Pr;
+    const Mat<float,2> pl = {KPl(0)/KPl(2), KPl(1)/KPl(2)};
+
+    if(isfinite(Pr4.z) && dImgl.InBounds(pl(0), pl(1), 2)) {
+
+        float Il = dImgl.template GetBilinear<float>(pl(0), pl(1));
+        float Ir = dImgr(u,v);
+
+        if( bDiscLimit && ( Il == 0.0 || Il == 255.0 || Ir == 0.0 || Ir == 255.0 ) ) {
+            dDebug(u,v) = make_float4(1,1,0,1);
+        } else {
+            const float y = Il - Ir;
+
+            const Mat<float,1,2> dIl = dImgl.template GetCentralDiff<float>(pl(0), pl(1));
+            const Mat<float,1,2> dIr = dImgr.template GetCentralDiff<float>((float)u, (float)v);
+
+            const Mat<float,2,3> dPl_by_dpl = {
+              1.0/KPl(2), 0, -KPl(0)/(KPl(2)*KPl(2)),
+              0, 1.0/KPl(2), -KPl(1)/(KPl(2)*KPl(2))
+            };
+
+            const Mat<float,2,3> dPr = {
+              1.0/KPr(2), 0, -KPr(0)/(KPr(2)*KPr(2)),
+              0, 1.0/KPr(2), -KPr(1)/(KPr(2)*KPr(2))
+            };
+
+            const Mat<float,1,4> dIldPlKT_lr = dIl * dPl_by_dpl * KT_lr;
+            const Mat<float,1,3> dIrdPr = dIr * dPr;
+
+            // Sparse Jl = dIldPlKT_lr * gen_i * Pr
+            const Mat<float,1,6> Jl = {
+                dIldPlKT_lr(0),
+                dIldPlKT_lr(1),
+                dIldPlKT_lr(2),
+                -dIldPlKT_lr(1)*Pr(2) + dIldPlKT_lr(2)*Pr(1),
+                +dIldPlKT_lr(0)*Pr(2) - dIldPlKT_lr(2)*Pr(0),
+                -dIldPlKT_lr(0)*Pr(1) + dIldPlKT_lr(1)*Pr(0)
+            };
+
+            // Sparse Jr = dIrdPrK * gen_i * KPr
+            const Mat<float,1,6> Jr = {
+                dIrdPr(0),
+                dIrdPr(1),
+                dIrdPr(2),
+                -dIrdPr(1)*KPr(2) + dIrdPr(2)*KPr(1),
+                +dIrdPr(0)*KPr(2) - dIrdPr(2)*KPr(0),
+                -dIrdPr(0)*KPr(1) + dIrdPr(1)*KPr(0)
+            };
+
+
+            // ESM Jacobian
+            const Mat<float,1,6> J = {
+                (Jr(0) + Jl(0))/2,
+                (Jr(1) + Jl(1))/2,
+                (Jr(2) + Jl(2))/2,
+                (Jr(3) + Jl(3))/2,
+                (Jr(4) + Jl(4))/2,
+                (Jr(5) + Jl(5))/2
+            };
+
+            const float w = LSReweightTukey(y,c);
+            lss.JTJ = OuterProduct(Jl,w);
+            lss.JTy = mul_aTb(Jl, y*w);
+            lss.obs = 1;
+            lss.sqErr = y*y;
+
+            const float debug = (abs(y) + 128) / 255.0f;
+            dDebug(u,v) = make_float4(debug,0,w,1);
+    //        dDebug(u,v) = make_float4(debug,debug,debug,1);
+    //        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
+    //        dDebug(u,v) = make_float4(1.0/Pr4.z,1.0/Pr4.z,1.0/Pr4.z,1);
+        }
+    }else{
+        dDebug(u,v) = make_float4(0,1,0,1);
+    }
+}
+
+
+template<typename Ti>
 __global__ void KernPoseRefinementFromVbo(
     const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float4> dPr,
     const Mat<float,3,4> KT_lr, float c,
@@ -140,7 +234,6 @@ __global__ void KernPoseRefinementFromDisparity(
     lss.ReducePutBlock(dSum);
 }
 
-
 LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float> dDispr,
@@ -149,10 +242,45 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 ){
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, dImgr);
+    InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
     KernPoseRefinementFromDisparity<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug );
+    return lss.FinalSystem();
+}
+
+template<typename Ti>
+__global__ void KernPoseRefinementFromDisparityESM(
+    const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDispr,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
+    const bool bDiscLimit
+){
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    __shared__ SumLeastSquaresSystem<float,6,16,16> lss;
+
+    const float4 Pr4 = DepthFromDisparity(u,v,dDispr(u,v), baseline, fu, fv, u0, v0 );
+    BuildPoseRefinementFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, KT_lr,c,lss.ZeroThisObs (),dDebug,bDiscLimit);
+
+    lss.ReducePutBlock(dSum);
+}
+
+LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float> dDispr,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug,
+    const bool bDiscLimit
+){
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
+
+    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
+    KernPoseRefinementFromDisparityESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscLimit );
     return lss.FinalSystem();
 }
 
