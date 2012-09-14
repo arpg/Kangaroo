@@ -22,6 +22,7 @@
 #include "common/HeightmapFusion.h"
 #include "common/CameraModelPyramid.h"
 #include "common/LoadPosesFromFile.h"
+#include "common/SavePPM.h"
 
 #include <kangaroo/kangaroo.h>
 
@@ -163,16 +164,16 @@ int main( int argc, char* argv[] )
     Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
     Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
 
+    Image<unsigned char, TargetDevice, Manage> upload(w,h);
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
 
     Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
-    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{w,h,MAXD}};
+    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{lw,lh,MAXD}};
     Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
     Image<float, TargetDevice, Manage> meanI(lw,lh);
     Image<float, TargetDevice, Manage> varI(lw,lh);
     Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
 
-    Image<float, TargetHost, Manage>     hDisp(lw,lh);
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
     Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
@@ -180,6 +181,9 @@ int main( int argc, char* argv[] )
 
     typedef ulong4 census_t;
     Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
+
+    Image<unsigned char, TargetHost, Manage> hImg[] = {{lw,lh},{lw,lh}};
+    Image<float, TargetHost, Manage> hDisp(lw,lh);
 
 #ifdef COSTVOL_TIME
     Sophus::SE3 T_wv;
@@ -347,20 +351,14 @@ int main( int argc, char* argv[] )
                 hCamImg[i].ptr = images[i].Image.data;
 
                 if(rectify) {
-//                    dTemp[0].CopyFrom(hCamImg[i].SubImage(roi));
-
-//                    if( level != 0 ) {
-//                        BoxReduce<unsigned char, unsigned int, unsigned char>(dTemp[2].SubImage(w,h), dTemp[0], dTemp[1], level);
-//                        Warp(dCamImg[i], dTemp[2].SubImage(w,h), dLookup[i]);
-//                    }else{
-//                        Warp(dCamImg[i], dTemp[0], dLookup[i]);
-//                    }
+                    upload.CopyFrom(hCamImg[i].SubImage(roi));
+                    Warp(img_pyr[i][0], upload, dLookup[i]);
                 }else{
                     img_pyr[i][0].CopyFrom(hCamImg[i].SubImage(roi));
-//                    img_pyr[i][0].MemcpyFromHost(images[i].Image.data + roi.y*images[i].width() + roi.x);
-                    BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
-                    ElementwiseScaleBias<float,unsigned char>(img[i], img_pyr[i][level],1.0f/255.0f);
                 }
+
+                BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
+                ElementwiseScaleBias<float,unsigned char>(img[i], img_pyr[i][level],1.0f/255.0f);
                 Census(census[i], img_pyr[i][level]);
             }
         }
@@ -460,22 +458,23 @@ int main( int argc, char* argv[] )
 #endif // COSTVOL_TIME
 
             if(go && save_dm) {
-                hDisp.CopyFrom(disp[0]);
-
                 // file info
-                string sFilePrefix = "disp/depth-";
-                char   Index[10];
+                char Index[10];
                 sprintf( Index, "%05d", frame );
+                string sFileName = (std::string)"disp/depth-" + Index + ".pdm";
 
-                // save in PDM format
-                string sFileName = sFilePrefix + Index + ".pdm";
-                ofstream bFile( sFileName.c_str(), ios::out | ios::binary );
-                bFile << "P7" << std::endl;
-                bFile << w << " " << h << std::endl;
-                unsigned int nSize = sizeof(float) * w * h;
-                bFile << nSize << std::endl;
-                bFile.write( (const char*)hDisp.ptr, nSize );
-                bFile.close();
+                // Save Disparity Image
+                hDisp.CopyFrom(disp[0]);
+                SavePXM<float>(sFileName, hDisp, "P7", maxdisp);
+
+                if(rectify)
+                {
+                    // Save rectified images
+                    hImg[0].CopyFrom(img_pyr[0][0]);
+                    SavePXM<unsigned char>((std::string)"disp/left-" + Index + ".pgm", hImg[0], "P5");
+                    hImg[1].CopyFrom(img_pyr[1][0]);
+                    SavePXM<unsigned char>((std::string)"disp/right-" + Index + ".pgm", hImg[1], "P5");
+                }
             }
 
             // Generate point cloud from disparity image
