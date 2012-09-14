@@ -29,7 +29,7 @@ using namespace std;
 using namespace pangolin;
 using namespace Eigen;
 
-#include <boost/thread.hpp>
+//#include <boost/thread.hpp>
 
 inline double Tic()
 {
@@ -206,7 +206,7 @@ std::istream& operator>> (std::istream& is, Sophus::SE3& o){
 
 int main( int argc, char* argv[] )
 {
-    ViconTracking vicon("KINECT","192.168.10.1");
+    ViconTracking vicon("GENLEE","192.168.10.1");
     std::vector<Observation> vicon_obs;
 
     // vicon frame to camera transform
@@ -215,7 +215,8 @@ int main( int argc, char* argv[] )
     // Target to World transform
     Sophus::SE3 T_wt;
 
-    CameraDevice video = OpenRpgCamera(argc,argv);
+    CameraDevice video;
+    OpenRpgCamera(video,argc,argv);
     std::vector<rpg::ImageWrapper> images;
     video.Capture(images);
     const unsigned w = images[0].width();
@@ -228,17 +229,9 @@ int main( int argc, char* argv[] )
 //    const Eigen::Vector2d targetSizeMeters = Eigen::Vector2d(11,8.5) * 0.0254;
 //    const double trad = targetSizeMeters[0]/40;
 //    tracker.target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);
+//    tracker.target.SaveRotatedEPS("target.eps",72/0.0254);
 
-    const double ppi = 72; // Points Per Inch
-    const double USwp = 11 * ppi;
-    const double UShp = 8.5 * ppi;
-    const double mpi = 0.0254; // meters per inch
-    const double mpp = mpi / ppi; // meters per point
-    const double unit = mpp;
-    tracker.target.GenerateRandom(60,unit*USwp*25/(842.0),unit*USwp*75/(842.0),unit*USwp*40/(842.0),Eigen::Vector2d(unit*USwp,unit*UShp));
-
-    // Save Target in points
-    tracker.target.SaveRotatedEPS("target.eps",72/0.0254);
+    tracker.target.LoadEPS("/home/rpg/Code/Builds/Kangaroo/applications/stereo.eps", 72/0.0254);
 
     // Pangolin 3D Render state
     pangolin::OpenGlRenderState s_cam(
@@ -249,6 +242,7 @@ int main( int argc, char* argv[] )
 
     // Create Glut window
     View& container = SetupPangoGL(1024, 768);
+    SetupContainer(container,3,w/(float)h);
 
     // Create viewport for video with fixed aspect
     View& vVideo = container[0];
@@ -265,7 +259,7 @@ int main( int argc, char* argv[] )
 //    cam_params << 0.808936, 1.06675, 0.495884, 0.520504, 0.180668, -0.354284, -0.00169838, 0.000600873, 0.0;
     //  FovCamera cam( w,h, w*cam_params[0],h*cam_params[1], w*cam_params[2],h*cam_params[3], cam_params[4] );
     //MatlabCamera cam( w,h, w*cam_params[0],h*cam_params[1], w*cam_params[2],h*cam_params[3], cam_params[4], cam_params[5], cam_params[6], cam_params[7], cam_params[8]);
-    mvl::CameraModel cammodel(video.GetProperty("DataSourceDir") + "/lcmod.xml");
+    mvl::CameraModel cammodel("/home/rpg/Data/Flea3/lcmod.xml");
     MatlabCamera cam( w,h, cammodel.GetModel()->warped.fx, cammodel.GetModel()->warped.fy, cammodel.GetModel()->warped.cx, cammodel.GetModel()->warped.cy, cammodel.GetModel()->warped.kappa1, cammodel.GetModel()->warped.kappa2, cammodel.GetModel()->warped.tau1, cammodel.GetModel()->warped.tau2, cammodel.GetModel()->warped.kappa3 );
 
     // Variables
@@ -372,72 +366,77 @@ int main( int argc, char* argv[] )
         }
 
         //    calibrator.iterate(rms);
-
-        if( lock_to_cam )
-            s_cam.SetModelViewMatrix(tracker.T_gw.matrix());
+        s_cam.Follow(tracker.T_gw.matrix(),lock_to_cam);
 
         // Display Live Image
         glColor3f(1,1,1);
-        vVideo.ActivateScissorAndClear();
 
-        if(!disp_thresh) {
-            tex.Upload(images[0].Image.data,GL_LUMINANCE,GL_UNSIGNED_BYTE);
-            tex.RenderToViewportFlipY();
-        }else{
-            tex.Upload(tracker.tI.get(),GL_LUMINANCE,GL_UNSIGNED_BYTE);
-            tex.RenderToViewportFlipY();
-        }
+        if(vVideo.IsShown()) {
+            vVideo.ActivateScissorAndClear();
 
-        // Display detected ellipses
-        glOrtho(-0.5,w-0.5,h-0.5,-0.5,0,1.0);
-        for( int i=0; i<tracker.conics.size(); ++i ) {
-            glColorBin(tracker.conics_target_map[i],tracker.target.circles3D().size());
-            DrawCross(tracker.conics[i].center,2);
+            if(!disp_thresh) {
+                tex.Upload(images[0].Image.data,GL_LUMINANCE,GL_UNSIGNED_BYTE);
+                tex.RenderToViewportFlipY();
+            }else{
+                tex.Upload(tracker.tI.get(),GL_LUMINANCE,GL_UNSIGNED_BYTE);
+                tex.RenderToViewportFlipY();
+            }
+
+            // Display detected ellipses
+            glOrtho(-0.5,w-0.5,h-0.5,-0.5,0,1.0);
+            for( int i=0; i<tracker.conics.size(); ++i ) {
+                glColorBin(tracker.conics_target_map[i],tracker.target.circles3D().size());
+                DrawCross(tracker.conics[i].center,2);
+            }
         }
 
         // Display 3D Vis
-        glEnable(GL_DEPTH_TEST);
-        v3D.ActivateScissorAndClear(s_cam);
-        glDepthFunc(GL_LEQUAL);
-        glDrawAxis(0.1);
-        DrawTarget(tracker.target,Vector2d(0,0),1,0.2,0.2);
-        DrawTarget(tracker.conics_target_map,tracker.target,Vector2d(0,0),1);
-
-        //    if( tracking_good )
-        {
-            // Draw Camera
-            glColor3f(1,0,0);
-            DrawFrustrum(cam.Kinv(),w,h,tracker.T_hw.inverse(),0.1);
-        }
-
-        v3D2.ActivateScissorAndClear(s_cam);
-
-        glColor3f(0.5,0.5,0.5);
-        DrawGrid(20,0.25);
-
-        glDisable(GL_DEPTH_TEST);
-        glColor3f(0.8,0.8,0.8);
-        DrawGrid(5,1.0);
-        glDrawAxis(1);
-        glEnable(GL_DEPTH_TEST);
-
-        // Draw Vicon
-        glSetFrameOfReferenceF(vicon_T_wf);
-        glDrawAxis(0.1);
-        DrawFrustrum(cam.Kinv(),w,h,T_cf.inverse(),0.1);
-        glUnsetFrameOfReference();
-
-        // Draw Target
-        glSetFrameOfReferenceF(T_wt);
-
-        {
+        if(v3D.IsShown()) {
+            glEnable(GL_DEPTH_TEST);
+            v3D.ActivateScissorAndClear(s_cam);
+            glDepthFunc(GL_LEQUAL);
+            glDrawAxis(0.1);
             DrawTarget(tracker.target,Vector2d(0,0),1,0.2,0.2);
             DrawTarget(tracker.conics_target_map,tracker.target,Vector2d(0,0),1);
-            glColor3f(1,0,0);
-            DrawFrustrum(cam.Kinv(),w,h,tracker.T_gw.inverse(),0.1);
+
+            //    if( tracking_good )
+            {
+                // Draw Camera
+                glColor3f(1,0,0);
+                DrawFrustrum(cam.Kinv(),w,h,tracker.T_hw.inverse(),0.1);
+            }
         }
 
-        glUnsetFrameOfReference();
+        if(v3D2.IsShown()) {
+            v3D2.ActivateScissorAndClear(s_cam);
+
+            glColor3f(0.5,0.5,0.5);
+            DrawGrid(20,0.25);
+
+            glDisable(GL_DEPTH_TEST);
+            glColor3f(0.8,0.8,0.8);
+            DrawGrid(5,1.0);
+            glDrawAxis(1);
+            glEnable(GL_DEPTH_TEST);
+
+            // Draw Vicon
+            glSetFrameOfReferenceF(vicon_T_wf);
+            glDrawAxis(0.1);
+            DrawFrustrum(cam.Kinv(),w,h,T_cf.inverse(),0.1);
+            glUnsetFrameOfReference();
+
+            // Draw Target
+            glSetFrameOfReferenceF(T_wt);
+
+            {
+                DrawTarget(tracker.target,Vector2d(0,0),1,0.2,0.2);
+                DrawTarget(tracker.conics_target_map,tracker.target,Vector2d(0,0),1);
+                glColor3f(1,0,0);
+                DrawFrustrum(cam.Kinv(),w,h,tracker.T_gw.inverse(),0.1);
+            }
+
+            glUnsetFrameOfReference();
+        }
 
         // Process window events via GLUT
         FinishGlutFrame();
