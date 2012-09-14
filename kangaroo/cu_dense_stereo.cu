@@ -21,14 +21,14 @@ typedef SANDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
 template<typename Tdisp, typename Tvol>
 __global__ void KernCostVolMinimum(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDispVal)
 {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     Tdisp bestd = 0;
     Tvol bestc = vol(x,y,0);
 
     const int maxDisp = min(maxDispVal, x+1);
-    for(unsigned d=1; d < maxDisp; ++d) {
+    for(int d=1; d < maxDisp; ++d) {
         const Tvol c = vol(x,y,d);
         if(c < bestc) {
             bestc = c;
@@ -55,6 +55,66 @@ template void CostVolMinimum<>(Image<char>,Volume<unsigned char>,unsigned);
 template void CostVolMinimum<>(Image<float>,Volume<float>,unsigned);
 template void CostVolMinimum<>(Image<float>,Volume<unsigned short>,unsigned);
 
+//////////////////////////////////////////////////////
+// Cost Volume minimum subpix refinement
+//////////////////////////////////////////////////////
+
+template<typename Tdisp, typename Tvol>
+__global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, unsigned maxDispVal, float sd)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    Tdisp bestd = 0;
+    Tvol bestc = 1E10;
+
+    for(int d=0; d < maxDispVal; ++d) {
+        const int xr = x + sd*d;
+        if(0 <= xr && xr < vol.w) {
+            const Tvol c = vol(x,y,d);
+            if(c < bestc) {
+                bestc = c;
+                bestd = d;
+            }
+        }
+    }
+
+    Tdisp out = bestd;
+
+    const int bestxr = x + sd*bestd;
+    if( 0 < bestxr && bestxr < vol.w-1) {
+        // Fit parabola to neighbours
+        const float d1 = bestd+1;
+        const float d2 = bestd;
+        const float d3 = bestd-1;
+        const float s1 = vol(x,y,d1);
+        const float s2 = bestc;
+        const float s3 = vol(x,y,d3);
+
+        // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
+        const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
+        const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
+        const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
+        const float subpixdisp = -B / (2*A);
+
+        // Minima of parabola
+
+        // Check that minima is sensible. Otherwise assume bad data.
+        if( d3 < subpixdisp && subpixdisp < d1 ) {
+            out = subpixdisp;
+        }
+    }
+
+    disp(x,y) = out;
+}
+
+void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp, float sd)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,disp);
+    KernCostVolMinimumSubpix<float,float><<<gridDim,blockDim>>>(disp,vol,maxDisp,sd);
+}
+
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo
@@ -64,8 +124,8 @@ template<typename TD, typename TI, typename Score>
 __global__ void KernDenseStereo(
     Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, TD maxDispVal, TD dispStep, float acceptThresh
 ) {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     TD bestDisp = InvalidValue<TD>::Value();
 
@@ -112,8 +172,8 @@ const int MAXBW = 512;
 //__global__ void KernDenseStereo(
 //    Image<TD> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, TD maxDispVal, TD dispStep, float acceptThresh
 //) {
-//    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-//    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+//    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+//    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
 //    const int W = Score::width;
 //    const int RAD = W / 2;
@@ -308,8 +368,8 @@ const int W = 2*RAD+1;
 __global__ void KernDenseStereoTest(
     Image<float> dDisp, Image<unsigned char> dCamLeft, Image<unsigned char> dCamRight, int maxDisp
 ) {
-    const uint x = threadIdx.x;
-    const uint y = blockIdx.y;
+    const int x = threadIdx.x;
+    const int y = blockIdx.y;
 
     __shared__ unsigned char cache_l[W][MAXBW];
     __shared__ unsigned char cache_r[W][MAXBW+1];
@@ -365,17 +425,18 @@ void DenseStereoTest(
 
 template<typename TD>
 __global__ void KernLeftRightCheck(
-    Image<TD> dispL, Image<TD> dispR, int maxDiff
+    Image<TD> dispL, Image<TD> dispR, float sd, float maxDiff
 ) {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( dispL.InBounds(x,y) ) {
         const TD dl = dispL(x,y);
+        const TD xr = x + sd*dl;
 
-        if( 0 <= ((int)x-(int)dl) ) {
-            const TD dr = dispR(x - dl, y);
-            if(abs(dl - (-dr)) > maxDiff) {
+        if( 0 <= xr && xr < dispR.w) {
+            const TD dr = dispR(xr, y);
+            if(!InvalidValue<TD>::IsValid(dr) || abs(dl - dr) > maxDiff) {
                 dispL(x,y) = InvalidValue<TD>::Value();
             }
         }else{
@@ -384,11 +445,18 @@ __global__ void KernLeftRightCheck(
     }
 }
 
-void LeftRightCheck(Image<char> dispL, Image<char> dispR, int maxDiff)
+void LeftRightCheck(Image<char> dispL, Image<char> dispR, int sd, int maxDiff)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim, dispL);
-    KernLeftRightCheck<char><<<gridDim,blockDim>>>(dispL, dispR, maxDiff);
+    KernLeftRightCheck<char><<<gridDim,blockDim>>>(dispL, dispR, sd, maxDiff);
+}
+
+void LeftRightCheck(Image<float> dispL, Image<float> dispR, float sd, float maxDiff)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, dispL);
+    KernLeftRightCheck<float><<<gridDim,blockDim>>>(dispL, dispR, sd, maxDiff);
 }
 
 //////////////////////////////////////////////////////
@@ -399,8 +467,8 @@ template<typename TD, typename TI, typename Score>
 __global__ void KernDisparityImageCrossSection(
     Image<TD> dScore, Image<unsigned char> dDisp, Image<TI> dCamLeft, Image<TI> dCamRight, int y
 ) {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint c = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int c = blockIdx.y*blockDim.y + threadIdx.y;
 
     const int rx = x-c;
     const float score = ( 0<= rx && rx < dCamRight.w ) ? Score::Score(dCamLeft, x,y, dCamRight, rx, y) : 0;
@@ -427,8 +495,8 @@ template<typename TDo, typename TDi, typename TI, typename Score>
 __global__ void KernDenseStereoSubpixelRefine(
     Image<TDo> dDispOut, const Image<TDi> dDisp, const Image<TI> dCamLeft, const Image<TI> dCamRight
 ) {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const int bestDisp = dDisp(x,y);
 
@@ -575,15 +643,15 @@ void CostVolumeAdd(Volume<CostVolElem> dvol, const Image<unsigned char> dimgv,
 template<typename Tdisp>
 __global__ void KernCostVolMinimum(Image<Tdisp> disp, Volume<CostVolElem> vol)
 {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     Tdisp bestd = 0;
     float bestc = 1E30;
 
     unsigned maxDisp = vol.d;
 #pragma unroll
-    for(unsigned d=0; d < maxDisp; ++d) {
+    for(int d=0; d < maxDisp; ++d) {
         const CostVolElem elem = vol(x,y,d);
         const float c = (elem.sum / elem.n);
         if(c < bestc) {
@@ -605,23 +673,23 @@ void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol)
 //////////////////////////////////////////////////////
 
 __global__ void KernCostVolumeCrossSection(
-    Image<float4> dScore, Image<CostVolElem> dCostVolSlice
+    Image<float> dScore, Image<CostVolElem> dCostVolSlice
 ) {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint d = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int d = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( dCostVolSlice.InBounds(x,d) )
     {
         CostVolElem elem = dCostVolSlice(x,d);
         const float score = (elem.sum / elem.n) / 255.0f;
-        dScore(x,d) = make_float4(score,score,score,1);
+        dScore(x,d) = score;
     }else{
-        dScore(x,d) = make_float4(1,0,0,1);
+        dScore(x,d) = 0.0f / 0.0f;
     }
 }
 
 void CostVolumeCrossSection(
-    Image<float4> dScore, Volume<CostVolElem> dCostVol, int y
+    Image<float> dScore, Volume<CostVolElem> dCostVol, int y
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dScore);
@@ -633,8 +701,8 @@ void CostVolumeCrossSection(
 template<typename To, typename Ti>
 __global__ void KernFilterDispGrad(Image<To> dOut, Image<Ti> dIn, float threshold )
 {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float dx = dOut.template GetCentralDiffDx<float>(x,y);
     const float dy = dOut.template GetCentralDiffDy<float>(x,y);
@@ -650,6 +718,40 @@ void FilterDispGrad(
     InitDimFromOutputImage(blockDim,gridDim, dOut, 16, 16);
     KernFilterDispGrad<float,float><<<gridDim,blockDim>>>(dOut, dIn, threshold);
 }
+
+//////////////////////////////////////////////////////
+// Cost volume with truncated grad and abs. diff. score
+// Fast Cost-Volume Filtering for Visual Correspondence and Beyond
+// Christoph Rhemann, Asmaa Hosni, Michael Bleyer, Carsten Rother, Margrit Gelautz
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename Tin>
+__global__ void KernCostVolumeFromStereoTruncatedAbsAndGrad(
+    Volume<Tout> dvol, Image<Tin> dimgl, Image<Tin> dimgr, float sd,
+    float alpha, float r1, float r2
+) {
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    const int d = blockIdx.z*blockDim.z + threadIdx.z;
+
+    const int r = u + sd*d;
+    if( 0 <= r && r < dimgr.w ) {
+        const float absI = abs( (float)dimgr(r,v) - (float)dimgl(u,v));
+        const float absGrad = abs( dimgr.template GetCentralDiffDx<float>(r,v) - dimgl.template GetCentralDiffDx<float>(u,v) );
+        const Tout cost = (1.0f-alpha)*min(absI,r1) + alpha*min(absGrad,r2);
+        dvol(u,v,d) = cost;
+    }else{
+        dvol(u,v,d) = (1.0f-alpha)*r1 + alpha*r2;
+    }
+}
+
+void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float sd, float alpha, float r1, float r2 )
+{
+    dim3 blockDim(8,8,8);
+    dim3 gridDim( ceil(dvol.w / (float)blockDim.x), ceil(dvol.h / (float)blockDim.y), ceil(dvol.d / (float)blockDim.z) );
+    KernCostVolumeFromStereoTruncatedAbsAndGrad<float,float><<<gridDim,blockDim>>>(dvol,dimgl,dimgr,sd, alpha,r1,r2);
+}
+
 
 
 }

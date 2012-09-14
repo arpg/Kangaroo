@@ -25,6 +25,9 @@ FIND_PACKAGE(SceneGraph REQUIRED)
 INCLUDE_DIRECTORIES(${SceneGraph_INCLUDE_DIRS})
 LINK_LIBRARIES(${SceneGraph_LIBRARIES})
 
+# https://github.com/obiou/FPL.git
+FIND_PACKAGE(CCAMERAMODEL QUIET)
+
 find_package( RPG REQUIRED )
 include_directories( ${RPG_INCLUDE_DIRS} )
 LINK_LIBRARIES(${RPG_LIBRARIES})
@@ -61,7 +64,7 @@ if( BuildCameraViewer )
     target_link_libraries( CameraViewer )
 endif()
 
-set( BuildTriggerTest false CACHE "" force )
+set( BuildTriggerTest true CACHE "" force )
 if( BuildTriggerTest )
     add_executable( TriggerTest ${COMMON_SRC} TriggerTest.cpp)
     target_link_libraries( TriggerTest ${SimpleGui_LIBRARIES} )
@@ -130,6 +133,11 @@ if(Kangaroo_FOUND)
     set( BuildBilateralFilter true CACHE "" force )
     if( BuildBilateralFilter )
       add_executable( BilateralFilter BilateralFilter.cpp ${COMMON_HEADERS})
+    endif()
+
+    set( BuildGuidedFilter true CACHE "" force )
+    if( BuildGuidedFilter )
+      add_executable( GuidedFilter GuidedFilter.cpp ${COMMON_HEADERS})
     endif()
 
     set( BuildManhatten true CACHE "" force )

@@ -29,7 +29,17 @@ int OutputBitonicNetwork()
     network.Print();
 }
 
+#include <fiducials/tracker.h>
+
+void TestEPS()
+{
+    Tracker tracker(640,480);
+    tracker.target.LoadEPS("/Users/slovegrove/Desktop/stereo.eps");
+
+}
+
 int main( int /*argc*/, char* argv[] )
 {
-    OutputBitonicNetwork();
+//    OutputBitonicNetwork();
+    TestEPS();
 }

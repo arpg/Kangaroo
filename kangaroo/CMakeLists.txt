@@ -2,7 +2,7 @@ find_package(CUDA REQUIRED)
 find_package(Boost REQUIRED)
 
 set(CUDA_PROPAGATE_HOST_FLAGS off)
-set(CUDA_NVCC_FLAGS "-arch=sm_30" )
+set(CUDA_NVCC_FLAGS "-arch=sm_30 -use_fast_math" )
 
 if(NOT CUDA_npp_LIBRARY)
     # Hack for old FindCUDA to locate libnpp.so
@@ -26,7 +26,7 @@ list(APPEND SRC_CU
     cu_median.cu cu_normals.cu cu_openni.cu cu_plane_fit.cu
     cu_resample.cu cu_heightmap.cu cu_blur.cu cu_operations.cu
     cu_census.cu cu_semi_global_matching.cu
-    cu_manhatten.cu
+    cu_manhatten.cu cu_integral_image.cu
 )
 
 include_directories( ${Boost_INCLUDE_DIRS} )

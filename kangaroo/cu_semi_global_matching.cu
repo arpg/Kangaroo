@@ -82,4 +82,26 @@ void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<u
     }
 }
 
+void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse)
+{
+    volH.Memset(0);
+    dim3 blockDim(volC.w, 1);
+    dim3 gridDim(1, 1);
+    if(dovert) {
+        KernSemiGlobalMatching<<<gridDim,blockDim>>>(volH,volC,left,maxDisp,P1,P2,0,0,0,1,volC.h);
+        if(doreverse) {
+            KernSemiGlobalMatching<<<gridDim,blockDim>>>(volH,volC,left,maxDisp,P1,P2,0,volC.h-1,0,-1,volC.h);
+        }
+    }
+
+    if(dohoriz) {
+        dim3 blockDim2(1, volC.h);
+        dim3 gridDim(1, 1);
+        KernSemiGlobalMatching<<<gridDim,blockDim2>>>(volH,volC,left,maxDisp,P1,P2,0,0,1,0,volC.w);
+        if(doreverse) {
+            KernSemiGlobalMatching<<<gridDim,blockDim2>>>(volH,volC,left,maxDisp,P1,P2,volC.w-1,0,-1,0,volC.w);
+        }
+    }
+}
+
 }

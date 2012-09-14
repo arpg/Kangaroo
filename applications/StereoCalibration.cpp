@@ -5,15 +5,16 @@
 #include <CVars/CVar.h>
 
 #include <RPG/Devices/Camera/CameraDevice.h>
-#include "common/RpgCameraOpen.h"
 
 #include <fiducials/tracker.h>
 #include <fiducials/drawing.h>
 
 #include <pangolin/pangolin.h>
 
+#include "common/RpgCameraOpen.h"
 #include "common/StereoIntrinsicsOptimisation.h"
-#include "common/DisplayUtils.h"
+#include "common/BaselineFromCamModel.h"
+#include "common/SaveMvlCamModel.h"
 
 using namespace std;
 using namespace Eigen;
@@ -54,59 +55,64 @@ public:
     {
     }
 
-    void InitCamera()
+    void InitCamera(int argc, char** argv)
     {
-//        InitRpgCamera( camera,
-//        //        "AlliedVision:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/AlliedVisionCam,CamUUID0=5004955,CamUUID1=5004954,ImageBinningX=2,ImageBinningY=2,ImageWidth=694,ImageHeight=518]//"
-//        //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/CityBlock-Noisy,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//                "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/xb3,Channel-0=left.*pgm,Channel-1=right.*pgm,StartFrame=0,BufferSize=120]//"
-//        //        "FileReader:[NumChannels=2,DataSourceDir=/Users/slovegrove/data/20120515/20090822_212628/rect_images,Channel-0=.*left.pnm,Channel-1=.*right.pnm,StartFrame=500,BufferSize=60]//"
-//        //        "Dvi2Pci:[NumChannels=2,ImageWidth=640,ImageHeight=480,BufferCount=60]//"
-//        );
-
-        InitPangoCamera( camera,
-            "file:[stream=0,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI",
-            "file:[stream=1,fmt=GRAY8]///Users/slovegrove/data/3DCam/DSCF0051.AVI"
-        );
+        OpenRpgCamera(camera,argc,argv);
 
         camera.Capture(img);
         width = img[0].width();
         height = img[0].height();
 
         // Setup camera parameters
-        VectorXd camParamsVec(6); // = Var<Matrix<double,9,1> >("cam_params");
-        camParamsVec << 0.558526, 0.747774, 0.484397, 0.494393, -0.249261, 0.0825967;
-        camParams = MatlabCamera( width,height, camParamsVec);
+//        VectorXd camParamsVec(6); // = Var<Matrix<double,9,1> >("cam_params");
+//        camParamsVec << 0.558526, 0.747774, 0.484397, 0.494393, -0.249261, 0.0825967;
+//        camParams = MatlabCamera( width,height, camParamsVec);
 
-        // Setup stereo baseline
-        Eigen::Matrix3d R_rl;
-        R_rl << 0.999995,   0.00188482,  -0.00251896,
-                -0.0018812,     0.999997,   0.00144025,
-                0.00252166,  -0.00143551,     0.999996;
+        mvl::CameraModel cam[] = {
+            (std::string)"/home/rpg/Data/Flea3/lcmod.xml",
+            (std::string)"/home/rpg/Data/Flea3/rcmod.xml"
+        };
 
-        Eigen::Vector3d l_r;
-        l_r <<    -0.203528, -0.000750334, 0.00403201;
+        camParams = MatlabCamera( width,height,
+            cam[0].GetModel()->warped.fx, cam[0].GetModel()->warped.fy,
+            cam[0].GetModel()->warped.cx, cam[0].GetModel()->warped.cy,
+            cam[0].GetModel()->warped.kappa1, cam[0].GetModel()->warped.kappa2, cam[0].GetModel()->warped.tau1, cam[0].GetModel()->warped.tau2, cam[0].GetModel()->warped.kappa3
+        );
 
-        T_rl = Sophus::SE3(R_rl, l_r);
+        Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
+        Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
+        Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();
+        T_vis_ro.block<3,3>(0,0) = RDFvision.transpose() * RDFrobot;
+        Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
+        T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
+
+        T_rl = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
+
+//        // Setup stereo baseline
+//        Eigen::Matrix3d R_rl;
+//        R_rl << 0.999995,   0.00188482,  -0.00251896,
+//                -0.0018812,     0.999997,   0.00144025,
+//                0.00252166,  -0.00143551,     0.999996;
+
+//        Eigen::Vector3d l_r;
+//        l_r <<    -0.203528, -0.000750334, 0.00403201;
+
+//        T_rl = Sophus::SE3(R_rl, l_r);
     }
 
     void InitTrackers()
     {
-        // Setup Tracker objects
-        // Unit hell!
-        const double ppi = 72; // Points Per Inch
-        const double USwp = 11 * ppi;
-        const double UShp = 8.5 * ppi;
-        const double mpi = 0.0254; // meters per inch
-        const double mpp = mpi / ppi; // meters per point
-        const double unit = mpp; //1; //mpp;
+        // Create Target in Meters
+        const Eigen::Vector2d targetSizeMeters = Eigen::Vector2d(11,8.5) * 0.0254;
+        const double trad = targetSizeMeters[0]/40;
 
         // Setup Trackers
         for(int i=0; i<2; ++i) {
             tracker[i] = new Tracker(width,height);
-            tracker[i]->target.GenerateRandom(60,unit*USwp*25/(842.0),unit*USwp*75/(842.0),unit*USwp*40/(842.0),Eigen::Vector2d(unit*USwp,unit*UShp));
-//            tracker[i]->target.SaveEPS("stereo.eps");
+            //tracker[i]->target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);
+            tracker[i]->target.LoadEPS("/home/rpg/Code/Builds/Kangaroo/applications/stereo.eps", 72/0.0254);
         }
+//        tracker[0]->target.SaveRotatedEPS("stereo.eps", 72/0.0254);
     }
 
     void OptimiseRun()
@@ -122,9 +128,9 @@ public:
         }
     }
 
-    int Run()
+    int Run(int argc, char** argv)
     {
-        InitCamera();
+        InitCamera(argc,argv);
         InitTrackers();
 
         // Create Graphics Context using Glut
@@ -165,14 +171,15 @@ public:
         // Run Optimisation Loop
         boost::thread optThread( boost::bind( &Application::OptimiseRun, this ) );
 
-        Var<bool> run("ui.Run", true, true);
-        Var<bool> step("ui.Step", false, false);
         Var<bool> save_kf("ui.Save Keyframe", false, false);
+        Var<bool> save_cam_model("ui.Save Camera Model", false, false);
+
+        pangolin::RegisterKeyPressCallback(' ', [&save_kf](){save_kf = true;} );
 
         // Run main loop
         for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
         {
-            const bool go = frame==0 || run || Pushed(step);
+            const bool go = frame==0 || true;
 
             if(go) {
                 // Capture camera images
@@ -186,6 +193,10 @@ public:
             }
             for(int i=0; i<2; ++i) {
                 trackerThreads[i].join();
+            }
+
+            if(Pushed(save_cam_model)) {
+                SaveCamModelLeftRightVisionConvention("/home/rpg/Data/Flea3/_", camParams, T_rl.inverse().matrix());
             }
 
             if( Pushed(save_kf) ) {
@@ -279,5 +290,5 @@ public:
 
 int main (int argc, char** argv){
     Application app;
-    return app.Run();
+    return app.Run(argc,argv);
 }

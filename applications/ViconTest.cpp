@@ -31,7 +31,7 @@ int main( int /*argc*/, char* argv[] )
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
       .SetHandler(new Handler3D(s_cam,AxisZ));
 
-    ViconTracking tracker("CAR","192.168.10.1");
+    ViconTracking tracker("GENLEE","192.168.10.1");
     int subsample = 1;
 
     pangolin::RegisterKeyPressCallback(' ', [&tracker](){tracker.ToggleRecordHistory();} );

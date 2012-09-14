@@ -18,7 +18,7 @@
 #include "common/DisplayUtils.h"
 #include "common/ScanlineRectify.h"
 #include "common/ImageSelect.h"
-#include "common/BaseDisplay.h"
+#include "common/BaseDisplayCuda.h"
 #include "common/HeightmapFusion.h"
 #include "common/CameraModelPyramid.h"
 #include "common/LoadPosesFromFile.h"
@@ -39,77 +39,69 @@ int main( int argc, char* argv[] )
     // Capture first image
     std::vector<rpg::ImageWrapper> images;
     video.Capture(images);
+    cout << images[0].width() << "x" << images[1].height() << endl;
 
     // native width and height (from camera)
     const unsigned int w = images[0].width();
     const unsigned int h = images[0].height();
-    const unsigned int MAXD = 256;
+    const unsigned int MAXD = 80;
 
     // Initialise window
-    View& container = SetupPangoGL(1024, 768);
+    View& container = SetupPangoGLWithCuda(1024, 768);
     SetupContainer(container, 4, (float)w/h);
 
-    // Initialise CUDA, allowing it to use OpenGL context
-    cudaGLSetGLDevice(0);
-
     // Allocate Camera Images on device for processing
-    Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
-    Volume<unsigned short, TargetDevice, Manage> vol(w,h,MAXD);
-    Volume<float, TargetDevice, Manage> sgm(w,h,MAXD);
+    Image<unsigned char, TargetDevice, Manage> upload(w,h);
+    Image<float, TargetDevice, Manage> img[] = {{w,h},{w,h}};
+    Volume<float, TargetDevice, Manage> vol[] = {{w,h,MAXD},{w,h,MAXD},{w,h,MAXD}};
+    Image<float, TargetDevice, Manage>  disp[] = {{w,h},{w,h}};
 
-//    Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
-    Image<unsigned long, TargetDevice, Manage> census[] = {{w,h},{w,h}};
-    Image<float, TargetDevice, Manage>  Disp[] = {{w,h},{w,h}};
+    Image<float, TargetDevice, Manage> meanI(w,h);
+    Image<float, TargetDevice, Manage> varI(w,h);
+    Image<float, TargetDevice, Manage> temp[] = {{w,h},{w,h},{w,h},{w,h},{w,h}};
+    Image<unsigned char, TargetDevice, Manage> Scratch(w*sizeof(float),h);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
 
-    Var<int> maxPosDisp("ui.disp",80, 0, MAXD-1);
-    Var<int> scoreRad("ui.score rad",4, 0, 7 );
-//    Var<float> dispStep("ui.disp step",1, 0.1, 1);
-//    Var<bool> scoreNormed("ui.score normed",true, true);
+    Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
+    Var<bool> subpix("ui.subpix", true, true);
+    Var<bool> filter("ui.filter", true, true);
 
-    Var<float> stereoAcceptThresh("ui.2nd Best thresh", 0, 0, 1, false);
+    Var<float> alpha("ui.alpha", 0.9, 0,1);
+    Var<float> r1("ui.r1", 0.0028, 0,0.01);
+    Var<float> r2("ui.r2", 0.008, 0,0.01);
 
-    Var<int> reverse_check("ui.reverse_check", -1, -1, 5);
-//    Var<bool> subpix("ui.subpix", false, true);
+    Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
+    Var<int> rad("ui.radius",9, 1, 20);
 
-//    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-//    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-//    Var<float> gs("ui.gs",2, 1E-3, 5);
-//    Var<float> gr("ui.gr",0.0184, 1E-3, 1);
+//    Var<int> showd("ui.showd",10, 0, MAXD-1);
+//    Var<float> scale("ui.scale",1, 0.1, 100);
 
-    Var<bool> dosgm("ui.sgm", true, true);
-    Var<float> sgmP1("ui.P1",1, 0, 100);
-    Var<float> sgmP2("ui.P2",500, 0, 1000);
-    Var<bool> dohoriz("ui.horiz", true, true);
-    Var<bool> dovert("ui.vert", true, true);
-    Var<bool> doreverse("ui.reverse", false, true);
+    Var<bool> leftrightcheck("ui.left-right check", true, true);
+    Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
+
+    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
+    Var<int> bilateralWinSize("ui.size",18, 1, 20);
+    Var<float> gs("ui.gs",10, 1E-3, 10);
+    Var<float> gr("ui.gr",6, 1E-3, 10);
+    Var<float> gc("ui.gc",0.01, 1E-4, 0.1);
 
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed9x9("ui.median 9x9", false, true);
     Var<bool> domed7x7("ui.median 7x7", false, true);
     Var<bool> domed5x5("ui.median 5x5", false, true);
-    Var<bool> domed3x3("ui.median 3x3", false, true);
+//    Var<bool> domed3x3("ui.median 3x3", false, true);
     Var<int> medi("ui.medi",12, 0, 24);
-
-    Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
-    Var<int> bilateralWinSize("ui.size",5, 1, 20);
-    Var<float> gs("ui.gs",2, 1E-3, 5);
-    Var<float> gr("ui.gr",0.5, 1E-3, 10);
-    Var<float> gc("ui.gc",10, 1E-3, 20);
-
-//    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
-//    Var<float> sigma("ui.sigma", 1, 0, 20);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
-    ActivateDrawImage<unsigned char> adImgL(img[0],GL_LUMINANCE8, false, true);
-    ActivateDrawImage<unsigned char> adImgR(img[1],GL_LUMINANCE8, false, true);
+    ActivateDrawImage<float> adImgL(img[0],GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> adImgR(img[1],GL_LUMINANCE32F_ARB, false, true);
 
-    ActivateDrawImage<float> adDispL(Disp[0],GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> adDispR(Disp[1],GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> adDispL(disp[0],GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> adDispR(disp[1],GL_LUMINANCE32F_ARB, false, true);
 
     container[0].SetDrawFunction(boost::ref(adImgL));
     container[1].SetDrawFunction(boost::ref(adImgR));
@@ -132,75 +124,62 @@ int main( int argc, char* argv[] )
             frame++;
 
             for(int i=0; i<2; ++i ) {
-                img[i].MemcpyFromHost(images[i].Image.data, w);
+                Image<unsigned char,TargetHost> himg(images[i].Image.data, images[i].width(),images[i].height());
+                upload.CopyFrom(himg.SubImage(w,h));
+                upload.MemcpyFromHost(images[i].Image.data, w);
+                ElementwiseScaleBias<float,unsigned char>(img[i], upload,1.0f/255.0f);
             }
         }
 
         if(go || guichanged ) {
+            CostVolumeFromStereoTruncatedAbsAndGrad(vol[0], img[0], img[1], -1, alpha, r1, r2);
+            CostVolumeFromStereoTruncatedAbsAndGrad(vol[1], img[1], img[0], +1, alpha, r1, r2);
 
-            for(int i=0; i<2; ++i) {
-                Census(census[i], img[i]);
+            if(filter) {
+                // Filter Cost volume
+                for(int v=0; v<2; ++v)
+                {
+                    Image<float, TargetDevice, Manage>& I = img[v];
+                    ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
+
+                    for(int d=0; d<maxdisp; ++d)
+                    {
+                        Image<float> P = vol[v].ImageXY(d);
+                        ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
+                        GuidedFilter(P,temp[0],varI,temp[1],meanI,I,Scratch,temp[2],temp[3],temp[4],rad,eps);
+                    }
+                }
             }
 
-            CensusStereoVolume(vol, census[0], census[1], maxPosDisp);
-            if(dosgm) {
-                SemiGlobalMatching(sgm,vol,img[0],maxPosDisp,sgmP1,sgmP2,dohoriz,dovert,doreverse);
-                CostVolMinimum<float,float>(Disp[0],sgm,maxPosDisp);
+            if(subpix) {
+                CostVolMinimumSubpix(disp[0],vol[0], maxdisp, -1);
+                CostVolMinimumSubpix(disp[1],vol[1], maxdisp, +1);
             }else{
-                CostVolMinimum<float,unsigned short>(Disp[0],vol,maxPosDisp);
+                CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
+                CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
             }
-            nppiDivC_32f_C1IR(maxPosDisp,Disp[0].ptr,Disp[0].pitch,Disp[0].Size());
 
-//            for(int i=0; i<2; ++i) {
-//                const size_t img1 = i;
-//                const size_t img2 = 1-i;
-//                const char maxDisp = -(2*i-1) * maxPosDisp;
-//                CensusStereo(DispInt[img1], census[img1], census[img2], maxDisp);
-//            }
-
-//            if(reverse_check >= 0) {
-//                LeftRightCheck(DispInt[0], DispInt[1], reverse_check);
-//            }
-
-//            DenseStereo<char,unsigned char>(DispInt[1], img[0], img[1], maxPosDisp, 0, scoreRad);
-
-//            for(int i=0; i<1; ++i) {
-////                ConvertImage<float, char>(Disp[i], DispInt[i]);
-//                const char maxDisp = maxPosDisp; //-(2*i-1) * maxPosDisp;
-//                nppiDivC_32f_C1IR(maxDisp,Disp[i].ptr,Disp[i].pitch,Disp[i].Size());
-//            }
-
-//            DenseStereo<char,unsigned char>(DispInt[1], img[0], img[1], maxPosDisp, 0, scoreRad);
-//            ConvertImage<float, char>(Disp[1], DispInt[1]);
-
-//            nppiDivC_32f_C1IR(maxPosDisp,Disp[0].ptr,Disp[0].pitch,Disp[0].Size());
-//            nppiDivC_32f_C1IR(maxPosDisp,Disp[1].ptr,Disp[1].pitch,Disp[1].Size());
-
-
-            for(int i=0; i < domedits; ++i ) {
-                if(domed9x9) MedianFilterRejectNegative9x9(Disp[0],Disp[0], medi);
-                if(domed7x7) MedianFilterRejectNegative7x7(Disp[0],Disp[0], medi);
-                if(domed5x5) MedianFilterRejectNegative5x5(Disp[0],Disp[0], medi);
-                if(domed3x3) MedianFilter3x3(Disp[0],Disp[0]);
+            for(int di=0; di<2; ++di) {
+                for(int i=0; i < domedits; ++i ) {
+                    if(domed9x9) MedianFilterRejectNegative9x9(disp[di],disp[di], medi);
+                    if(domed7x7) MedianFilterRejectNegative7x7(disp[di],disp[di], medi);
+                    if(domed5x5) MedianFilterRejectNegative5x5(disp[di],disp[di], medi);
+                }
             }
 
             if(applyBilateralFilter) {
-                BilateralFilter<float,float,unsigned char>(Disp[1],Disp[0],img[0],gs,gr,gc,bilateralWinSize);
-                Disp[0].CopyFrom(Disp[1]);
+                temp[0].CopyFrom(disp[0]);
+                BilateralFilter<float,float,float>(disp[0],temp[0],img[0],gs,gr,gc,bilateralWinSize);
             }
 
-//            if(filtgradthresh > 0) {
-//                FilterDispGrad(DispL, DispL, filtgradthresh);
-//            }
-
-//            if(applyBilateralFilter) {
-//                BilateralFilter(DispFilt,DispL,gs,gr,bilateralWinSize);
-//                DispL.CopyFrom(DispFilt);
-//            }
-
-            // normalise dDisp
-//            nppiDivC_32f_C1IR(maxDisp,DispL.ptr,DispL.pitch,DispL.Size());
+            if(leftrightcheck ) {
+                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
+                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
+            }
         }
+
+        adDispL.SetImageScale(1.0f/maxdisp);
+        adDispR.SetImageScale(1.0f/maxdisp);
 
         /////////////////////////////////////////////////////////////
         // Draw

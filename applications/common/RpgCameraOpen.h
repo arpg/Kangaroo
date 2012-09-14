@@ -4,7 +4,7 @@
 #include <RPG/Devices/Camera/CameraDevice.h>
 #include <RPG/Utils/GetPot>
 
-CameraDevice OpenRpgCamera(int argc, char* argv[]);
+CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels);
 
 //! Convenience method to load camera based on string URI containing PropertyMap and device.
 CameraDevice OpenRpgCamera( const std::string& str_uri);
@@ -51,7 +51,7 @@ const char USAGE[] =
 "Example:\n"
 "program  -idev FileReader  -lcmod lcmod.xml  -rcmod rcmod.xml  -lfile \"left.*pgm\"  -rfile \"right.*pgm\"\n\n";
 
-inline CameraDevice OpenRpgCamera(int argc, char* argv[])
+inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2)
 {
     if( argc < 2 ) {
         std::cout << USAGE;
@@ -60,8 +60,7 @@ inline CameraDevice OpenRpgCamera(int argc, char* argv[])
 
     GetPot cl(argc,argv);
 
-    CameraDevice camera;
-    camera.SetProperty("NumChannels", 2);
+    camera.SetProperty("NumChannels", numChannels);
     camera.SetProperty("DataSourceDir", cl.follow( ".", "-sdir"  ) );
     camera.SetProperty("Channel-0", cl.follow( ".*left.*", "-lfile" ) );
     camera.SetProperty("Channel-1", cl.follow( ".*right.*", "-rfile" ) );
@@ -71,6 +70,12 @@ inline CameraDevice OpenRpgCamera(int argc, char* argv[])
     camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
 
     camera.InitDriver( cl.follow( "FileReader", "-idev" ) );
+}
+
+inline CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels = 2)
+{
+    CameraDevice camera;
+    OpenRpgCamera(camera,argc,argv,numChannels);
     return camera;
 }
 

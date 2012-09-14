@@ -99,6 +99,7 @@ void BilateralFilter(
 }
 
 template void BilateralFilter(Image<float>, const Image<float>, const Image<unsigned char>, float, float, float, uint);
+template void BilateralFilter(Image<float>, const Image<float>, const Image<float>, float, float, float, uint);
 
 
 }

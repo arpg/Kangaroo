@@ -493,6 +493,16 @@ struct Image {
         return Image<TP,Target,DontManage>((TP*)ptr, width, height, width*sizeof(TP) );
     }
 
+    template<typename TP>
+    inline __device__ __host__
+    Image<TP,Target,DontManage> AlignedImage(int width, int height, int align_bytes=16)
+    {
+        const int wbytes = width*sizeof(TP);
+        const int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
+        assert(npitch*height <= h*pitch );
+        return Image<TP,Target,DontManage>((TP*)ptr, width, height, npitch );
+    }
+
     //////////////////////////////////////////////////////
     // Accessors for cuda vector types
     //////////////////////////////////////////////////////

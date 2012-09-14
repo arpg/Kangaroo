@@ -19,8 +19,8 @@ __global__ void KernCensus9x7(Image<Tout> census, Image<Tin> img)
     const int WRAD = 4;
     const int HRAD = 3;
 
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
         const Tin p = img(x,y);
@@ -35,7 +35,7 @@ __global__ void KernCensus9x7(Image<Tout> census, Image<Tin> img)
                 if( q < p ) {
                     out |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -53,8 +53,8 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
     const int WRAD = 5;
     const int HRAD = 5;
 
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
         const Tin p = img(x,y);
@@ -69,7 +69,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
                 if( q < p ) {
                     out.x |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -79,7 +79,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
             if( q < p ) {
                 out.x |= bit;
             }
-            bit = bit << 1;
+            bit <<= 1;
         }
 
         bit = 1;
@@ -89,7 +89,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
             if( q < p ) {
                 out.y |= bit;
             }
-            bit = bit << 1;
+            bit <<= 1;
         }
 
         for(int r=1; r <= HRAD; ++r) {
@@ -99,7 +99,7 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
                 if( q < p ) {
                     out.y |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -114,8 +114,8 @@ __global__ void KernCensus11x11(Image<ulong2> census, Image<Tin> img)
 template<typename Tin>
 __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
 {
-    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( img.InBounds(x,y) ) {
         const Tin p = img(x,y);
@@ -130,7 +130,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.x |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -142,7 +142,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.y |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -154,7 +154,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.z |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
 
@@ -166,7 +166,7 @@ __global__ void KernCensus16x16(Image<ulong4> census, Image<Tin> img)
                 if( q < p ) {
                     out.w |= bit;
                 }
-                bit = bit << 1;
+                bit <<= 1;
             }
         }
         census(x,y) = out;
@@ -247,7 +247,7 @@ void CensusStereo(Image<char> disp, Image<unsigned long> left, Image<unsigned lo
 //////////////////////////////////////////////////////
 
 template<typename Tvol, typename T>
-__global__ void KernCensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T> right, int maxDispVal)
+__global__ void KernCensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T> right, int maxDispVal, float sd)
 {
     const int x = threadIdx.x;
     const int y = blockIdx.y;
@@ -258,37 +258,35 @@ __global__ void KernCensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T>
 
     const T p = left(x,y);
 
-    const int maxDisp = min(maxDispVal, x+1);
+//    const int maxDisp = min(maxDispVal, x+1);
 
-    for(int d=0; d< maxDisp; ++d)
+    for(int d=0; d< maxDispVal; ++d)
     {
-        const int xd = x-d;
-        const T q = cache_r[xd]; //right(xd,y);
-        const Tvol score = HammingDistance(p,q);
+        const int xd = x + sd*d;
+        Tvol score;
+        if(0 <= xd && xd < right.w) {
+            const T q = cache_r[xd]; //right(xd,y);
+            score = HammingDistance(p,q) / (float)(sizeof(T)*8);
+        }else{
+            score = 0.5;
+        }
         vol(x,y,d) = score;
     }
 }
 
-
-void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp)
+template<typename Tvol, typename T>
+void CensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T> right, int maxDisp, float sd)
 {
     dim3 blockDim(left.w, 1);
     dim3 gridDim(1, left.h);
-    KernCensusStereoVolume<unsigned short, unsigned long><<<gridDim,blockDim>>>(vol,left,right,maxDisp);
+    KernCensusStereoVolume<Tvol,T><<<gridDim,blockDim>>>(vol,left,right,maxDisp, sd);
 }
 
-void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp)
-{
-    dim3 blockDim(left.w, 1);
-    dim3 gridDim(1, left.h);
-    KernCensusStereoVolume<unsigned short, ulong2><<<gridDim,blockDim>>>(vol,left,right,maxDisp);
-}
-
-void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp)
-{
-    dim3 blockDim(left.w, 1);
-    dim3 gridDim(1, left.h);
-    KernCensusStereoVolume<unsigned short, ulong4><<<gridDim,blockDim>>>(vol,left,right,maxDisp);
-}
+template void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);
+template void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp, float);
+template void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp, float);
+template void CensusStereoVolume(Volume<float> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);
+template void CensusStereoVolume(Volume<float> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp, float);
+template void CensusStereoVolume(Volume<float> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp, float);
 
 }

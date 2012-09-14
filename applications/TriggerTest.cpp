@@ -1,9 +1,8 @@
-#include <SimpleGui/Gui.h>
-#include <SimpleGui/GetPot>
-
+#include <iostream>
+#include <Eigen/Eigen>
 #include <dc1394/dc1394.h>
 #include <dc1394/conversions.h>
-
+#include <pangolin/pangolin.h>
 
 using namespace std;
 using namespace Eigen;
@@ -278,7 +277,6 @@ class Application
 {
 public:
     Application()
-        : window(0, 0, 640*2, 480, __FILE__ )
     {
         Init();
     }
@@ -289,14 +287,7 @@ public:
         while(1)
         {
             CaptureDraw();
-            window.swap_buffers();
         }
-    }
-    
-    static void PostRender(GLWindow*, void* data)
-    {
-        Application* self = (Application*)data;
-        self->CaptureDraw();
     }
     
     int Init()
@@ -392,7 +383,7 @@ public:
 //        ClearDmaBuffer(m_pCam[0]);
 //        ClearDmaBuffer(m_pCam[1]);
 
-        window.AddPostRenderCallback( Application::PostRender, this);
+//        window.AddPostRenderCallback( Application::PostRender, this);
     }
 
     void CaptureDraw()
@@ -461,7 +452,6 @@ public:
         glDisable(GL_TEXTURE_2D);
     }
     
-    GLWindow window;
     dc1394_t* m_pBus;
     dc1394camera_t* m_pCam[2];
     GLuint m_glTex[2];

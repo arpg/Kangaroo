@@ -6,6 +6,8 @@
 #include <Mvlpp/Cameras.h>
 
 #include "CameraModelPyramid.h"
+#include "BaselineFromCamModel.h"
+
 #include <kangaroo/kangaroo.h>
 
 inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size_t h)
@@ -17,7 +19,7 @@ inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size
     return K;
 }
 
-Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
+inline Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     Gpu::Image<float2> dlookup_left, Gpu::Image<float2> dlookup_right,
     const Sophus::SE3 T_rl, const Eigen::Matrix3d& K, double kappa1, double kappa2,
     size_t w, size_t h
@@ -75,21 +77,4 @@ Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     CreateMatlabLookupTable(dlookup_right,K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_or_nr);
 
     return T_nr_nl;
-}
-
-Sophus::SE3 T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl::CameraModel& rcmod, const Eigen::Matrix3d& targetRDF)
-{
-    // Transformation matrix to adjust to target RDF
-    Eigen::Matrix4d Tadj[2] = {Eigen::Matrix4d::Identity(),Eigen::Matrix4d::Identity()};
-    Tadj[0].block<3,3>(0,0) = targetRDF.transpose() * lcmod.RDF();
-    Tadj[1].block<3,3>(0,0) = targetRDF.transpose() * rcmod.RDF();
-
-    // Computer Poses in our adjust coordinate system
-    const Eigen::Matrix4d T_lw_ = Tadj[0] * lcmod.GetPose().inverse();
-    const Eigen::Matrix4d T_rw_ = Tadj[1] * rcmod.GetPose().inverse();
-
-    // Computer transformation to right camera frame from left
-    const Eigen::Matrix4d T_rl = T_rw_ * T_lw_.inverse();
-
-    return Sophus::SE3(T_rl.block<3,3>(0,0), T_rl.block<3,1>(0,3) );
 }
