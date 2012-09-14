@@ -57,8 +57,7 @@ public:
 
     void InitCamera(int argc, char** argv)
     {
-        //camera = OpenRpgCamera(argc,argv);
-        camera.InitDriver( "Flycap" );
+        OpenRpgCamera(camera,argc,argv);
 
         camera.Capture(img);
         width = img[0].width();
