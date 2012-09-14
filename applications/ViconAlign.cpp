@@ -358,9 +358,10 @@ int main( int argc, char* argv[] )
         if(Pushed(minimise_vicon)) {
             OptimiseTargetVicon(cam,tracker.target,vicon_obs, T_cf, T_wt);
             cout << "Vicon to camera (T_cv)" << endl;
-            const Eigen::Quaterniond q = T_cf.so3().unit_quaternion();
-            const Eigen::Vector3d t = T_cf.translation();
-            cout << "Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(" << q.w() << "," << q.x() << "," << q.y() << "," << q.z() << ")), Eigen::Vector3d(" << t[0] << "," << t[1] << "," << t[2] << ") )" << endl;
+//            const Eigen::Quaterniond q = T_cf.so3().unit_quaternion();
+//            const Eigen::Vector3d t = T_cf.translation();
+//            cout << "Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(" << q.w() << "," << q.x() << "," << q.y() << "," << q.z() << ")), Eigen::Vector3d(" << t[0] << "," << t[1] << "," << t[2] << ") )" << endl;
+            cout << "T_cv" << mvl::T2Cart(T_cf.matrix()).transpose() << endl;
         }
 
         if(Pushed(reset)) {
