@@ -21,11 +21,12 @@ inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size
 
 inline Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     Gpu::Image<float2> dlookup_left, Gpu::Image<float2> dlookup_right,
-    const Sophus::SE3 T_rl, const Eigen::Matrix3d& K, double kappa1, double kappa2,
-    size_t w, size_t h
+    const Sophus::SE3 T_rl,
+    const Eigen::Matrix3d& lK, double lk1, double lk2,
+    const Eigen::Matrix3d& rK, double rk1, double rk2
 ) {
-//    Eigen::Matrix3d K =    MakeK(camParamsVec, w, h);
-    Eigen::Matrix3d Kinv = MakeKinv(K);
+    Eigen::Matrix3d lKinv = MakeKinv(lK);
+    Eigen::Matrix3d rKinv = MakeKinv(rK);
 
     const Sophus::SO3 R_rl = T_rl.so3();
     const Sophus::SO3 R_lr = R_rl.inverse();
@@ -56,10 +57,9 @@ inline Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     // as the left camera.
     const Sophus::SE3 T_nr_nl = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(-r_l.norm(),0,0) );
 
-
     // Homographies which should be applied to left and right images to scan-line rectify them
-    const Eigen::Matrix3d Hl_nl = K * mR_nl.transpose() * Kinv;
-    const Eigen::Matrix3d Hr_nr = K * (mR_nl * R_lr.matrix()).transpose() * Kinv;
+    const Eigen::Matrix3d Hl_nl = lK * mR_nl.transpose() * lKinv;
+    const Eigen::Matrix3d Hr_nr = rK * (mR_nl * R_lr.matrix()).transpose() * rKinv;
 
     // Copy to simple Array objects to pass to CUDA by Value
     Gpu::Mat<float,9> H_ol_nl;
@@ -73,8 +73,8 @@ inline Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
     }
 
     // Invoke CUDA Kernel to generate lookup table
-    CreateMatlabLookupTable(dlookup_left, K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_ol_nl);
-    CreateMatlabLookupTable(dlookup_right,K(0,0), K(1,1), K(0,2), K(1,2), kappa1, kappa2, H_or_nr);
+    Gpu::CreateMatlabLookupTable(dlookup_left, lK(0,0), lK(1,1), lK(0,2), lK(1,2), lk1, lk2, H_ol_nl);
+    Gpu::CreateMatlabLookupTable(dlookup_right,rK(0,0), rK(1,1), rK(0,2), rK(1,2), rk1, rk2, H_or_nr);
 
     return T_nr_nl;
 }

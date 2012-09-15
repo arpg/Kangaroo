@@ -76,11 +76,6 @@ if( BuildStereoCalibration )
     target_link_libraries( StereoCalibration ${Fiducials_LIBRARIES} )
 endif()
 
-set( BuildStereoCalibrationOpenCV true CACHE "" force )
-if( BuildStereoCalibrationOpenCV )
-    add_executable( StereoCalibrationOpenCV ${COMMON_SRC} StereoCalibrationOpenCV.cpp)
-endif()
-
 set( BuildViconTest true CACHE "" force )
 if( BuildViconTest )
     add_executable( ViconTest ${COMMON_SRC} ViconTest.cpp)
@@ -99,6 +94,15 @@ if( BuildGpsConvert )
     target_link_libraries( GpsConvert Geographic )
 endif()
 
+set( BuildStereoCalibrationOpenCV true CACHE "" force )
+if( BuildStereoCalibrationOpenCV )
+    add_executable( StereoCalibrationOpenCV ${COMMON_SRC} StereoCalibrationOpenCV.cpp)
+endif()
+
+set( BuildStereoRectifyOpenCV true CACHE "" force )
+if( BuildStereoRectifyOpenCV )
+    add_executable( StereoRectifyOpenCV ${COMMON_SRC} StereoRectifyOpenCV.cpp)
+endif()
 
 find_package( Kangaroo )
 if(Kangaroo_FOUND)

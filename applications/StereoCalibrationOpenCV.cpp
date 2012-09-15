@@ -74,7 +74,7 @@ Eigen::Matrix<T,R,C> FromOpenCV(const cv::Mat& mat)
 
 
 static void
-StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=true, bool showRectified=true)
+StereoCalib(const vector<string>& imagelist, Size boardSize, float squareLength, bool useCalibrated=true, bool showRectified=true)
 {
     if( imagelist.size() % 2 != 0 )
     {
@@ -84,7 +84,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
 
     bool displayCorners = false;//true;
     const int maxScale = 2;
-    const float squareSize = 1.f;  // Set this to your actual square size
+    const float squareSize = squareLength;  // Set this to your actual square size
     // ARRAY AND VECTOR STORAGE:
 
     vector<vector<Point2f> > imagePoints[2];
@@ -263,12 +263,13 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
     Mat R1, R2, P1, P2, Q;
     Rect validRoi[2];
 
-    const double alpha = 1;
+    const double alpha = 0; //1;
+    const int correct_disp = 0; //CALIB_ZERO_DISPARITY;
 
     stereoRectify(cameraMatrix[0], distCoeffs[0],
                   cameraMatrix[1], distCoeffs[1],
                   imageSize, R, T, R1, R2, P1, P2, Q,
-                  CALIB_ZERO_DISPARITY, alpha, imageSize, &validRoi[0], &validRoi[1]);
+                  correct_disp, alpha, imageSize, &validRoi[0], &validRoi[1]);
 
     fs.open("extrinsics.yml", CV_STORAGE_WRITE);
     if( fs.isOpened() )
@@ -346,7 +347,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
             cvtColor(rimg, cimg, CV_GRAY2BGR);
             Mat canvasPart = !isVerticalStereo ? canvas(Rect(w*k, 0, w, h)) : canvas(Rect(0, h*k, w, h));
             resize(cimg, canvasPart, canvasPart.size(), 0, 0, CV_INTER_AREA);
-            if( useCalibrated )
+            if( useCalibrated && alpha != 0.0)
             {
                 Rect vroi(cvRound(validRoi[k].x*sf), cvRound(validRoi[k].y*sf),
                           cvRound(validRoi[k].width*sf), cvRound(validRoi[k].height*sf));
@@ -426,7 +427,8 @@ bool readDirRegex( const string& sDir, const string& regex_left, const string& r
 
 int main(int argc, char** argv)
 {
-    Size boardSize;
+    Size boardSize(6,9);
+    float squareLength = 0.025;
     bool showRectified = true;
 
     string sDir = ".";
@@ -448,6 +450,14 @@ int main(int argc, char** argv)
             if( sscanf(argv[++i], "%d", &boardSize.height) != 1 || boardSize.height <= 0 )
             {
                 cout << "invalid board height" << endl;
+                return print_help();
+            }
+        }
+        else if( string(argv[i]) == "-sq" )
+        {
+            if( sscanf(argv[++i], "%d", &squareLength) != 1 || squareLength <= 0 )
+            {
+                cout << "invalid square length" << endl;
                 return print_help();
             }
         }
@@ -476,11 +486,8 @@ int main(int argc, char** argv)
             return print_help();
     }
 
-    if( boardSize.width <= 0 || boardSize.height <= 0 )
-    {
-        cout << "Specify the board width and height (-w and -h options)" << endl;
-        return 0;
-    }
+    cout << "Using " << boardSize.width << "x" << boardSize.height << " grid." << endl;
+    cout << "Square length: " << squareLength << "m" << endl;
 
     vector<string> imagelist;
 //    bool ok = readStringList(imagelistfn, imagelist);
@@ -490,6 +497,6 @@ int main(int argc, char** argv)
         return print_help();
     }
 
-    StereoCalib(imagelist, boardSize, true, showRectified);
+    StereoCalib(imagelist, boardSize, squareLength, true, showRectified);
     return 0;
 }

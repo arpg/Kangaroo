@@ -72,11 +72,11 @@ __global__ void KernCreateMatlabLookupTable(
 }
 
 void CreateMatlabLookupTable(
-        Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Mat<float,9> H_no
+        Image<float2> lookup, float fu, float fv, float u0, float v0, float k1, float k2, Mat<float,9> H_on
 ) {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, lookup);
-    KernCreateMatlabLookupTable<<<gridDim,blockDim>>>(lookup,fu,fv,u0,v0,k1,k2,H_no);
+    KernCreateMatlabLookupTable<<<gridDim,blockDim>>>(lookup,fu,fv,u0,v0,k1,k2,H_on);
 }
 
 //////////////////////////////////////////////////////
