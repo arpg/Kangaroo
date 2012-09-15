@@ -74,7 +74,7 @@ Eigen::Matrix<T,R,C> FromOpenCV(const cv::Mat& mat)
 
 
 static void
-StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=true, bool showRectified=true)
+StereoCalib(const vector<string>& imagelist, Size boardSize, float squareLength, bool useCalibrated=true, bool showRectified=true)
 {
     if( imagelist.size() % 2 != 0 )
     {
@@ -84,7 +84,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
 
     bool displayCorners = false;//true;
     const int maxScale = 2;
-    const float squareSize = 1.f;  // Set this to your actual square size
+    const float squareSize = squareLength;  // Set this to your actual square size
     // ARRAY AND VECTOR STORAGE:
 
     vector<vector<Point2f> > imagePoints[2];
@@ -427,7 +427,8 @@ bool readDirRegex( const string& sDir, const string& regex_left, const string& r
 
 int main(int argc, char** argv)
 {
-    Size boardSize;
+    Size boardSize(6,9);
+    float squareLength = 0.025;
     bool showRectified = true;
 
     string sDir = ".";
@@ -449,6 +450,14 @@ int main(int argc, char** argv)
             if( sscanf(argv[++i], "%d", &boardSize.height) != 1 || boardSize.height <= 0 )
             {
                 cout << "invalid board height" << endl;
+                return print_help();
+            }
+        }
+        else if( string(argv[i]) == "-sq" )
+        {
+            if( sscanf(argv[++i], "%d", &squareLength) != 1 || squareLength <= 0 )
+            {
+                cout << "invalid square length" << endl;
                 return print_help();
             }
         }
@@ -477,11 +486,8 @@ int main(int argc, char** argv)
             return print_help();
     }
 
-    if( boardSize.width <= 0 || boardSize.height <= 0 )
-    {
-        cout << "Specify the board width and height (-w and -h options)" << endl;
-        return 0;
-    }
+    cout << "Using " << boardSize.width << "x" << boardSize.height << " grid." << endl;
+    cout << "Square length: " << squareLength << "m" << endl;
 
     vector<string> imagelist;
 //    bool ok = readStringList(imagelistfn, imagelist);
@@ -491,6 +497,6 @@ int main(int argc, char** argv)
         return print_help();
     }
 
-    StereoCalib(imagelist, boardSize, true, showRectified);
+    StereoCalib(imagelist, boardSize, squareLength, true, showRectified);
     return 0;
 }
