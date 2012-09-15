@@ -76,6 +76,11 @@ if( BuildStereoCalibration )
     target_link_libraries( StereoCalibration ${Fiducials_LIBRARIES} )
 endif()
 
+set( BuildStereoCalibrationOpenCV true CACHE "" force )
+if( BuildStereoCalibrationOpenCV )
+    add_executable( StereoCalibrationOpenCV ${COMMON_SRC} StereoCalibrationOpenCV.cpp)
+endif()
+
 set( BuildViconTest true CACHE "" force )
 if( BuildViconTest )
     add_executable( ViconTest ${COMMON_SRC} ViconTest.cpp)
