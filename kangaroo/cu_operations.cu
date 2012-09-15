@@ -169,6 +169,7 @@ void ElementwiseMultiplyAdd(Image<Tout> d, const Image<Tin1> a, const Image<Tin2
 template void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
 template void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
 template void ElementwiseAdd(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, int, int, int);
+template void ElementwiseAdd(Image<float>, Image<float>, Image<float>, float, float, float);
 template void ElementwiseMultiply(Image<float>, Image<float>, Image<float>, float,float);
 template void ElementwiseMultiply(Image<float>, Image<unsigned char>, Image<unsigned char>, float,float);
 template void ElementwiseSquare<float,float,float>(Image<float>, Image<float>, float, float);

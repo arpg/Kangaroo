@@ -196,6 +196,27 @@ void Census(Image<ulong4> census, Image<unsigned char> img)
     KernCensus16x16<unsigned char><<<gridDim,blockDim>>>(census,img);
 }
 
+void Census(Image<unsigned long> census, Image<float> img)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,img);
+    KernCensus9x7<unsigned long, float><<<gridDim,blockDim>>>(census,img);
+}
+
+void Census(Image<ulong2> census, Image<float> img)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,img);
+    KernCensus11x11<float><<<gridDim,blockDim>>>(census,img);
+}
+
+void Census(Image<ulong4> census, Image<float> img)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,img);
+    KernCensus16x16<float><<<gridDim,blockDim>>>(census,img);
+}
+
 //////////////////////////////////////////////////////
 // Census Stereo
 //////////////////////////////////////////////////////

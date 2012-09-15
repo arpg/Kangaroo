@@ -168,7 +168,7 @@ int main( int argc, char* argv[] )
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
 
     Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
-    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD}};
+    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{lw,lh,MAXD}};
     Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
     Image<float, TargetDevice, Manage> meanI(lw,lh);
     Image<float, TargetDevice, Manage> varI(lw,lh);
@@ -247,14 +247,20 @@ int main( int argc, char* argv[] )
     Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
     Var<int> rad("ui.radius",9, 1, 20);
 
-    Var<bool> leftrightcheck("ui.left-right check", true, true);
-    Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
-
     Var<bool> applyBilateralFilter("ui.Apply Bilateral Filter", false, true);
     Var<int> bilateralWinSize("ui.size",18, 1, 20);
     Var<float> gs("ui.gs",10, 1E-3, 10);
     Var<float> gr("ui.gr",6, 1E-3, 10);
     Var<float> gc("ui.gc",0.01, 1E-4, 0.1);
+
+    Var<bool> do_sgm_h("ui.SGM horiz", false, true);
+    Var<bool> do_sgm_v("ui.SGM vert", false, true);
+    Var<bool> do_sgm_reverse("ui.SGM reverse", false, true);
+    Var<float> sgm_p1("ui.sgm p1",0.01, 0, 0.1);
+    Var<float> sgm_p2("ui.sgm p2",0.02, 0, 1, false);
+
+    Var<bool> leftrightcheck("ui.left-right check", true, true);
+    Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
 
     Var<int> domedits("ui.median its",1, 1, 10);
     Var<bool> domed9x9("ui.median 9x9", false, true);
@@ -263,6 +269,8 @@ int main( int argc, char* argv[] )
     Var<int> medi("ui.medi",12, 0, 24);
 
     Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
+
+    Var<int> avg_rad("ui.avg_rad",5, 1, 100);
 
 
 #ifdef PLANE_FIT
@@ -309,8 +317,10 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
 
     Handler2dImageSelect handler2d(lw,lh,level);
-    ActivateDrawPyramid<unsigned char,max_levels> adleft(img_pyr[0],GL_LUMINANCE8, false, true);
-    ActivateDrawPyramid<unsigned char,max_levels> adright(img_pyr[1],GL_LUMINANCE8, false, true);
+//    ActivateDrawPyramid<unsigned char,max_levels> adleft(img_pyr[0],GL_LUMINANCE8, false, true);
+//    ActivateDrawPyramid<unsigned char,max_levels> adright(img_pyr[1],GL_LUMINANCE8, false, true);
+    ActivateDrawImage<float> adleft(img[0],GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> adright(img[1],GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float> adisp(disp[0],GL_LUMINANCE32F_ARB, false, true);
 //    ActivateDrawImage<float> adCrossSection(dCrossSection,GL_RGBA_FLOAT32_APPLE, false, true);
     ActivateDrawImage<float> adVol(vol[0].ImageXY(show_slice),GL_LUMINANCE32F_ARB, false, true);
@@ -369,15 +379,20 @@ int main( int argc, char* argv[] )
                 }else{
                     img_pyr[i][0].CopyFrom(hCamImg[i].SubImage(roi));
                 }
-
-                BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
-                ElementwiseScaleBias<float,unsigned char>(img[i], img_pyr[i][level],1.0f/255.0f);
-                Census(census[i], img_pyr[i][level]);
             }
         }
 
         if(go || GuiVarHasChanged() )
         {
+            for(int i=0; i<2; ++i ) {
+                BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
+                ElementwiseScaleBias<float,unsigned char>(img[i], img_pyr[i][level],1.0f/255.0f);
+//                BoxFilter<float,float,float>(temp[0],img[i],Scratch,avg_rad);
+//                ElementwiseAdd<float,float,float,float>(img[i], img[i], temp[0], 1, -1, 0.5);
+
+                Census(census[i], img[i]);
+            }
+
             if(use_census) {
                 CensusStereoVolume<float, census_t>(vol[0], census[0], census[1], maxdisp, -1);
                 if(leftrightcheck) CensusStereoVolume<float, census_t>(vol[1], census[1], census[0], maxdisp, +1);
@@ -415,6 +430,13 @@ int main( int argc, char* argv[] )
                         temp[0].CopyFrom(P);
                         BilateralFilter<float,float,float>(P,temp[0],I,gs,gr,gc,bilateralWinSize);
                     }
+                }
+            }
+
+            if(do_sgm_h || do_sgm_v) {
+                for(int i=0; i<1; ++i) {
+                    SemiGlobalMatching<float,float,float>(vol[2],vol[i],img[i], maxdisp, sgm_p1, sgm_p2, do_sgm_h, do_sgm_v, do_sgm_reverse);
+                    vol[i].CopyFrom(vol[2]);
                 }
             }
 
@@ -533,7 +555,8 @@ int main( int argc, char* argv[] )
             resetPlane = false;
 #endif
 
-            if(container[3].IsShown()) {
+//            if(container[3].IsShown())
+            {
                 // Copy point cloud into VBO
                 {
                     CudaScopedMappedPtr var(vbo);
@@ -555,8 +578,8 @@ int main( int argc, char* argv[] )
 
             // Update texture views
             adisp.SetImageScale(1.0f/maxdisp);
-            adleft.SetLevel(show_level);
-            adright.SetLevel(show_level);
+//            adleft.SetLevel(show_level);
+//            adright.SetLevel(show_level);
             adVol.SetImage(vol[0].ImageXY(show_slice));
         }
 

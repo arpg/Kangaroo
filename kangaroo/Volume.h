@@ -88,7 +88,11 @@ struct Volume
     {
         // If these volumes don't have the same height, or have an image pitch different from their height,
         // we need to do a copy for each depth layer.
-        assert(h = img.h && img_pitch = pitch*h && img.img_pitch == img.pitch * img.h);
+        assert(w == img.w);
+        assert(h == img.h);
+        assert(pitch == img.pitch);
+        assert(img_pitch == img.img_pitch);
+
         cudaMemcpy2D(ptr,pitch,img.ptr,img.pitch, std::min(img.w,w)*sizeof(T), h*std::min(img.d,d), TargetCopyKind<Target,TargetFrom>() );
     }
 

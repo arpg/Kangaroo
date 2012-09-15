@@ -61,10 +61,12 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void Census(Image<unsigned long> census, Image<unsigned char> img);
-
 void Census(Image<ulong2> census, Image<unsigned char> img);
-
 void Census(Image<ulong4> census, Image<unsigned char> img);
+
+void Census(Image<unsigned long> census, Image<float> img);
+void Census(Image<ulong2> census, Image<float> img);
+void Census(Image<ulong4> census, Image<float> img);
 
 //////////////////////////////////////////////////////
 
@@ -257,9 +259,8 @@ void CostVolumeCrossSection(
 
 //////////////////////////////////////////////////////
 
-void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
-
-void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+template<typename TH, typename TC, typename Timg>
+void SemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<Timg> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 //////////////////////////////////////////////////////
 
