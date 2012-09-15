@@ -214,7 +214,11 @@ int main( int argc, char* argv[] )
 
     // Build camera distortion lookup tables
     if(rectify) {
-        T_rl = CreateScanlineRectifiedLookupAndT_rl(dLookup[0], dLookup[1], T_rl_orig, K0, k1, k2, w, h );
+        T_rl = CreateScanlineRectifiedLookupAndT_rl(
+                    dLookup[0], dLookup[1], T_rl_orig,
+                    cam[0].K(), cam[0].GetModel()->warped.kappa1, cam[0].GetModel()->warped.kappa2,
+                    cam[1].K(), cam[1].GetModel()->warped.kappa1, cam[1].GetModel()->warped.kappa2
+                    );
     }
 
     const double baseline = T_rl.translation().norm();

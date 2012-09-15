@@ -263,12 +263,13 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
     Mat R1, R2, P1, P2, Q;
     Rect validRoi[2];
 
-    const double alpha = 1;
+    const double alpha = 0; //1;
+    const int correct_disp = 0; //CALIB_ZERO_DISPARITY;
 
     stereoRectify(cameraMatrix[0], distCoeffs[0],
                   cameraMatrix[1], distCoeffs[1],
                   imageSize, R, T, R1, R2, P1, P2, Q,
-                  CALIB_ZERO_DISPARITY, alpha, imageSize, &validRoi[0], &validRoi[1]);
+                  correct_disp, alpha, imageSize, &validRoi[0], &validRoi[1]);
 
     fs.open("extrinsics.yml", CV_STORAGE_WRITE);
     if( fs.isOpened() )
@@ -346,7 +347,7 @@ StereoCalib(const vector<string>& imagelist, Size boardSize, bool useCalibrated=
             cvtColor(rimg, cimg, CV_GRAY2BGR);
             Mat canvasPart = !isVerticalStereo ? canvas(Rect(w*k, 0, w, h)) : canvas(Rect(0, h*k, w, h));
             resize(cimg, canvasPart, canvasPart.size(), 0, 0, CV_INTER_AREA);
-            if( useCalibrated )
+            if( useCalibrated && alpha != 0.0)
             {
                 Rect vroi(cvRound(validRoi[k].x*sf), cvRound(validRoi[k].y*sf),
                           cvRound(validRoi[k].width*sf), cvRound(validRoi[k].height*sf));

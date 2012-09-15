@@ -10,6 +10,8 @@ inline void SaveCamModelRobotConvention(std::string filename, std::string name, 
     f.open(filename);
 
     if(f.is_open()) {
+        f.precision(10);
+        f.setf(std::ios::fixed, std::ios::floatfield);
         const Eigen::Matrix<double,6,1> x = mvl::T2Cart(T_wc);
         f << "<camera_model name=\"" << name << "\" index=\"0\" serialno=\"-1\" type=\"MVL_CAMERA_WARPED\" version=\"7\">" << std::endl;
         f << "<pose>"<< x(0) << ";"<< x(1) << ";"<< x(2) << ";"<< x(3) << ";"<< x(4) << ";"<< x(5) << "</pose>" << std::endl;
