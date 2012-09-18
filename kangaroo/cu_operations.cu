@@ -204,7 +204,9 @@ __global__ void KernImageL1(Image<T> img, Image<Tout> sum)
     Tout absval = 0;
 
     if(x < img.w && y < img.h ) {
-        absval = L1(img(x,y));
+        const T p = img(x,y);
+//        absval = sqrt(p.x*p.x + p.y*p.y) ; //L1(p);
+        absval = L1(p);
     }
 
     SumReducePutBlock2D<Tout>(absval, shared.getPointer(), sum.ptr);
@@ -219,7 +221,7 @@ Tout ImageL1(Image<T> img, Image<unsigned char> scratch)
     Image<Tout> sum = scratch.PackedImage<Tout>(gridDim.x, gridDim.y);
     KernImageL1<Tout,T><<<gridDim,blockDim,sizeof(Tout)*blockDim.x*blockDim.y>>>(img, sum);
 
-    return thrust::reduce(sum.begin(), sum.end(), 0, thrust::plus<Tout>() );
+    return thrust::reduce(sum.begin(), sum.end(), 0.0f, thrust::plus<Tout>() );
 }
 
 //////////////////////////////////////////////////////

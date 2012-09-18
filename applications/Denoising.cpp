@@ -44,20 +44,24 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgg(w,h);
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgu(w,h);
     Gpu::Image<float2, Gpu::TargetDevice, Gpu::Manage> imgp(w,h);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgdivp(w,h);
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> scratch(w,h);
 
     ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> addivp(imgdivp, GL_LUMINANCE32F_ARB, false, true);
 
-    container[0].SetDrawFunction(boost::ref(adg));
-    container[1].SetDrawFunction(boost::ref(adu));
+    Handler2dImageSelect handler2d(w,h);
+    container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(boost::ref(adu)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(boost::ref(addivp)).SetHandler(&handler2d);
 
     Var<bool> nextImage("ui.step", false, false);
-    Var<bool> go("ui.go", false, false);
+    Var<bool> go("ui.go", false, true);
 
-    Var<float> sigma("ui.sigma", 0.01, 0, 1);
-    Var<float> tau("ui.tau", 0.01, 0, 1);
-    Var<float> lamda("ui.lamda", 0.01, 0, 1);
+    Var<float> sigma("ui.sigma", 0.5, 0, 0.1);
+    Var<float> tau("ui.tau", 0.5, 0, 0.1);
+    Var<float> lambda("ui.lambda", 0.9, 0, 1);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -69,10 +73,13 @@ int main( int argc, char* argv[] )
             Gpu::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
             imgu.CopyFrom(imgg);
             imgp.Memset(0);
+            imgdivp.Memset(0);
         }
 
         if(go) {
             Gpu::DenoisingRof_pAscent(imgp,imgu,sigma,scratch);
+            Gpu::Divergence(imgdivp,imgp);
+            Gpu::DenoisingRof_uDescent(imgu,imgp,imgg, tau, lambda);
         }
 
         /////////////////////////////////////////////////////////////
