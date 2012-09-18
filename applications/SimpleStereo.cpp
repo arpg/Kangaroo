@@ -127,7 +127,7 @@ int main( int argc, char* argv[] )
                 Image<unsigned char,TargetHost> himg(images[i].Image.data, images[i].width(),images[i].height());
                 upload.CopyFrom(himg.SubImage(w,h));
                 upload.MemcpyFromHost(images[i].Image.data, w);
-                ElementwiseScaleBias<float,unsigned char>(img[i], upload,1.0f/255.0f);
+                ElementwiseScaleBias<float,unsigned char,float>(img[i], upload,1.0f/255.0f);
             }
         }
 

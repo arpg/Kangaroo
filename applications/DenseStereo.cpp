@@ -386,7 +386,7 @@ int main( int argc, char* argv[] )
         {
             for(int i=0; i<2; ++i ) {
                 BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
-                ElementwiseScaleBias<float,unsigned char>(img[i], img_pyr[i][level],1.0f/255.0f);
+                ElementwiseScaleBias<float,unsigned char,float>(img[i], img_pyr[i][level],1.0f/255.0f);
 //                BoxFilter<float,float,float>(temp[0],img[i],Scratch,avg_rad);
 //                ElementwiseAdd<float,float,float,float>(img[i], img[i], temp[0], 1, -1, 0.5);
 

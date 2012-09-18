@@ -2,6 +2,9 @@
 #include "launch_utils.h"
 #include "Image.h"
 
+#include "CUDA_SDK/sharedmem.h"
+
+
 namespace Gpu
 {
 
@@ -11,7 +14,7 @@ namespace Gpu
 //////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin, typename Tup>
-__global__ void KernElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, Tup s, Tup offset)
+__global__ void KernElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, float s, Tup offset)
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -23,7 +26,7 @@ __global__ void KernElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, Tup 
 }
 
 template<typename Tout, typename Tin, typename Tup>
-void ElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, Tup s, Tup offset)
+void ElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, float s, Tup offset)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim, b);
@@ -161,6 +164,63 @@ void ElementwiseMultiplyAdd(Image<Tout> d, const Image<Tin1> a, const Image<Tin2
     KernElementwiseMultiplyAdd<Tout,Tin1,Tin2,Tin3,Tup><<<gridDim,blockDim>>>(d,a,b,c,sab,sc,offset);
 }
 
+//////////////////////////////////////////////////////
+// Image Summation
+//////////////////////////////////////////////////////
+
+template<typename T>
+inline __device__
+void SumReducePutBlock2D(T value, T* sReduce, T* dSum)
+{
+    const unsigned int tid = threadIdx.y*blockDim.x + threadIdx.x;
+    const unsigned int bid = blockIdx.y*gridDim.x + blockIdx.x;
+
+    sReduce[tid] = value;
+
+    __syncthreads();
+    for(unsigned S=blockDim.y*blockDim.x/2;S>0; S>>=1)  {
+        if( tid < S ) {
+            sReduce[tid] += sReduce[tid+S];
+        }
+        __syncthreads();
+    }
+    if( tid == 0) {
+        dSum[bid] = sReduce[0];
+    }
+}
+
+//////////////////////////////////////////////////////
+// Image Abs elements
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename T>
+__global__ void KernImageL1(Image<T> img, Image<Tout> sum)
+{
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    SharedMemory<Tout> shared;
+
+    Tout absval = 0;
+
+    if(x < img.w && y < img.h ) {
+        absval = L1(img(x,y));
+    }
+
+    SumReducePutBlock2D<Tout>(absval, shared.getPointer(), sum.ptr);
+}
+
+template<typename Tout, typename T>
+Tout ImageL1(Image<T> img, Image<unsigned char> scratch)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, img);
+
+    Image<Tout> sum = scratch.PackedImage<Tout>(gridDim.x, gridDim.y);
+    KernImageL1<Tout,T><<<gridDim,blockDim,sizeof(Tout)*blockDim.x*blockDim.y>>>(img, sum);
+
+    return thrust::reduce(sum.begin(), sum.end(), 0, thrust::plus<Tout>() );
+}
 
 //////////////////////////////////////////////////////
 // Instantiate Templates
@@ -168,6 +228,7 @@ void ElementwiseMultiplyAdd(Image<Tout> d, const Image<Tin1> a, const Image<Tin2
 
 template void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
 template void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
+template void ElementwiseScaleBias(Image<float2> b, const Image<float2> a, float s, float2 offset);
 template void ElementwiseAdd(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, int, int, int);
 template void ElementwiseAdd(Image<float>, Image<float>, Image<float>, float, float, float);
 template void ElementwiseMultiply(Image<float>, Image<float>, Image<float>, float,float);
@@ -177,4 +238,7 @@ template void ElementwiseSquare<float,unsigned char,float>(Image<float>, Image<u
 template void ElementwiseMultiplyAdd(Image<float> d, const Image<float> a, const Image<float> b, const Image<float> c, float sab, float sc, float offset);
 template void ElementwiseMultiplyAdd(Image<float> d, const Image<float> a, const Image<unsigned char> b, const Image<float> c, float sab, float sc, float offset);
 template void ElementwiseDivision(Image<float> c, const Image<float> a, const Image<float> b, float sa, float sb, float scalar, float offset);
+
+template float ImageL1(Image<float2> img, Image<unsigned char> scratch);
+
 }

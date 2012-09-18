@@ -389,7 +389,26 @@ struct Image {
     }
 
     //////////////////////////////////////////////////////
-    // Image Derivatives
+    // Backward difference
+    //////////////////////////////////////////////////////
+
+    template<typename TR>
+    inline __device__ __host__
+    TR GetBackwardDiffDx(int x, int y) const
+    {
+        const T* row = RowPtr(y);
+        return ( ConvertPixel<TR,T>(row[x]) - ConvertPixel<TR,T>(row[x-1]) );
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    TR GetBackwardDiffDy(int x, int y) const
+    {
+        return ( ConvertPixel<TR,T>(Get(x,y)) - ConvertPixel<TR,T>(Get(x,y-1)) );
+    }
+
+    //////////////////////////////////////////////////////
+    // Central difference
     //////////////////////////////////////////////////////
 
     template<typename TR>
