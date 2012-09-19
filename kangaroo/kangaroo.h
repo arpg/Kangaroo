@@ -296,11 +296,20 @@ LeastSquaresSystem<float,3> ManhattenLineCost(
 
 //////////////////////////////////////////////////////
 
+template<typename OT, typename IT, typename KT, typename ACC>
+void Convolution(
+    Image<OT> out,  Image<IT> in,  Image<KT> kern, int kx, int ky
+);
+
+//////////////////////////////////////////////////////
+
 template<typename Tout, typename Tin>
 void Transpose(Image<Tout> out, Image<Tin> in);
 
 template<typename Tout, typename Tin>
 void PrefixSumRows(Image<Tout> out, Image<Tin> in);
+
+//////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin>
 void BoxFilterIntegralImage(Image<Tout> out, Image<Tin> IntegralImageT, int rad);
@@ -319,6 +328,8 @@ void BoxFilter(Image<Tout> out, Image<Tin> in, Image<unsigned char> scratch, int
 
     BoxFilterIntegralImage<Tout,TSum>(out,IntegralImageT,rad);
 }
+
+//////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin, typename TSum>
 void ComputeMeanVarience(Image<Tout> varI, Image<Tout> meanII, Image<Tout> meanI, const Image<Tin> I, Image<unsigned char> Scratch, int rad)
@@ -348,6 +359,8 @@ inline void ComputeCovariance(Image<float> covIP, Image<float> meanIP, Image<flo
     // cov_Ip = mean_Ip - mean_I .* mean_p; % this is the covariance of (I, p) in each local patch.
     ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
 }
+
+//////////////////////////////////////////////////////
 
 inline void GuidedFilter(Image<float> q, const Image<float> covIP, const Image<float> varI, const Image<float> meanP, const Image<float> meanI, const Image<float> I, Image<unsigned char> Scratch, Image<float> tmp1, Image<float> tmp2, Image<float> tmp3, int rad, float eps)
 {

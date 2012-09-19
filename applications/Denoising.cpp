@@ -47,9 +47,9 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgdivp(w,h);
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> scratch(w,h);
 
-    ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> addivp(imgdivp, GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float> addivp(imgdivp, GL_LUMINANCE32F_ARB, true, true);
 
     Handler2dImageSelect handler2d(w,h);
     container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
@@ -59,9 +59,11 @@ int main( int argc, char* argv[] )
     Var<bool> nextImage("ui.step", false, false);
     Var<bool> go("ui.go", false, true);
 
-    Var<float> sigma("ui.sigma", 0.5, 0, 0.1);
-    Var<float> tau("ui.tau", 0.5, 0, 0.1);
-    Var<float> lambda("ui.lambda", 0.9, 0, 1);
+    const float L = sqrt(8);
+    Var<float> sigma("ui.sigma", 1.0f/L, 0, 0.1);
+    Var<float> tau("ui.tau", 1.0f/L, 0, 0.1);
+    Var<float> lambda("ui.lambda", 1.2, 0, 10);
+    Var<float> alpha("ui.alpha", 0.002, 0, 0.005);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -77,9 +79,11 @@ int main( int argc, char* argv[] )
         }
 
         if(go) {
-            Gpu::DenoisingRof_pAscent(imgp,imgu,sigma,scratch);
-            Gpu::Divergence(imgdivp,imgp);
-            Gpu::DenoisingRof_uDescent(imgu,imgp,imgg, tau, lambda);
+            for(int i=0; i<10; ++i ) {
+                Gpu::HuberGradU_DualAscentP(imgp,imgu,sigma,alpha);
+                Gpu::Divergence(imgdivp,imgp);
+                Gpu::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg, tau, lambda);
+            }
         }
 
         /////////////////////////////////////////////////////////////
