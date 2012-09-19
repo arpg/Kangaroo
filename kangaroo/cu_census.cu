@@ -3,6 +3,8 @@
 #include "hamming_distance.h"
 #include "launch_utils.h"
 #include "InvalidValue.h"
+#include "CUDA_SDK/sharedmem.h"
+
 
 namespace Gpu
 {
@@ -273,7 +275,8 @@ __global__ void KernCensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T>
     const int x = threadIdx.x;
     const int y = blockIdx.y;
 
-    __shared__ T cache_r[MaxImageWidth];
+    SharedMemory<T> shared;
+    T* cache_r = shared.getPointer();
     cache_r[x] = right(x,y);
     __syncthreads();
 
@@ -300,7 +303,7 @@ void CensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T> right, int max
 {
     dim3 blockDim(left.w, 1);
     dim3 gridDim(1, left.h);
-    KernCensusStereoVolume<Tvol,T><<<gridDim,blockDim>>>(vol,left,right,maxDisp, sd);
+    KernCensusStereoVolume<Tvol,T><<<gridDim,blockDim,sizeof(T)*left.w>>>(vol,left,right,maxDisp, sd);
 }
 
 template void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);

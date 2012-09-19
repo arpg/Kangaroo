@@ -260,6 +260,8 @@ void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp
 
 void CostVolMinimumSquarePenaltySubpix(Image<float> imga, Volume<float> vol, Image<float> imgd, unsigned maxDisp, float sd, float lambda, float theta);
 
+void ExponentialEdgeWeight(Image<float> imgw, const Image<float> imgi, float alpha, float beta);
+
 void CostVolumeCrossSection(
     Image<float> dScore, Volume<CostVolElem> dCostVol, int y
 );

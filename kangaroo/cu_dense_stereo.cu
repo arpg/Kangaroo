@@ -179,6 +179,32 @@ void CostVolMinimumSquarePenaltySubpix(Image<float> imga, Volume<float> vol, Ima
     KernCostVolMinimumSquarePenaltySubpix<float,float><<<gridDim,blockDim>>>(imga,vol,imgd,maxDisp,sd,lambda,theta);
 }
 
+//////////////////////////////////////////////////////
+// Edge Weight
+//////////////////////////////////////////////////////
+
+__global__ void KernExponentialEdgeWeight(Image<float> imgw, const Image<float> imgi, float alpha, float beta)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( x < imgi.w && y < imgi.h ) {
+        float2 grad = make_float2(0,0);
+        if(0<x && x<imgi.w-1) grad.x = imgi.GetCentralDiffDx<float>(x,y);
+        if(0<y && y<imgi.h-1) grad.y = imgi.GetCentralDiffDy<float>(x,y);
+
+        const float w = expf( -alpha * powf(sqrt(grad.x*grad.x + grad.y*grad.y),beta) );
+        imgw(x,y) = w;
+    }
+}
+
+void ExponentialEdgeWeight(Image<float> imgw, const Image<float> imgi, float alpha, float beta)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,imgw);
+    KernExponentialEdgeWeight<<<gridDim,blockDim>>>(imgw,imgi,alpha,beta);
+}
+
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo
