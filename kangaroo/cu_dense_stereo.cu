@@ -115,6 +115,70 @@ void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp
     KernCostVolMinimumSubpix<float,float><<<gridDim,blockDim>>>(disp,vol,maxDisp,sd);
 }
 
+//////////////////////////////////////////////////////
+// Cost Volume minimum square penalty subpix refinement
+//////////////////////////////////////////////////////
+
+template<typename Tdisp, typename Tvol>
+__global__ void KernCostVolMinimumSquarePenaltySubpix(Image<Tdisp> imga, Volume<Tvol> vol, Image<float> imgd, unsigned maxDispVal, float sd, float lambda, float theta)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const float lastd = imgd(x,y);
+    const float inv2theta = 1.0f / (2.0f*theta);
+
+    Tdisp bestd = 0;
+    Tvol bestc = inv2theta*(lastd)*(lastd) + lambda * vol(x,y,0);;
+
+    for(int d=1; d < maxDispVal; ++d) {
+        const int xr = x + sd*d;
+        if(0 <= xr && xr < vol.w) {
+            const float ddif = lastd - d;
+            const Tvol c = inv2theta*ddif*ddif + lambda * vol(x,y,d);
+            if(c < bestc) {
+                bestc = c;
+                bestd = d;
+            }
+        }
+    }
+
+    Tdisp out = bestd;
+
+    const int bestxr = x + sd*bestd;
+    if( 0 < bestxr && bestxr < vol.w-1) {
+        // Fit parabola to neighbours
+        const float d1 = bestd+1;
+        const float d2 = bestd;
+        const float d3 = bestd-1;
+        const float s1 = inv2theta*(lastd-d1)*(lastd-d1) + lambda * vol(x,y,d1); //vol(x,y,d1);
+        const float s2 = bestc;
+        const float s3 = inv2theta*(lastd-d3)*(lastd-d3) + lambda * vol(x,y,d3); //vol(x,y,d3);
+
+        // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
+        const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
+        const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
+        const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
+        const float subpixdisp = -B / (2*A);
+
+        // Minima of parabola
+
+        // Check that minima is sensible. Otherwise assume bad data.
+        if( d3 < subpixdisp && subpixdisp < d1 ) {
+            out = subpixdisp;
+        }
+    }
+
+    imga(x,y) = out;
+}
+
+void CostVolMinimumSquarePenaltySubpix(Image<float> imga, Volume<float> vol, Image<float> imgd, unsigned maxDisp, float sd, float lambda, float theta)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,imga);
+    KernCostVolMinimumSquarePenaltySubpix<float,float><<<gridDim,blockDim>>>(imga,vol,imgd,maxDisp,sd,lambda,theta);
+}
+
 
 //////////////////////////////////////////////////////
 // Scanline rectified dense stereo

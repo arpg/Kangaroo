@@ -25,6 +25,7 @@
 #include "common/SavePPM.h"
 
 #include <kangaroo/kangaroo.h>
+#include <kangaroo/variational.h>
 
 
 const int MAXD = 128;
@@ -150,8 +151,8 @@ int main( int argc, char* argv[] )
     Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
 
     Image<float,TargetDevice, Manage>& imgd = disp[0];
-    Image<float,TargetDevice, Manage> imga;
-    Image<float,TargetDevice, Manage> imgq;
+    Image<float,TargetDevice, Manage> imga(lw,lh);
+    Image<float2,TargetDevice, Manage> imgq(lw,lh);
 
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
@@ -175,17 +176,26 @@ int main( int argc, char* argv[] )
     Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
     Var<bool> subpix("ui.subpix", true, true);
 
-    Var<bool> use_census("ui.use census", false, true);
+    Var<bool> use_census("ui.use census", true, true);
+
+    Var<bool> do_dtam("ui.do dtam", false, true);
+    Var<bool> dtam_reset("ui.reset", false, false);
+    Var<float> theta("ui.theta", 100, 0,100);
+    Var<float> lambda("ui.lambda", 200, 0,1000);
+    Var<float> sigma_q("ui.sigma q", 0.7, 0, 1);
+    Var<float> sigma_d("ui.sigma d", 0.7, 0, 1);
+    Var<float> huber_alpha("ui.huber alpha", 0.002, 0, 0.01);
+    Var<float> beta("ui.beta", 0.01, 0, 0.01);
 
     Var<float> alpha("ui.alpha", 0.9, 0,1);
     Var<float> r1("ui.r1", 0.0028, 0,0.01);
     Var<float> r2("ui.r2", 0.008, 0,0.01);
 
-    Var<bool> filter("ui.filter", true, true);
+    Var<bool> filter("ui.filter", false, true);
     Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
     Var<int> rad("ui.radius",9, 1, 20);
 
-    Var<bool> leftrightcheck("ui.left-right check", true, true);
+    Var<bool> leftrightcheck("ui.left-right check", false, true);
     Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
 
     Var<int> domedits("ui.median its",1, 1, 10);
@@ -290,33 +300,73 @@ int main( int argc, char* argv[] )
             }
         }
 
+        static int n = 0;
+//        static float theta = 0;
+        go |= Pushed(dtam_reset);
+        if(go ) {
+            n = 0;
+//            theta = 1000;
+
+            // Initialise primal and auxillary variables
+            CostVolMinimumSubpix(imgd,vol[0], maxdisp,-1);
+            imga.CopyFrom(imgd);
+
+            // Initialise dual variable
+            imgq.Memset(0);
+        }
+
+        if(do_dtam)
+        {
+            for(int i=0; i<5; ++i ) {
+                // TODO: Modify for edge weighting
+
+                // Dual Ascent
+                Gpu::HuberGradU_DualAscentP(imgq, imgd, sigma_q, huber_alpha);
+
+                // Primal Descent
+                Gpu::L2_u_minus_g_PrimalDescent(imgd, imgq, imga, sigma_d, 1.0f / (theta+1E-10) );
+
+                // Auxillary exhaustive search
+                CostVolMinimumSquarePenaltySubpix(imga, vol[0], imgd, maxdisp, -1, lambda, (theta+1E-10) );
+    //            imgd.CopyFrom(imga);
+
+    //            theta= theta * (1-beta*n);
+                ++n;
+            }
+        }
+
         go |= GuiVarHasChanged();
-        if(go) {
-            if(subpix) {
-                CostVolMinimumSubpix(disp[0],vol[0], maxdisp,-1);
-                if(leftrightcheck) CostVolMinimumSubpix(disp[1],vol[1], maxdisp,+1);
-            }else{
-                CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
-                if(leftrightcheck) CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
-            }
+//        if(go) {
+//            if(subpix) {
+//                CostVolMinimumSubpix(disp[0],vol[0], maxdisp,-1);
+//                if(leftrightcheck) CostVolMinimumSubpix(disp[1],vol[1], maxdisp,+1);
+//            }else{
+//                CostVolMinimum<float,float>(disp[0],vol[0], maxdisp);
+//                if(leftrightcheck) CostVolMinimum<float,float>(disp[1],vol[1], maxdisp);
+//            }
 
-            for(int di=0; di<(leftrightcheck?2:1); ++di) {
-                for(int i=0; i < domedits; ++i ) {
-                    if(domed9x9) MedianFilterRejectNegative9x9(disp[di],disp[di], medi);
-                    if(domed7x7) MedianFilterRejectNegative7x7(disp[di],disp[di], medi);
-                    if(domed5x5) MedianFilterRejectNegative5x5(disp[di],disp[di], medi);
-                }
-            }
+//            for(int di=0; di<(leftrightcheck?2:1); ++di) {
+//                for(int i=0; i < domedits; ++i ) {
+//                    if(domed9x9) MedianFilterRejectNegative9x9(disp[di],disp[di], medi);
+//                    if(domed7x7) MedianFilterRejectNegative7x7(disp[di],disp[di], medi);
+//                    if(domed5x5) MedianFilterRejectNegative5x5(disp[di],disp[di], medi);
+//                }
+//            }
+//        }
 
-            if(leftrightcheck ) {
-                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
-                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
-            }
+//        if(go) {
+//            if(leftrightcheck ) {
+//                LeftRightCheck(disp[1], disp[0], +1, maxdispdiff);
+//                LeftRightCheck(disp[0], disp[1], -1, maxdispdiff);
+//            }
 
-            if(filtgradthresh > 0) {
-                FilterDispGrad(disp[0], disp[0], filtgradthresh);
-            }
+//            if(filtgradthresh > 0) {
+//                FilterDispGrad(disp[0], disp[0], filtgradthresh);
+//            }
+//        }
 
+//        if(go)
+        {
             // Generate point cloud from disparity image
             DisparityImageToVbo(d3d, disp[0], baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
 

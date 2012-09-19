@@ -258,6 +258,8 @@ void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol);
 
 void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp, float sd);
 
+void CostVolMinimumSquarePenaltySubpix(Image<float> imga, Volume<float> vol, Image<float> imgd, unsigned maxDisp, float sd, float lambda, float theta);
+
 void CostVolumeCrossSection(
     Image<float> dScore, Volume<CostVolElem> dCostVol, int y
 );
