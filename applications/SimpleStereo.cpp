@@ -158,7 +158,7 @@ int main( int argc, char* argv[] )
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
 
-    typedef unsigned long census_t;
+    typedef ulong4 census_t;
     Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
     // Stereo transformation (post-rectification)
@@ -324,7 +324,7 @@ int main( int argc, char* argv[] )
         go |= Pushed(dtam_reset);
         if(go ) {
             n = 0;
-            theta = 1000;
+            theta.Reset();
 
             // Initialise primal and auxillary variables
             CostVolMinimumSubpix(imgd,vol[0], maxdisp,-1);
@@ -337,14 +337,14 @@ int main( int argc, char* argv[] )
         if(do_dtam && theta > 1E-3)
         {
             for(int i=0; i<5; ++i ) {
+                // Auxillary exhaustive search
+                CostVolMinimumSquarePenaltySubpix(imga, vol[0], imgd, maxdisp, -1, lambda, (theta) );
+
                 // Dual Ascent
                 Gpu::WeightedHuberGradU_DualAscentP(imgq, imgd, imgw, sigma_q, huber_alpha);
 
                 // Primal Descent
                 Gpu::WeightedL2_u_minus_g_PrimalDescent(imgd, imgq, imga, imgw, sigma_d, 1.0f / (theta) );
-
-                // Auxillary exhaustive search
-                CostVolMinimumSquarePenaltySubpix(imga, vol[0], imgd, maxdisp, -1, lambda, (theta) );
 
                 theta= theta * (1-beta*n);
                 ++n;
