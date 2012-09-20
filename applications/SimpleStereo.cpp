@@ -28,7 +28,7 @@
 #include <kangaroo/variational.h>
 
 
-const int MAXD = 128;
+const int MAXD = 80;
 
 using namespace std;
 using namespace pangolin;
@@ -158,7 +158,7 @@ int main( int argc, char* argv[] )
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
 
-    typedef ulong4 census_t;
+    typedef unsigned long census_t;
     Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
     // Stereo transformation (post-rectification)
@@ -178,24 +178,25 @@ int main( int argc, char* argv[] )
     Var<bool> subpix("ui.subpix", true, true);
 
     Var<bool> use_census("ui.use census", true, true);
+    Var<int> avg_rad("ui.avg_rad",0, 0, 100);
 
     Var<bool> do_dtam("ui.do dtam", false, true);
     Var<bool> dtam_reset("ui.reset", false, false);
 
-    Var<float> g_alpha("ui.g alpha", 0.1, 0,1);
-    Var<float> g_beta("ui.g beta", 0.1, 0,1);
+    Var<float> g_alpha("ui.g alpha", 4, 0,4);
+    Var<float> g_beta("ui.g beta", 1.0, 0,2);
 
 
     Var<float> theta("ui.theta", 100, 0,100);
-    Var<float> lambda("ui.lambda", 1, 0,10);
+    Var<float> lambda("ui.lambda", 20, 0,20);
     Var<float> sigma_q("ui.sigma q", 0.7, 0, 1);
     Var<float> sigma_d("ui.sigma d", 0.7, 0, 1);
     Var<float> huber_alpha("ui.huber alpha", 0.002, 0, 0.01);
     Var<float> beta("ui.beta", 0.00001, 0, 0.01);
 
     Var<float> alpha("ui.alpha", 0.9, 0,1);
-    Var<float> r1("ui.r1", 0.0028, 0,0.01);
-    Var<float> r2("ui.r2", 0.008, 0,0.01);
+    Var<float> r1("ui.r1", 100, 0,0.01);
+    Var<float> r2("ui.r2", 100, 0,0.01);
 
     Var<bool> filter("ui.filter", false, true);
     Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
@@ -220,12 +221,6 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
     pangolin::RegisterKeyPressCallback(']', [&jump_frames](){jump_frames=100;} );
     pangolin::RegisterKeyPressCallback('}', [&jump_frames](){jump_frames=1000;} );
-    pangolin::RegisterKeyPressCallback('~', [&container](){static bool showpanel=true; showpanel = !showpanel; if(showpanel) { container.SetBounds(0,1,Attach::Pix(180), 1); }else{ container.SetBounds(0,1,0, 1); } Display("ui").Show(showpanel); } );
-    pangolin::RegisterKeyPressCallback('1', [&container](){container[0].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('2', [&container](){container[1].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('3', [&container](){container[2].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
 
     Handler2dImageSelect handler2d(lw,lh,level);
 //    ActivateDrawPyramid<unsigned char,max_levels> adleft(img_pyr[0],GL_LUMINANCE8, false, true);
@@ -276,8 +271,20 @@ int main( int argc, char* argv[] )
                 }
 
                 BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
+            }
+        }
+
+        go |= avg_rad.GuiChanged() | use_census.GuiChanged();
+        if( go ) {
+            for(int i=0; i<2; ++i ) {
                 ElementwiseScaleBias<float,unsigned char,float>(img[i], img_pyr[i][level],1.0f/255.0f);
-                Census(census[i], img[i]);
+                if(avg_rad > 0 ) {
+                    BoxFilter<float,float,float>(temp[0],img[i],Scratch,avg_rad);
+                    ElementwiseAdd<float,float,float,float>(img[i], img[i], temp[0], 1, -1, 0.5);
+                }
+                if(use_census) {
+                    Census(census[i], img[i]);
+                }
             }
         }
 
@@ -285,7 +292,7 @@ int main( int argc, char* argv[] )
             ExponentialEdgeWeight(imgw, img[0], g_alpha, g_beta);
         }
 
-        go |= use_census.GuiChanged() | filter.GuiChanged() | leftrightcheck.GuiChanged() | rad.GuiChanged() | eps.GuiChanged() | alpha.GuiChanged() | r1.GuiChanged() | r2.GuiChanged();
+        go |= filter.GuiChanged() | leftrightcheck.GuiChanged() | rad.GuiChanged() | eps.GuiChanged() | alpha.GuiChanged() | r1.GuiChanged() | r2.GuiChanged();
         if(go) {
             if(use_census) {
                 CensusStereoVolume<float, census_t>(vol[0], census[0], census[1], maxdisp, -1);
@@ -317,7 +324,7 @@ int main( int argc, char* argv[] )
         go |= Pushed(dtam_reset);
         if(go ) {
             n = 0;
-            theta = 100;
+            theta = 1000;
 
             // Initialise primal and auxillary variables
             CostVolMinimumSubpix(imgd,vol[0], maxdisp,-1);
@@ -327,11 +334,9 @@ int main( int argc, char* argv[] )
             imgq.Memset(0);
         }
 
-        if(do_dtam)
+        if(do_dtam && theta > 1E-3)
         {
             for(int i=0; i<5; ++i ) {
-                if(theta < 1E-4) theta = 1E-4;
-
                 // Dual Ascent
                 Gpu::WeightedHuberGradU_DualAscentP(imgq, imgd, imgw, sigma_q, huber_alpha);
 
