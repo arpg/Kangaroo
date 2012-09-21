@@ -5,6 +5,27 @@
 namespace Gpu
 {
 
+//////////////////////////////////////////////////////
+// Disparity to Depth Conversion
+//////////////////////////////////////////////////////
+
+__global__
+void KernDisp2Depth(const Image<float> dIn, Image<float> dOut, float fu, float fBaseline, float fMinDisp)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+    if( dOut.InBounds(x,y) ) {
+        dOut(x,y) = dIn(x,y) >= fMinDisp ? fu * fBaseline / dIn(x,y) : 0.0f/0.0f;
+    }
+}
+
+void Disp2Depth(Image<float> dIn, const Image<float> dOut, float fu, float fBaseline, float fMinDisp)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim, gridDim, dOut);
+    KernDisp2Depth<<<gridDim,blockDim>>>( dIn, dOut, fu, fBaseline, fMinDisp );
+}
+
 __global__ void KernFilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth)
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;

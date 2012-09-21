@@ -40,4 +40,5 @@ template void ConvertImage<unsigned char, uchar3>(Image<unsigned char>, const Im
 template void ConvertImage<unsigned char, uchar4>(Image<unsigned char>, const Image<uchar4>);
 template void ConvertImage<float4, float>(Image<float4>, const Image<float>);
 
-}
+
+} // namespace Gpu

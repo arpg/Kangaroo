@@ -24,7 +24,7 @@ list(APPEND SRC_H
 list(APPEND SRC_CU
     cu_anaglyph.cu cu_bilateral.cu cu_convert.cu cu_index_buffer.cu
     cu_model_refinement.cu cu_dense_stereo.cu cu_lookup_warp.cu
-    cu_median.cu cu_normals.cu cu_openni.cu cu_plane_fit.cu
+    cu_median.cu cu_normals.cu cu_depth_tools.cu cu_plane_fit.cu
     cu_resample.cu cu_heightmap.cu cu_blur.cu cu_operations.cu
     cu_census.cu cu_semi_global_matching.cu
     cu_manhatten.cu cu_integral_image.cu
