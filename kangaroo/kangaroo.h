@@ -389,4 +389,10 @@ inline void GuidedFilter(Image<float> q, const Image<float> covIP, const Image<f
     ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
 }
 
+//////////////////////////////////////////////////////
+
+void SegmentTest(
+    Image<unsigned char> out, const Image<unsigned char> img, unsigned char threshold
+);
+
 }

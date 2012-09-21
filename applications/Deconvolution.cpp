@@ -75,7 +75,7 @@ int main( int argc, char* argv[] )
     Var<float> sigma_p("ui.sigma p", 0.001, 0, 0.01);
     Var<float> tau("ui.tau", 0.001, 0, 0.01);
     Var<float> lambda("ui.lambda", 1000, 0, 100);
-//    Var<float> alpha("ui.alpha", 0.002, 0, 0.005);
+    Var<float> alpha("ui.alpha", 0.002, 0, 0.005);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -96,7 +96,8 @@ int main( int argc, char* argv[] )
 
         if(go) {
             for(int i=0; i<1; ++i ) {
-                Gpu::TVL1GradU_DualAscentP(imgp,imgu,sigma_p);
+//                Gpu::TVL1GradU_DualAscentP(imgp,imgu,sigma_p);
+                Gpu::HuberGradU_DualAscentP(imgp,imgu,sigma_p,alpha);
                 Gpu::Convolution<float,float,float,float>(imgAu, imgu, imgk, kw/2, kh/2);
                 Gpu::DeconvolutionDual_qAscent(imgq,imgAu,imgg,sigma_q,lambda);
                 Gpu::Convolution<float,float,float,float>(imgATq, imgq, imgkT, kw/2, kh/2);
