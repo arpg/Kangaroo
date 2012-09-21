@@ -183,8 +183,8 @@ int main( int argc, char* argv[] )
     Var<bool> do_dtam("ui.do dtam", false, true);
     Var<bool> dtam_reset("ui.reset", false, false);
 
-    Var<float> g_alpha("ui.g alpha", 4, 0,4);
-    Var<float> g_beta("ui.g beta", 1.0, 0,2);
+    Var<float> g_alpha("ui.g alpha", 14, 0,4);
+    Var<float> g_beta("ui.g beta", 2.5, 0,2);
 
 
     Var<float> theta("ui.theta", 100, 0,100);
@@ -321,8 +321,10 @@ int main( int argc, char* argv[] )
 
         static int n = 0;
 //        static float theta = 0;
-        go |= Pushed(dtam_reset);
-        if(go ) {
+//        go |= Pushed(dtam_reset);
+//        if(go )
+        if(Pushed(dtam_reset))
+        {
             n = 0;
             theta.Reset();
 
