@@ -22,6 +22,8 @@ namespace Gpu
 template<typename To, typename Ti>
 void ConvertImage(Image<To> dOut, const Image<Ti> dIn);
 
+void Disp2Depth(Image<float> dIn, const Image<float> dOut, float fu, float fBaseline, float fMinDisp = 0.0);
+
 //////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin, typename Tup>
@@ -151,8 +153,17 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
         const Mat<float,3,4> KT_lr, float c,
         float baseline, float fu, float fv, float u0, float v0,
         Image<unsigned char> dWorkspace, Image<float4> dDebug,
-        const bool bDiscLimit = false
+        const bool bDiscardMaxMin = false
         );
+
+LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float> dDispr,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug,
+    const bool bDiscardMaxMin = false
+    );
 
 LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     const Image<float4> dPl,

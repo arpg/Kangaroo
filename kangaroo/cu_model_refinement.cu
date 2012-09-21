@@ -98,7 +98,7 @@ void BuildPoseRefinementFromDepthmapSystemESM(
     const Image<Ti>& dImgl, const Image<Ti>& dImgr,
     const float fu, const float fv, const float u0, const float v0,
     const Mat<float,3,4>& KT_lr, float c,
-    LeastSquaresSystem<float,6>& lss, Image<float4> dDebug, const bool bDiscLimit
+    LeastSquaresSystem<float,6>& lss, Image<float4> dDebug, const bool bDiscardMaxMin
 ) {
     const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
     Mat<float,3> KPr;
@@ -115,7 +115,7 @@ void BuildPoseRefinementFromDepthmapSystemESM(
         float Il = dImgl.template GetBilinear<float>(pl(0), pl(1));
         float Ir = dImgr(u,v);
 
-        if( bDiscLimit && ( Il == 0.0 || Il == 255.0 || Ir == 0.0 || Ir == 255.0 ) ) {
+        if( bDiscardMaxMin && ( Il == 0 || Il == 255 || Ir == 0 || Ir == 255 ) ) {
             dDebug(u,v) = make_float4(1,1,0,1);
         } else {
             const float y = Il - Ir;
@@ -255,7 +255,7 @@ __global__ void KernPoseRefinementFromDisparityESM(
     const Mat<float,3,4> KT_lr, float c,
     float baseline, float fu, float fv, float u0, float v0,
     Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
-    const bool bDiscLimit
+    const bool bDiscardMaxMin
 ){
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -263,7 +263,7 @@ __global__ void KernPoseRefinementFromDisparityESM(
     __shared__ SumLeastSquaresSystem<float,6,16,16> lss;
 
     const float4 Pr4 = DepthFromDisparity(u,v,dDispr(u,v), baseline, fu, fv, u0, v0 );
-    BuildPoseRefinementFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, KT_lr,c,lss.ZeroThisObs (),dDebug,bDiscLimit);
+    BuildPoseRefinementFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, KT_lr,c,lss.ZeroThisObs (),dDebug,bDiscardMaxMin);
 
     lss.ReducePutBlock(dSum);
 }
@@ -274,15 +274,59 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
     const Mat<float,3,4> KT_lr, float c,
     float baseline, float fu, float fv, float u0, float v0,
     Image<unsigned char> dWorkspace, Image<float4> dDebug,
-    const bool bDiscLimit
+    const bool bDiscardMaxMin
 ){
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
-    KernPoseRefinementFromDisparityESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscLimit );
+    KernPoseRefinementFromDisparityESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin );
     return lss.FinalSystem();
 }
+
+
+template<typename Ti>
+__global__ void KernPoseRefinementFromDepthESM(
+    const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDepth,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
+    const bool bDiscardMaxMin
+){
+    const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    __shared__ SumLeastSquaresSystem<float,6,16,16> lss;
+
+    float4 Pr4;
+    Pr4.z = dDepth(u,v);
+    Pr4.x = Pr4.z * (u-u0) / fu;
+    Pr4.y = Pr4.z * (v-v0) / fv;
+    Pr4.w = 1;
+
+    BuildPoseRefinementFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, KT_lr,c,lss.ZeroThisObs (),dDebug,bDiscardMaxMin);
+
+    lss.ReducePutBlock(dSum);
+}
+
+
+LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float> dDispr,
+    const Mat<float,3,4> KT_lr, float c,
+    float baseline, float fu, float fv, float u0, float v0,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug,
+    const bool bDiscardMaxMin
+){
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
+
+    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
+    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin );
+    return lss.FinalSystem();
+}
+
+
 
 //////////////////////////////////////////////////////
 // Projective ICP with Point Plane constraint

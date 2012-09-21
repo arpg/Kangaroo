@@ -274,6 +274,21 @@ struct Image {
         MemcpyFromHost(ptr, w*sizeof(T) );
     }
 
+    template <typename DT>
+    inline __host__
+    void MemcpyToHost(DT* hptr, size_t hpitch )
+    {
+        cudaMemcpy2D( hptr, hpitch, (void*)ptr, pitch, w*sizeof(T), h, cudaMemcpyDeviceToHost );
+    }
+
+    template <typename DT>
+    inline __host__
+    void MemcpyToHost(DT* ptr )
+    {
+        MemcpyToHost(ptr, w*sizeof(T) );
+    }
+
+
     inline __host__ __device__
     void Swap(Image<T,Target,Management>& img)
     {
