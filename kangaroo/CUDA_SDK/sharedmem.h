@@ -12,6 +12,8 @@
 #ifndef _SHAREDMEM_H_
 #define _SHAREDMEM_H_
 
+#include <cuda_runtime.h>
+
 //****************************************************************************
 // Because dynamically sized shared memory arrays are declared "extern",
 // we can't templatize them directly.  To get around this, we declare a 
@@ -111,6 +113,24 @@ template <>
 struct SharedMemory <unsigned long>
 {
     inline __device__ unsigned long* getPointer() { extern __shared__ unsigned long s_ulong[]; return s_ulong; }
+};
+
+template <>
+struct SharedMemory <ulong2>
+{
+    inline __device__ ulong2* getPointer() { extern __shared__ ulong2 s_ulong2[]; return s_ulong2; }
+};
+
+template <>
+struct SharedMemory <ulong3>
+{
+    inline __device__ ulong3* getPointer() { extern __shared__ ulong3 s_ulong3[]; return s_ulong3; }
+};
+
+template <>
+struct SharedMemory <ulong4>
+{
+    inline __device__ ulong4* getPointer() { extern __shared__ ulong4 s_ulong4[]; return s_ulong4; }
 };
 
 template <>

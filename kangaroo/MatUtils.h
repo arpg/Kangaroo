@@ -349,4 +349,32 @@ inline __device__ __host__ Mat<float,R,1> mul_aTb(const Mat<float3,1,R>& a, cons
     return ret;
 }
 
+//////////////////////////////////////////////////////
+// L1 norm
+//////////////////////////////////////////////////////
+
+inline __device__ __host__
+float L1(float val)
+{
+    return abs(val);
+}
+
+inline __device__ __host__
+float L1(float2 val)
+{
+    return abs(val.x) + abs(val.y);
+}
+
+inline __device__ __host__
+float L1(float3 val)
+{
+    return abs(val.x) + abs(val.y) + abs(val.z);
+}
+
+inline __device__ __host__
+float L1(float4 val)
+{
+    return abs(val.x) + abs(val.y) + abs(val.z) + abs(val.w);
+}
+
 }

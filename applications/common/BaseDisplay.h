@@ -41,17 +41,12 @@ inline void SetupContainer(pangolin::View& container, int num_views, float aspec
 
     pangolin::RegisterKeyPressCallback('~', [&container](){static bool showpanel=true; showpanel = !showpanel; if(showpanel) { container.SetBounds(0,1,pangolin::Attach::Pix(180), 1); }else{ container.SetBounds(0,1,0, 1); } pangolin::Display("ui").Show(showpanel); } );
 
-    pangolin::RegisterKeyPressCallback('1', [&container](){container[0].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('2', [&container](){container[1].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('3', [&container](){container[2].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('4', [&container](){container[3].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('5', [&container](){container[4].ToggleShow();} );
-    pangolin::RegisterKeyPressCallback('6', [&container](){container[5].ToggleShow();} );
+    const int keys = 10;
+    const char keyShowHide[] = {'1','2','3','4','5','6','7','8','9','0'};
+    const char keySave[]     = {'!','@','#','$','%','^','&','*','(',')'};
 
-    pangolin::RegisterKeyPressCallback('!', [&container](){container[0].SaveRenderNow("screenshot",4);} );
-    pangolin::RegisterKeyPressCallback('@', [&container](){container[1].SaveRenderNow("screenshot",4);} );
-    pangolin::RegisterKeyPressCallback('#', [&container](){container[2].SaveRenderNow("screenshot",4);} );
-    pangolin::RegisterKeyPressCallback('$', [&container](){container[3].SaveRenderNow("screenshot",4);} );
-    pangolin::RegisterKeyPressCallback('%', [&container](){container[4].SaveRenderNow("screenshot",4);} );
-    pangolin::RegisterKeyPressCallback('^', [&container](){container[5].SaveRenderNow("screenshot",4);} );
+    for(int v=0; v < num_views && v < keys; v++) {
+        pangolin::RegisterKeyPressCallback(keyShowHide[v], [&container,v](){container[v].ToggleShow();} );
+        pangolin::RegisterKeyPressCallback(keySave[v], [&container,v](){container[v].SaveRenderNow("screenshot",4);} );
+    }
 }

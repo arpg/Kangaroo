@@ -27,7 +27,7 @@ void Disp2Depth(Image<float> dIn, const Image<float> dOut, float fu, float fBase
 //////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin, typename Tup>
-void ElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, Tup s, Tup offset=0);
+void ElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, float s, Tup offset=0);
 
 template<typename Tout, typename Tin1, typename Tin2, typename Tup>
 void ElementwiseAdd(Image<Tout> c, Image<Tin1> a, Image<Tin2> b, Tup sa=1, Tup sb=1, Tup offset=0 );
@@ -43,6 +43,11 @@ void ElementwiseSquare(Image<Tout> b, const Image<Tin> a, Tup scalar=1, Tup offs
 
 template<typename Tout, typename Tin1, typename Tin2, typename Tin3, typename Tup>
 void ElementwiseMultiplyAdd(Image<Tout> d, const Image<Tin1> a, const Image<Tin2> b, const Image<Tin3> c, Tup sab=1, Tup sc=1, Tup offset=0);
+
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename T>
+Tout ImageL1(Image<T> img, Image<unsigned char> scratch);
 
 //////////////////////////////////////////////////////
 
@@ -63,10 +68,12 @@ void Warp(
 //////////////////////////////////////////////////////
 
 void Census(Image<unsigned long> census, Image<unsigned char> img);
-
 void Census(Image<ulong2> census, Image<unsigned char> img);
-
 void Census(Image<ulong4> census, Image<unsigned char> img);
+
+void Census(Image<unsigned long> census, Image<float> img);
+void Census(Image<ulong2> census, Image<float> img);
+void Census(Image<ulong4> census, Image<float> img);
 
 //////////////////////////////////////////////////////
 
@@ -271,15 +278,18 @@ void CostVolMinimum(Image<float> disp, Volume<CostVolElem> vol);
 
 void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp, float sd);
 
+void CostVolMinimumSquarePenaltySubpix(Image<float> imga, Volume<float> vol, Image<float> imgd, unsigned maxDisp, float sd, float lambda, float theta);
+
+void ExponentialEdgeWeight(Image<float> imgw, const Image<float> imgi, float alpha, float beta);
+
 void CostVolumeCrossSection(
     Image<float> dScore, Volume<CostVolElem> dCostVol, int y
 );
 
 //////////////////////////////////////////////////////
 
-void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
-
-void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+template<typename TH, typename TC, typename Timg>
+void SemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<Timg> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 //////////////////////////////////////////////////////
 
@@ -310,11 +320,20 @@ LeastSquaresSystem<float,3> ManhattenLineCost(
 
 //////////////////////////////////////////////////////
 
+template<typename OT, typename IT, typename KT, typename ACC>
+void Convolution(
+    Image<OT> out,  Image<IT> in,  Image<KT> kern, int kx, int ky
+);
+
+//////////////////////////////////////////////////////
+
 template<typename Tout, typename Tin>
 void Transpose(Image<Tout> out, Image<Tin> in);
 
 template<typename Tout, typename Tin>
 void PrefixSumRows(Image<Tout> out, Image<Tin> in);
+
+//////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin>
 void BoxFilterIntegralImage(Image<Tout> out, Image<Tin> IntegralImageT, int rad);
@@ -333,6 +352,8 @@ void BoxFilter(Image<Tout> out, Image<Tin> in, Image<unsigned char> scratch, int
 
     BoxFilterIntegralImage<Tout,TSum>(out,IntegralImageT,rad);
 }
+
+//////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin, typename TSum>
 void ComputeMeanVarience(Image<Tout> varI, Image<Tout> meanII, Image<Tout> meanI, const Image<Tin> I, Image<unsigned char> Scratch, int rad)
@@ -362,6 +383,8 @@ inline void ComputeCovariance(Image<float> covIP, Image<float> meanIP, Image<flo
     // cov_Ip = mean_Ip - mean_I .* mean_p; % this is the covariance of (I, p) in each local patch.
     ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
 }
+
+//////////////////////////////////////////////////////
 
 inline void GuidedFilter(Image<float> q, const Image<float> covIP, const Image<float> varI, const Image<float> meanP, const Image<float> meanI, const Image<float> I, Image<unsigned char> Scratch, Image<float> tmp1, Image<float> tmp2, Image<float> tmp3, int rad, float eps)
 {

@@ -65,47 +65,49 @@ __global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, un
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
 
-    Tdisp bestd = 0;
-    Tvol bestc = 1E10;
+    if( x < disp.w && y < disp.h ) {
+        Tdisp bestd = 0;
+        Tvol bestc = 1E10;
 
-    for(int d=0; d < maxDispVal; ++d) {
-        const int xr = x + sd*d;
-        if(0 <= xr && xr < vol.w) {
-            const Tvol c = vol(x,y,d);
-            if(c < bestc) {
-                bestc = c;
-                bestd = d;
+        for(int d=0; d < maxDispVal; ++d) {
+            const int xr = x + sd*d;
+            if(0 <= xr && xr < vol.w) {
+                const Tvol c = vol(x,y,d);
+                if(c < bestc) {
+                    bestc = c;
+                    bestd = d;
+                }
             }
         }
-    }
 
-    Tdisp out = bestd;
+        Tdisp out = bestd;
 
-    const int bestxr = x + sd*bestd;
-    if( 0 < bestxr && bestxr < vol.w-1) {
-        // Fit parabola to neighbours
-        const float d1 = bestd+1;
-        const float d2 = bestd;
-        const float d3 = bestd-1;
-        const float s1 = vol(x,y,d1);
-        const float s2 = bestc;
-        const float s3 = vol(x,y,d3);
+        const int bestxr = x + sd*bestd;
+        if( 0 < bestxr && bestxr < vol.w-1) {
+            // Fit parabola to neighbours
+            const float d1 = bestd+1;
+            const float d2 = bestd;
+            const float d3 = bestd-1;
+            const float s1 = vol(x,y,d1);
+            const float s2 = bestc;
+            const float s3 = vol(x,y,d3);
 
-        // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
-        const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
-        const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
-        const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
-        const float subpixdisp = -B / (2*A);
+            // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
+            const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
+            const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
+            const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
+            const float subpixdisp = -B / (2*A);
 
-        // Minima of parabola
+            // Minima of parabola
 
-        // Check that minima is sensible. Otherwise assume bad data.
-        if( d3 < subpixdisp && subpixdisp < d1 ) {
-            out = subpixdisp;
+            // Check that minima is sensible. Otherwise assume bad data.
+            if( d3 < subpixdisp && subpixdisp < d1 ) {
+                out = subpixdisp;
+            }
         }
-    }
 
-    disp(x,y) = out;
+        disp(x,y) = out;
+    }
 }
 
 void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp, float sd)
@@ -113,6 +115,100 @@ void CostVolMinimumSubpix(Image<float> disp, Volume<float> vol, unsigned maxDisp
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim,disp);
     KernCostVolMinimumSubpix<float,float><<<gridDim,blockDim>>>(disp,vol,maxDisp,sd);
+}
+
+//////////////////////////////////////////////////////
+// Cost Volume minimum square penalty subpix refinement
+//////////////////////////////////////////////////////
+
+template<typename Tdisp, typename Tvol>
+__global__ void KernCostVolMinimumSquarePenaltySubpix(Image<Tdisp> imga, Volume<Tvol> vol, Image<float> imgd, unsigned maxDispVal, float sd, float lambda, float theta)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( x < imga.w && y < imga.h ) {
+        const float lastd = imgd(x,y);
+        const float inv2theta = 1.0f / (2.0f*theta);
+
+        Tdisp bestd = 0;
+        Tvol bestc = inv2theta*(lastd)*(lastd) + lambda * vol(x,y,0);;
+
+        for(int d=1; d < maxDispVal; ++d) {
+            const int xr = x + sd*d;
+            if(0 <= xr && xr < vol.w) {
+                const float ddif = lastd - d;
+                const Tvol c = inv2theta*ddif*ddif + lambda * vol(x,y,d);
+                if(c < bestc) {
+                    bestc = c;
+                    bestd = d;
+                }
+            }
+        }
+
+        Tdisp out = bestd;
+
+        const int bestxr = x + sd*bestd;
+        if( 0 < bestxr && bestxr < vol.w-1) {
+            // Fit parabola to neighbours
+            const float d1 = bestd+1;
+            const float d2 = bestd;
+            const float d3 = bestd-1;
+            const float s1 = inv2theta*(lastd-d1)*(lastd-d1) + lambda * vol(x,y,d1); //vol(x,y,d1);
+            const float s2 = bestc;
+            const float s3 = inv2theta*(lastd-d3)*(lastd-d3) + lambda * vol(x,y,d3); //vol(x,y,d3);
+
+            // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
+            const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
+            const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
+            const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
+            const float subpixdisp = -B / (2*A);
+
+            // Minima of parabola
+
+            // Check that minima is sensible. Otherwise assume bad data.
+            if( d3 < subpixdisp && subpixdisp < d1 ) {
+                out = subpixdisp;
+            }
+        }
+
+        imga(x,y) = out;
+    }
+}
+
+void CostVolMinimumSquarePenaltySubpix(Image<float> imga, Volume<float> vol, Image<float> imgd, unsigned maxDisp, float sd, float lambda, float theta)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,imga);
+    KernCostVolMinimumSquarePenaltySubpix<float,float><<<gridDim,blockDim>>>(imga,vol,imgd,maxDisp,sd,lambda,theta);
+}
+
+//////////////////////////////////////////////////////
+// Edge Weight
+//////////////////////////////////////////////////////
+
+__global__ void KernExponentialEdgeWeight(Image<float> imgw, const Image<float> imgi, float alpha, float beta)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( x < imgi.w && y < imgi.h ) {
+        float2 grad = make_float2(0,0);
+        if(0<x && x<imgi.w-1) grad.x = imgi.GetCentralDiffDx<float>(x,y);
+        if(0<y && y<imgi.h-1) grad.y = imgi.GetCentralDiffDy<float>(x,y);
+//        if(0<x && x<imgi.w) grad.x = imgi.GetBackwardDiffDx<float>(x,y);
+//        if(0<y && y<imgi.h) grad.y = imgi.GetBackwardDiffDy<float>(x,y);
+
+        const float w = expf( -alpha * powf(sqrt(grad.x*grad.x + grad.y*grad.y),beta) );
+        imgw(x,y) = w;
+    }
+}
+
+void ExponentialEdgeWeight(Image<float> imgw, const Image<float> imgi, float alpha, float beta)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim,imgw);
+    KernExponentialEdgeWeight<<<gridDim,blockDim>>>(imgw,imgi,alpha,beta);
 }
 
 

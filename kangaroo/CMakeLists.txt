@@ -18,6 +18,7 @@ list(APPEND SRC_H
     Image.h Volume.h ImageApron.h sampling.h pixel_convert.h patch_score.h
     Mat.h MatUtils.h reweighting.h Pyramid.h reduce.h InvalidValue.h
     CudaTimer.h LeastSquareSum.h hamming_distance.h
+    variational.h
 )
 
 list(APPEND SRC_CU
@@ -27,6 +28,8 @@ list(APPEND SRC_CU
     cu_resample.cu cu_heightmap.cu cu_blur.cu cu_operations.cu
     cu_census.cu cu_semi_global_matching.cu
     cu_manhatten.cu cu_integral_image.cu
+    cu_convolution.cu cu_deconvolution.cu
+    cu_rof_denoising.cu
 )
 
 include_directories( ${Boost_INCLUDE_DIRS} )

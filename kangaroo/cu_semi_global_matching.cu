@@ -16,15 +16,15 @@ namespace Gpu
 //    int d = yoffset + blockIdx.z*blockDim.z + threadIdx.z;
 //}
 
-template<typename TH, typename TC>
-__global__ void KernSemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<unsigned char> left, int maxDispVal, float P1, float P2, int xoffset, int yoffset, int dx, int dy, unsigned pathlen)
+template<typename TH, typename TC, typename Timg>
+__global__ void KernSemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<Timg> left, int maxDispVal, float P1, float P2, int xoffset, int yoffset, int dx, int dy, unsigned pathlen)
 {
     const float MAX_ERROR = 1E30;
     int x = xoffset + blockIdx.x*blockDim.x + threadIdx.x;
     int y = yoffset + blockIdx.y*blockDim.y + threadIdx.y;
 
     TH lastBestCr = 0;
-    int last_c = left(x,y);
+    Timg last_c = left(x,y);
 
     const int maxDisp = min(maxDispVal,x+1);
     int lastMaxDisp = maxDisp;
@@ -37,9 +37,9 @@ __global__ void KernSemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<u
 
     for(int r=1; r<pathlen; ++r)
     {
-        const int c = left(x,y);
-        const int diff = last_c-c;
-        const float _P2 = P2 / (float)(1+abs(diff) );
+        const Timg c = left(x,y);
+        const float diff = last_c-c;
+        const float _P2 = P2 / (1.0f+abs(diff) );
         TH bestCr = MAX_ERROR;
         const int maxDisp = min(maxDispVal,x+1);
 #pragma unroll 128
@@ -60,7 +60,8 @@ __global__ void KernSemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<u
     }
 }
 
-void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse)
+template<typename TH, typename TC, typename Timg>
+void SemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<Timg> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse)
 {
     volH.Memset(0);
     dim3 blockDim(volC.w, 1);
@@ -82,26 +83,7 @@ void SemiGlobalMatching(Volume<float> volH, Volume<unsigned short> volC, Image<u
     }
 }
 
-void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse)
-{
-    volH.Memset(0);
-    dim3 blockDim(volC.w, 1);
-    dim3 gridDim(1, 1);
-    if(dovert) {
-        KernSemiGlobalMatching<<<gridDim,blockDim>>>(volH,volC,left,maxDisp,P1,P2,0,0,0,1,volC.h);
-        if(doreverse) {
-            KernSemiGlobalMatching<<<gridDim,blockDim>>>(volH,volC,left,maxDisp,P1,P2,0,volC.h-1,0,-1,volC.h);
-        }
-    }
-
-    if(dohoriz) {
-        dim3 blockDim2(1, volC.h);
-        dim3 gridDim(1, 1);
-        KernSemiGlobalMatching<<<gridDim,blockDim2>>>(volH,volC,left,maxDisp,P1,P2,0,0,1,0,volC.w);
-        if(doreverse) {
-            KernSemiGlobalMatching<<<gridDim,blockDim2>>>(volH,volC,left,maxDisp,P1,P2,volC.w-1,0,-1,0,volC.w);
-        }
-    }
-}
+template void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+template void SemiGlobalMatching(Volume<float> volH, Volume<float> volC, Image<float> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 }
