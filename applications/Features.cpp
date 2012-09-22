@@ -54,6 +54,10 @@ int main( int argc, char* argv[] )
     Var<bool> run("ui.run", true, true);
     Var<bool> step("ui.step", false, false);
     Var<int> thresh("ui.threshold", 10, 0, 255);
+    Var<int> minseglen("ui.min seg len", 9, 9, 16);
+
+    pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
+    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -67,7 +71,7 @@ int main( int argc, char* argv[] )
 
         go |= GuiVarHasChanged();
         if(go) {
-            Gpu::SegmentTest(imgs, img, thresh);
+            Gpu::SegmentTest(imgs, img, thresh, minseglen);
         }
 
         /////////////////////////////////////////////////////////////

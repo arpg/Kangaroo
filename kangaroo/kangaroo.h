@@ -412,7 +412,7 @@ inline void GuidedFilter(Image<float> q, const Image<float> covIP, const Image<f
 //////////////////////////////////////////////////////
 
 void SegmentTest(
-    Image<unsigned char> out, const Image<unsigned char> img, unsigned char threshold
+    Image<unsigned char> out, const Image<unsigned char> img, unsigned char threshold, unsigned char min_segment_len
 );
 
 }
