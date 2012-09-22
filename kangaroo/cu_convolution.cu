@@ -20,11 +20,15 @@ __global__ void KernConvolution(
             for(int c=0; c< kern.w; ++c) {
                 const int sx = x - kx + c;
                 const int sy = y - ky + r;
-                if( 0 <= sx && sx < out.w && 0 <= sy && sy < out.h ) {
-                    const KT kv = kern(c,r);
-                    kernsum += kv;
-                    pixsum += in(sx,sy) * kv;
-                }
+//                if( 0 <= sx && sx < out.w && 0 <= sy && sy < out.h ) {
+//                    const KT kv = kern(c,r);
+//                    kernsum += kv;
+//                    pixsum += in(sx,sy) * kv;
+//                }
+                const KT kv = kern(c,r);
+                kernsum += kv;
+
+                pixsum += in.GetConditionNeumann(abs(sx),sy) * kv;
             }
         }
         out(x,y) = pixsum / kernsum;

@@ -378,6 +378,18 @@ struct Image {
         return RowPtr(y)[x];
     }
 
+    inline  __device__ __host__
+    const T& GetConditionNeumann(int x, int y) const
+    {
+        x = abs(x);
+        if(x >= w) x = (w-1)-(x-w);
+
+        y = abs(y);
+        if(y >= h) y = (h-1)-(y-h);
+
+        return RowPtr(y)[x];
+    }
+
     template<typename TR>
     inline __device__ __host__
     TR GetBilinear(float u, float v) const
