@@ -46,10 +46,11 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgdivp(w,h);
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imglambda(w,h);
 
-    ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, true, true);
-    ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, true, true);
-    ActivateDrawImage<float> addivp(imgdivp, GL_LUMINANCE32F_ARB, true, true);
-    ActivateDrawImage<float> adlambda(imglambda, GL_LUMINANCE32F_ARB, true, true);
+    const bool bilinear = false;
+    ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, bilinear, true);
+    ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, bilinear, true);
+    ActivateDrawImage<float> addivp(imgdivp, GL_LUMINANCE32F_ARB, bilinear, true);
+    ActivateDrawImage<float> adlambda(imglambda, GL_LUMINANCE32F_ARB, bilinear, true);
 
     Handler2dImageSelect handler2d(w,h);
     SetupContainer(container, 4, (float)w/h);

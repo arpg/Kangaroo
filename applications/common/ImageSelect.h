@@ -39,6 +39,10 @@ public:
         return selected;
     }
 
+    void Deselect() {
+        selected = false;
+    }
+
     void WindowToImage(const Viewport& v, int wx, int wy, float& ix, float& iy )
     {
         ix = img_w * (wx - v.l) /(float)v.w - 0.5;
@@ -100,13 +104,14 @@ public:
             pixel_scale *= 0.98;
         }else{
             WindowToImage(view.v, x,y, topleft[0], topleft[1]);
-            selected = (button == pangolin::MouseButtonLeft);
+            selected = pressed;
         }
     }
 
     virtual void MouseMotion(View& view, int x, int y, int button_state)
     {
         WindowToImage(view.v, x,y, topleft[0], topleft[1]);
+        selected = true;
     }
 };
 
