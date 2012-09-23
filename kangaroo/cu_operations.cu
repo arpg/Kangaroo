@@ -9,6 +9,29 @@ namespace Gpu
 {
 
 //////////////////////////////////////////////////////
+// Image Fill
+//////////////////////////////////////////////////////
+
+template<typename T>
+__global__ void KernFill(Image<T> img, T val)
+{
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if(img.InBounds(x,y)) {
+        img(x,y) = val;
+    }
+}
+
+template<typename T>
+void Fill(Image<T> img, T val)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, img);
+    KernFill<T><<<gridDim,blockDim>>>(img,val);
+}
+
+//////////////////////////////////////////////////////
 // Image Scale / Bias
 // b = s*a+offset
 //////////////////////////////////////////////////////
@@ -228,6 +251,8 @@ Tout ImageL1(Image<T> img, Image<unsigned char> scratch)
 // Instantiate Templates
 //////////////////////////////////////////////////////
 
+template void Fill(Image<float> img, float val);
+template void Fill(Image<unsigned char> img, unsigned char val);
 template void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
 template void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
 template void ElementwiseScaleBias(Image<float2> b, const Image<float2> a, float s, float2 offset);

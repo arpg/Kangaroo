@@ -39,7 +39,6 @@ int main( int argc, char* argv[] )
 
     // Initialise window
     View& container = SetupPangoGLWithCuda(180+2*w, h,180);
-    SetupContainer(container, 4, (float)w/h);
 
     // Allocate Camera Images on device for processing
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
@@ -61,21 +60,24 @@ int main( int argc, char* argv[] )
     ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float> adk(imgk, GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float> adAu(imgAu, GL_LUMINANCE32F_ARB, true, true);
 
     Handler2dImageSelect handler2d(w,h);
+    SetupContainer(container, 5, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adgt)).SetHandler(&handler2d);
     container[1].SetDrawFunction(boost::ref(adk)).SetHandler(&handler2d);
     container[2].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
     container[3].SetDrawFunction(boost::ref(adu)).SetHandler(&handler2d);
+    container[4].SetDrawFunction(boost::ref(adAu)).SetHandler(&handler2d);
 
     Var<bool> nextImage("ui.step", false, false);
     Var<bool> go("ui.go", false, true);
 
-    Var<float> sigma_q("ui.sigma q", 0.001, 0, 0.01);
-    Var<float> sigma_p("ui.sigma p", 0.001, 0, 0.01);
+    Var<float> sigma_q("ui.sigma q", 0.2, 0, 0.01);
+    Var<float> sigma_p("ui.sigma p", 0.2, 0, 0.01);
     Var<float> tau("ui.tau", 0.001, 0, 0.01);
-    Var<float> lambda("ui.lambda", 1000, 0, 100);
-    Var<float> alpha("ui.alpha", 0.002, 0, 0.005);
+    Var<float> lambda("ui.lambda", 20, 0, 100);
+    Var<float> alpha("ui.alpha", 0.0, 0, 0.005);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {

@@ -31,6 +31,7 @@ list(APPEND SRC_CU
     cu_convolution.cu cu_deconvolution.cu
     cu_rof_denoising.cu
     cu_segment_test.cu
+    cu_painting.cu
 )
 
 include_directories( ${Boost_INCLUDE_DIRS} )

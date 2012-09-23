@@ -164,6 +164,11 @@ if(Kangaroo_FOUND)
       add_executable( Deconvolution Deconvolution.cpp ${COMMON_HEADERS})
     endif()
 
+    set( BuildInpainting true CACHE "" force )
+    if( BuildInpainting )
+      add_executable( Inpainting Inpainting.cpp ${COMMON_HEADERS})
+    endif()
+
     set( BuildFeatures true CACHE "" force )
     if( BuildFeatures )
       add_executable( Features Features.cpp ${COMMON_HEADERS})

@@ -30,6 +30,12 @@ void L2_u_minus_g_PrimalDescent(
         float tau, float lambda
 );
 
+void L2_u_minus_g_PrimalDescent(
+        Image<float> imgu, const Image<float2> imgp, const Image<float> imgg,
+        const Image<float> imglambdaweight,
+        float tau, float lambda
+);
+
 void WeightedL2_u_minus_g_PrimalDescent(
         Image<float> imgu, const Image<float2> imgp, const Image<float> imgg, const Image<float> imgw,
         float tau, float lambda
