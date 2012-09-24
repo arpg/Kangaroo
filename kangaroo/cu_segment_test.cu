@@ -1,6 +1,11 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
 
+#include <thrust/copy.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/functional.h>
+
+
 namespace Gpu {
 
 //////////////////////////////////////////////////////
@@ -107,6 +112,7 @@ __global__ void KernHarrisScore(
             float sum_Ixy = 0;
 
             for(int sy=-rad; sy<=rad; ++sy) {
+#pragma unroll
                 for(int sx=-rad; sx<=rad; ++sx) {
                     Mat<float,1,2> dI = img.template GetCentralDiff<float>(x+sx,y+sy);
                     sum_Ixx += dI(0) * dI(0);
@@ -156,6 +162,7 @@ __global__ void KernNonMaximalSuppression(
             T score = p;
 
             for(int sy=-rad; sy<=rad; ++sy) {
+#pragma unroll
                 for(int sx=-rad; sx<=rad; ++sx) {
                     const T q = img(x+sx, y+sy);
                     if(q >= p && !(sx==0 && sy==0) ) {
@@ -177,5 +184,21 @@ void NonMaximalSuppression(Image<unsigned char> out, Image<float> scores, int ra
     InitDimFromOutputImageOver(blockDim,gridDim, out);
     KernNonMaximalSuppression<unsigned char,float><<<gridDim,blockDim>>>(out, scores, rad, threshold);
 }
+
+//////////////////////////////////////////////////////
+// Compact into index list - Untested
+//////////////////////////////////////////////////////
+
+void GetIndices(thrust::device_vector<int> active_indices, Image<float> scores, float threshold)
+{
+    thrust::copy_if(
+            thrust::make_counting_iterator<int>(0),
+            thrust::make_counting_iterator<int>(scores.h * scores.pitch / sizeof(float)),
+            scores.begin(),
+            active_indices.begin(),
+            thrust::placeholders::_1 > threshold
+    );
+}
+
 
 }
