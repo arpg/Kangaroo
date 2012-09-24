@@ -40,11 +40,11 @@ int main( int argc, char* argv[] )
 
     // Allocate Camera Images on device for processing
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> imgs(w,h);
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> scratch(w,h);
+    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> imgf(w,h);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgs(w,h);
 
     ActivateDrawImage<unsigned char> adg(img, GL_LUMINANCE8, true, true);
-    ActivateDrawImage<unsigned char> ads(imgs, GL_LUMINANCE8, true, true);
+    ActivateDrawImage<unsigned char> ads(imgf, GL_LUMINANCE8, true, true);
 
     Handler2dImageSelect handler2d(w,h);
     SetupContainer(container, 2, (float)w/h);
@@ -53,8 +53,13 @@ int main( int argc, char* argv[] )
 
     Var<bool> run("ui.run", true, true);
     Var<bool> step("ui.step", false, false);
-    Var<int> thresh("ui.threshold", 10, 0, 255);
+    Var<float> harris_thresh("ui.harris threshold", 1E4, 1, 1E8, true);
+    Var<float> harris_lambda("ui.harris lambda", 0.04, 0, 1);
+    Var<int> harris_nms_rad("ui.harris nonmax rad", 1, 0, 5);
+    Var<float> fast_thresh("ui.fast threshold", 10, 0, 255);
     Var<int> minseglen("ui.min seg len", 9, 9, 16);
+
+    Var<bool> do_fast("ui.do fast", false, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -71,7 +76,12 @@ int main( int argc, char* argv[] )
 
         go |= GuiVarHasChanged();
         if(go) {
-            Gpu::SegmentTest(imgs, img, thresh, minseglen);
+            if(do_fast) {
+                Gpu::SegmentTest(imgf, img, fast_thresh, minseglen);
+            }else{
+                Gpu::HarrisScore(imgs, img, harris_lambda);
+                Gpu::NonMaximalSuppression(imgf, imgs, harris_nms_rad, harris_thresh);
+            }
         }
 
         /////////////////////////////////////////////////////////////

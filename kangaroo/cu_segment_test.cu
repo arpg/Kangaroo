@@ -3,6 +3,10 @@
 
 namespace Gpu {
 
+//////////////////////////////////////////////////////
+// Segment test
+//////////////////////////////////////////////////////
+
 template<typename Tup>
 __host__ __device__
 inline void PixelTest(Tup p, Tup q, unsigned short bit, unsigned short& dark, unsigned short& light, Tup threshold)
@@ -16,7 +20,7 @@ inline void PixelTest(Tup p, Tup q, unsigned short bit, unsigned short& dark, un
     }
 }
 
-template<typename T, typename Tout, typename Tup>
+template<typename Tout, typename T, typename Tup>
 __global__ void KernSegmentTest(
     Image<Tout> out, const Image<T> img, Tup threshold, unsigned char min_segment_len = 9
 ) {
@@ -79,6 +83,99 @@ void SegmentTest(
     dim3 gridDim, blockDim;
     InitDimFromOutputImageOver(blockDim,gridDim, img);
     KernSegmentTest<unsigned char, unsigned char, int><<<gridDim,blockDim>>>(out, img, threshold, min_segment_len);
+}
+
+//////////////////////////////////////////////////////
+// Harris Corner score
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename T, typename Tup>
+__global__ void KernHarrisScore(
+    Image<Tout> out, const Image<T> img, float lambda = 0.04
+) {
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    const int rad = 1;
+
+    if( x < img.w && y < img.h ) {
+        float score = 0;
+
+        if(rad < x && x < img.w-rad && rad < y && y < img.h - rad ) {
+            float sum_Ixx = 0;
+            float sum_Iyy = 0;
+            float sum_Ixy = 0;
+
+            for(int sy=-rad; sy<=rad; ++sy) {
+                for(int sx=-rad; sx<=rad; ++sx) {
+                    Mat<float,1,2> dI = img.template GetCentralDiff<float>(x+sx,y+sy);
+                    sum_Ixx += dI(0) * dI(0);
+                    sum_Iyy += dI(1) * dI(1);
+                    sum_Ixy += dI(0) * dI(1);
+                }
+            }
+
+            const int area = (2*rad+1)*(2*rad+1);
+            sum_Ixx /= area;
+            sum_Iyy /= area;
+            sum_Ixy /= area;
+
+            const float det = sum_Ixx * sum_Iyy - sum_Ixy * sum_Ixy;
+            const float trace = sum_Ixx + sum_Iyy;
+            score = det - lambda * trace*trace;
+        }
+
+        out(x,y) = score;
+    }
+}
+
+void HarrisScore(
+    Image<float> out, const Image<unsigned char> img, float lambda
+) {
+    dim3 gridDim, blockDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, img);
+    KernHarrisScore<float, unsigned char, int><<<gridDim,blockDim>>>(out, img, lambda);
+}
+
+//////////////////////////////////////////////////////
+// Non-maximal suppression
+//////////////////////////////////////////////////////
+
+template<typename Tout, typename T>
+__global__ void KernNonMaximalSuppression(
+    Image<Tout> out, const Image<T> img, int rad, float threshold
+) {
+    const int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( x < img.w && y < img.h ) {
+        float val = 0;
+
+        if(rad < x && x < img.w-rad && rad < y && y < img.h - rad ) {
+            const T p = img(x,y);
+            T score = p;
+
+            for(int sy=-rad; sy<=rad; ++sy) {
+                for(int sx=-rad; sx<=rad; ++sx) {
+                    const T q = img(x+sx, y+sy);
+                    if(q >= p && !(sx==0 && sy==0) ) {
+                        score = 0;
+                    }
+                }
+            }
+
+            val = score > threshold ? 255 : 0;
+        }
+
+        out(x,y) = val;
+    }
+}
+
+void NonMaximalSuppression(Image<unsigned char> out, Image<float> scores, int rad, float threshold)
+{
+    dim3 gridDim, blockDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, out);
+    KernNonMaximalSuppression<unsigned char,float><<<gridDim,blockDim>>>(out, scores, rad, threshold);
 }
 
 }
