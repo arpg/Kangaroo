@@ -122,15 +122,7 @@ __global__ void KernWeightedHuberGradU_DualAscentP(
 
     if( x < imgu.w && y < imgu.h ) {
         const float u = imgu(x,y);
-        float2 du = make_float2(0,0);
-
-        if(x < imgu.w-1 ) {
-            du.x = imgu(x+1,y) - u;
-        }
-
-        if(y < imgu.h-1 ) {
-            du.y = imgu(x,y+1) - u;
-        }
+        const float2 du = GradU(imgu,u,x,y);
 
         const float w = imgw(x,y);
         const float2 np = (imgp(x,y) + sigma * w * du) / (1 + sigma*alpha);
