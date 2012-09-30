@@ -60,14 +60,16 @@ int main( int argc, char* argv[] )
     Var<bool> go("ui.go", false, true);
 
     const float L = sqrt(8);
-    Var<float> sigma("ui.sigma", 1.0f/L, 0, 0.1);
-    Var<float> tau("ui.tau", 1.0f/L, 0, 0.1);
+    Var<float> sigma("ui.sigma", 0.04, 0, 0.1);
+    Var<float> tau("ui.tau", 0.05, 0, 0.1);
     Var<float> lambda("ui.lambda", 1.2, 0, 10);
     Var<float> alpha("ui.alpha", 0.002, 0, 0.005);
 
     Var<bool> tgv_do("ui.tgv", false, true);
-    Var<float> tgv_a0("ui.alpha0", 0.5, 0, 0.5);
-    Var<float> tgv_a1("ui.alpha1", 0.5, 0, 0.5);
+    Var<float> tgv_a1("ui.alpha1", 0.9, 0, 0.5);
+//    Var<float> tgv_a0("ui.alpha0", 0.5, 0, 0.5);
+    Var<float> tgv_k("ui.k", 10, 1, 10);
+    Var<float> tgv_delta("ui.delta", 0.1, 0, 0.2);
 
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
@@ -94,7 +96,8 @@ int main( int argc, char* argv[] )
                     Gpu::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg, tau, lambda);
                 }
             }else{
-                Gpu::TGV_L1_DenoisingIteration(imgu,imgv,imgp,imgq,imgr,imgg,tgv_a0, tgv_a1, sigma, tau, alpha);
+                const float tgv_a0 = tgv_k * tgv_a1;
+                Gpu::TGV_L1_DenoisingIteration(imgu,imgv,imgp,imgq,imgr,imgg,tgv_a0, tgv_a1, sigma, tau, tgv_delta);
             }
         }
 

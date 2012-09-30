@@ -209,7 +209,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromVbo(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 ){
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, dImgr);
+    InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
     KernPoseRefinementFromVbo<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dPr, KT_lr, c, lss.LeastSquareImage(), dDebug );
@@ -341,8 +341,8 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
+    __shared__ SumLeastSquaresSystem<float,6,16,16> sumlss;
+    LeastSquaresSystem<float,6>& sum = sumlss.ZeroThisObs();
 
     const float4 Pr = dPr(u,v);
     const float4 Nr = dNr(u,v);
@@ -382,7 +382,7 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
         dDebug(u,v) = make_float4(1,0,0,1);
     }
 
-    dSum(u,v) = sum;
+    sumlss.ReducePutBlock(dSum);
 }
 
 
@@ -393,14 +393,11 @@ LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 ){
     dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, dPl);
-    Image<LeastSquaresSystem<float,6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,6> >(dPl.w, dPl.h);
+    InitDimFromOutputImage(blockDim, gridDim, dPl, 16, 16);
 
-    KernPoseRefinementProjectiveIcpPointPlane<<<gridDim,blockDim>>>(dPl, dPr, dNr, KT_lr, T_rl, c, dSum, dDebug );
-
-    LeastSquaresSystem<float,6> sum;
-    sum.SetZero();
-    return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<float,6> >() );
+    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
+    KernPoseRefinementProjectiveIcpPointPlane<<<gridDim,blockDim>>>(dPl, dPr, dNr, KT_lr, T_rl, c, lss.LeastSquareImage(), dDebug );
+    return lss.FinalSystem();
 }
 
 //////////////////////////////////////////////////////

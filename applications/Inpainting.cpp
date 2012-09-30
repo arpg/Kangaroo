@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
     const unsigned int h = images[0].height();
 
     // Initialise window
-    View& container = SetupPangoGLWithCuda(180+2*w, h,180);
+    View& container = SetupPangoGLWithCuda(2*w, 2*h,180);
 
     // Allocate Camera Images on device for processing
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);

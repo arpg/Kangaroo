@@ -18,7 +18,7 @@ __global__ void KernTgvL1DenoisingDescentU(
         const float u = imgu(x,y);
         const float r = imgr(x,y);
         const float divp = DivA(imgp,x,y);
-        imgu(x,y) = u - tau*(alpha1*divp + r);
+        imgu(x,y) = u - tau*(r - alpha1*divp);
     }
 }
 
@@ -32,7 +32,7 @@ __global__ void KernTgvL1DenoisingDescentV(
         const float2 v = imgv(x,y);
         const float2 p = imgp(x,y);
         const float2 divq = DivA(imgq, x, y);
-        imgv(x,y) = v - tau*(alpha0*divq /*- alpha1*p*/);
+        imgv(x,y) = v - tau*(-alpha1*p - alpha0*divq);
     }
 }
 
@@ -44,11 +44,11 @@ __global__ void KernTgvL1DenoisingAscentP(
 
     if( x < imgp.w && y < imgp.h ) {
         const float u = imgu(x,y);
-        const float2 du = GradU(imgu,u,x,y);
+        const float2 du = GradUFwd(imgu,u,x,y);
         const float2 v = imgv(x,y);
         const float2 p = imgp(x,y);
 
-        imgp(x,y) = ProjectUnitBall( p + sigma * (alpha1 * (du/*-v*/)) );
+        imgp(x,y) = ProjectUnitBall( p + sigma * (alpha1 * (du-v)) );
     }
 }
 
@@ -75,7 +75,7 @@ __global__ void KernTgvL1DenoisingAscentR(
         const float r = imgr(x,y);
         const float u = imgu(x,y);
         const float f = imgf(x,y);
-        imgr(x,y) = ProjectUnitBall( (r + sigma*(u-f) ) / (1 + sigma * delta) );
+        imgr(x,y) = ProjectUnitBall( (r + sigma*(u-f) ) / (1.0f + sigma * delta) );
     }
 }
 
@@ -87,7 +87,7 @@ __global__ void KernGradU(
 
     if( x < imgv.w && y < imgv.h ) {
         const float u = imgu(x,y);
-        const float2 du = GradU(imgu,u,x,y);
+        const float2 du = GradUFwd(imgu,u,x,y);
         imgv(x,y) = du;
     }
 }
