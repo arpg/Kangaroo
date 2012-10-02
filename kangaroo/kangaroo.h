@@ -167,7 +167,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float> dDispr,
     const Mat<float,3,4> KT_lr, float c,
-    float baseline, float fu, float fv, float u0, float v0,
+    float fu, float fv, float u0, float v0,
     Image<unsigned char> dWorkspace, Image<float4> dDebug,
     const bool bDiscardMaxMin = false
     );

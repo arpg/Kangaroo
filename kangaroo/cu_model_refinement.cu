@@ -289,7 +289,7 @@ template<typename Ti>
 __global__ void KernPoseRefinementFromDepthESM(
     const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDepth,
     const Mat<float,3,4> KT_lr, float c,
-    float baseline, float fu, float fv, float u0, float v0,
+    float fu, float fv, float u0, float v0,
     Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
     const bool bDiscardMaxMin
 ){
@@ -314,7 +314,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float> dDispr,
     const Mat<float,3,4> KT_lr, float c,
-    float baseline, float fu, float fv, float u0, float v0,
+    float fu, float fv, float u0, float v0,
     Image<unsigned char> dWorkspace, Image<float4> dDebug,
     const bool bDiscardMaxMin
 ){
@@ -322,7 +322,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
-    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin );
+    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin );
     return lss.FinalSystem();
 }
 
