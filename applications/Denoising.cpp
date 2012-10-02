@@ -96,8 +96,10 @@ int main( int argc, char* argv[] )
                     Gpu::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg, tau, lambda);
                 }
             }else{
-                const float tgv_a0 = tgv_k * tgv_a1;
-                Gpu::TGV_L1_DenoisingIteration(imgu,imgv,imgp,imgq,imgr,imgg,tgv_a0, tgv_a1, sigma, tau, tgv_delta);
+                for(int i=0; i<20; ++i ) {
+                    const float tgv_a0 = tgv_k * tgv_a1;
+                    Gpu::TGV_L1_DenoisingIteration(imgu,imgv,imgp,imgq,imgr,imgg,tgv_a0, tgv_a1, sigma, tau, tgv_delta);
+                }
             }
         }
 

@@ -125,6 +125,7 @@ void DisparityImageCrossSection(
 //////////////////////////////////////////////////////
 
 void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth);
+void FilterBadKinectData(Image<float> dFiltered, Image<float> dKinectDepth);
 void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f);
 void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f);
 

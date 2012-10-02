@@ -26,8 +26,7 @@ struct Pyramid {
         Management::AllocateCheck();
 
         // Build power of two structure
-        for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l )
-        {
+        for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l ) {
             imgs[l] = Gpu::Image<T,Target,Management>(w>>l,h>>l);
         }
     }
@@ -81,11 +80,13 @@ struct Pyramid {
     // Image accessors
     //////////////////////////////////////////////////////
 
+    inline __host__ __device__
     Gpu::Image<T,Target,Management>& operator[](size_t i)
     {
         return imgs[i];
     }
 
+    inline __host__ __device__
     const Gpu::Image<T,Target,Management>& operator[](size_t i) const
     {
         return imgs[i];
@@ -107,6 +108,22 @@ struct Pyramid {
         }
 
         return pyr;
+    }
+
+    //////////////////////////////////////////////////////
+    // Allocate from image (as memory pool)
+    //////////////////////////////////////////////////////
+
+    inline __host__
+    void AllocateFromImage(unsigned w, unsigned h, Image<unsigned char, Target, DontManage> scratch )
+    {
+        // Verify that this is DontManage pyramid type
+        Management::AssignmentCheck();
+
+        // Build power of two structure
+        for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l ) {
+            imgs[l] = scratch.SplitAlignedImage(w>>l,h>>l);
+        }
     }
 
 

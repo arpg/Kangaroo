@@ -1,36 +1,39 @@
-PROJECT( Kangaroo )
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
+project( Kangaroo )
+cmake_minimum_required(VERSION 2.8)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 # git://github.com/stevenlovegrove/fiducials.git
 find_package( Fiducials REQUIRED )
 include_directories( ${Fiducials_INCLUDE_DIRS} )
-LINK_DIRECTORIES(${Fiducials_LIBRARY_DIRS})
-LINK_LIBRARIES(${Fiducials_LIBRARIES})
+link_directories(${Fiducials_LIBRARY_DIRS})
+link_libraries(${Fiducials_LIBRARIES})
 
 # git://github.com/stevenlovegrove/Sophus.git
 find_package(Sophus REQUIRED)
 include_directories(${Sophus_INCLUDE_DIR})
-LINK_DIRECTORIES(${Sophus_LIBRARY_DIRS})
-LINK_LIBRARIES(${Sophus_LIBRARIES})
+link_directories(${Sophus_LIBRARY_DIRS})
+link_libraries(${Sophus_LIBRARIES})
 
 # git://github.com/stevenlovegrove/Pangolin.git
 find_package(Pangolin REQUIRED)
 include_directories(${Pangolin_INCLUDE_DIRS})
-LINK_DIRECTORIES(${Pangolin_LIBRARY_DIRS})
-LINK_LIBRARIES(${Pangolin_LIBRARIES})
+link_directories(${Pangolin_LIBRARY_DIRS})
+link_libraries(${Pangolin_LIBRARIES})
 
 # Find Scenegraph
-FIND_PACKAGE(SceneGraph REQUIRED)
-INCLUDE_DIRECTORIES(${SceneGraph_INCLUDE_DIRS})
-LINK_LIBRARIES(${SceneGraph_LIBRARIES})
+find_package(SceneGraph REQUIRED)
+include_directories(${SceneGraph_INCLUDE_DIRS})
+link_libraries(${SceneGraph_LIBRARIES})
 
 # https://github.com/obiou/FPL.git
-FIND_PACKAGE(CCAMERAMODEL QUIET)
+find_package(CCAMERAMODEL QUIET)
 
 find_package( RPG REQUIRED )
 include_directories( ${RPG_INCLUDE_DIRS} )
-LINK_LIBRARIES(${RPG_LIBRARIES})
+link_libraries(${RPG_LIBRARIES})
+
+#git clone https://ceres-solver.googlesource.com/ceres-solver
+find_package( CeresSolver QUIET)
 
 #FIND_PACKAGE( NODE REQUIRED )
 #find_package( ZeroMQ REQUIRED )
@@ -39,18 +42,18 @@ set(NODE_INCLUDE_DIRS "~/Code/Dev/Hermes1.0")
 include_directories( ${ZeroMQ_INCLUDE_DIRS} )
 include_directories( ${PROTOBUF_INCLUDE_DIRS} )
 include_directories( ${NODE_INCLUDE_DIRS} )
-PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
+protobuf_generate_cpp( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
-LIST(APPEND COMMON_HEADERS
+list(APPEND COMMON_HEADERS
     common/DisplayUtils.h common/RpgCameraOpen.h common/ImageSelect.h
     common/LeastSquaresBlockHelpers.h common/ViconTracker.h
     common/AssimpVboExport.h
 )
 
-IF(CMAKE_COMPILER_IS_GNUCXX)
-  SET(CMAKE_CXX_FLAGS "-std=c++11 -g")
-ENDIF()
+if(CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "-std=c++11 -g")
+endif()
 
 set( BuildOddsAndEnds true CACHE "" force )
 if( BuildOddsAndEnds )
@@ -104,6 +107,17 @@ if( BuildStereoRectifyOpenCV )
     add_executable( StereoRectifyOpenCV ${COMMON_SRC} StereoRectifyOpenCV.cpp)
 endif()
 
+#if(CeresSolver_FOUND)
+#    include_directories( ${CeresSolver_INCLUDE_DIRS} )
+#    set( BuildPoseGraph true CACHE "" force )
+#    if( BuildPoseGraph )
+#      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+#      SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
+#      add_executable( PoseGraph PoseGraph.cpp)
+#      target_link_libraries( PoseGraph ${CeresSolver_LIBRARIES} )
+#    endif()
+#endif()
+
 find_package( Kangaroo )
 if(Kangaroo_FOUND)
     include_directories( ${Kangaroo_INCLUDE_DIRS} )
@@ -132,6 +146,11 @@ if(Kangaroo_FOUND)
     set( BuildDenseStereo true CACHE "" force )
     if( BuildDenseStereo )
       add_executable( DenseStereo DenseStereo.cpp ${COMMON_HEADERS})
+    endif()
+
+    set( BuildKinectTrack true CACHE "" force )
+    if( BuildKinectTrack )
+      add_executable( KinectTrack KinectTrack.cpp ${COMMON_HEADERS})
     endif()
 
     set( BuildKinectHeightmap true CACHE "" force )

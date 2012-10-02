@@ -201,6 +201,7 @@ int main( int /*argc*/, char* argv[] )
             if(camera.Capture(img)) {
                 dI.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
                 dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+                frame++;
             }
 
             if(tracker.IsConnected())
@@ -218,7 +219,9 @@ int main( int /*argc*/, char* argv[] )
 
             DepthToVbo(dV, dKinectf, Kdepth(0,0), Kdepth(1,1), Kdepth(0,2), Kdepth(1,2), 1.0f/1000.0f );
             NormalsFromVbo(dN, dV);
+        }
 
+        {
             if(bundle) {
                 const Eigen::Matrix<double, 3,4> mKcT_cd = Krgb * T_cd.matrix3x4();
                 const Eigen::Matrix<double, 3,4> mT_lr = T_lr.matrix3x4();

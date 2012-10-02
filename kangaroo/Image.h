@@ -529,6 +529,10 @@ struct Image {
         return Image<T,Target,DontManage>(ptr, width, height, pitch);
     }
 
+    //////////////////////////////////////////////////////
+    // Reuse image memory buffer for different images
+    //////////////////////////////////////////////////////
+
     //! Ignore this images pitch - just return new image of
     //! size w x h which uses this memory
     template<typename TP>
@@ -547,6 +551,31 @@ struct Image {
         const int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
         assert(npitch*height <= h*pitch );
         return Image<TP,Target,DontManage>((TP*)ptr, width, height, npitch );
+    }
+
+    //! Split image into smaller typed image and remaining space
+    //! Use for simple CPU/GPU memory pool
+    //! Only applicable for DontManage types
+    template<typename TP>
+    inline __device__ __host__
+    Image<TP,Target,DontManage> SplitAlignedImage(int nwidth, int nheight, int align_bytes=16)
+    {
+        // Only let us split DontManage image types (so we can't orthan memory)
+        Management::AssignmentCheck();
+
+        // Extract aligned image of type TP from start of this image
+        const int wbytes = nwidth*sizeof(TP);
+        const int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
+        const TP* nptr = (TP*)ptr;
+        assert(npitch*nheight <= h*pitch );
+
+        // Update this image to reflect remainder (as single row image)
+        ptr = (T*)((char*)(ptr) + nheight*npitch);
+        pitch = (h*pitch - nheight*npitch);
+        h = 1;
+        w = pitch / sizeof(T);
+
+        return Image<TP,Target,DontManage>(nptr, nwidth, nheight, npitch );
     }
 
     //////////////////////////////////////////////////////
