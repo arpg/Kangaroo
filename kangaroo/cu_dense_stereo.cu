@@ -8,7 +8,7 @@
 namespace Gpu
 {
 
-const int MinDisparity = 1;
+const int MinDisparity = 0;
 const int DefaultRad = 2;
 //typedef SSNDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
 typedef SANDPatchScore<float,DefaultRad,ImgAccessRaw> DefaultSafeScoreType;
@@ -85,23 +85,17 @@ __global__ void KernCostVolMinimumSubpix(Image<Tdisp> disp, Volume<Tvol> vol, un
         const int bestxr = x + sd*bestd;
         if( 0 < bestxr && bestxr < vol.w-1) {
             // Fit parabola to neighbours
-            const float d1 = bestd+1;
-            const float d2 = bestd;
-            const float d3 = bestd-1;
-            const float s1 = vol(x,y,d1);
-            const float s2 = bestc;
-            const float s3 = vol(x,y,d3);
+            const float dl = bestd-1;
+            const float dr = bestd+1;
+            const float sl = vol(x,y,dl);
+            const float sr = vol(x,y,dr);
 
-            // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
-            const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
-            const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
-            const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
-            const float subpixdisp = -B / (2*A);
+            const float subpixdisp = bestd - (sr-sl) / (2*(sr-2*bestc+sl));
 
             // Minima of parabola
 
             // Check that minima is sensible. Otherwise assume bad data.
-            if( d3 < subpixdisp && subpixdisp < d1 ) {
+            if( dl < subpixdisp && subpixdisp < dr ) {
                 out = subpixdisp;
             }
         }
@@ -132,7 +126,7 @@ __global__ void KernCostVolMinimumSquarePenaltySubpix(Image<Tdisp> imga, Volume<
         const float inv2theta = 1.0f / (2.0f*theta);
 
         Tdisp bestd = 0;
-        Tvol bestc = inv2theta*(lastd)*(lastd) + lambda * vol(x,y,0);;
+        Tvol bestc = inv2theta*lastd*lastd + lambda * vol(x,y,0);
 
         for(int d=1; d < maxDispVal; ++d) {
             const int xr = x + sd*d;
@@ -150,24 +144,16 @@ __global__ void KernCostVolMinimumSquarePenaltySubpix(Image<Tdisp> imga, Volume<
 
         const int bestxr = x + sd*bestd;
         if( 0 < bestxr && bestxr < vol.w-1) {
-            // Fit parabola to neighbours
-            const float d1 = bestd+1;
-            const float d2 = bestd;
-            const float d3 = bestd-1;
-            const float s1 = inv2theta*(lastd-d1)*(lastd-d1) + lambda * vol(x,y,d1); //vol(x,y,d1);
-            const float s2 = bestc;
-            const float s3 = inv2theta*(lastd-d3)*(lastd-d3) + lambda * vol(x,y,d3); //vol(x,y,d3);
+            // Newton Step
+            const float dl = bestd-1;
+            const float dr = bestd+1;
+            const float sl = inv2theta*(lastd-dl)*(lastd-dl) + lambda * vol(x,y,dl); //vol(x,y,d3);
+            const float sr = inv2theta*(lastd-dr)*(lastd-dr) + lambda * vol(x,y,dr); //vol(x,y,d1);
 
-            // Cooefficients of parabola through (d1,s1),(d2,s2),(d3,s3)
-            const float denom = (d1 - d2)*(d1 - d3)*(d2 - d3);
-            const float A = (d3 * (s2 - s1) + d2 * (s1 - s3) + d1 * (s3 - s2)) / denom;
-            const float B = (d3*d3 * (s1 - s2) + d2*d2 * (s3 - s1) + d1*d1 * (s2 - s3)) / denom;
-            const float subpixdisp = -B / (2*A);
-
-            // Minima of parabola
+            const float subpixdisp = bestd - (sr-sl) / (2*(sr-2*bestc+sl));
 
             // Check that minima is sensible. Otherwise assume bad data.
-            if( d3 < subpixdisp && subpixdisp < d1 ) {
+            if( dl < subpixdisp && subpixdisp < dr ) {
                 out = subpixdisp;
             }
         }

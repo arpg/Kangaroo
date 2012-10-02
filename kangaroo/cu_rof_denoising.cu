@@ -81,14 +81,15 @@ __global__ void KernHuberGradU_DualAscentP(
     const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( x < imgu.w && y < imgu.h ) {
+        const float u = imgu(x,y);
         float2 du = make_float2(0,0);
 
         if(x < imgu.w-1 ) {
-            du.x = imgu(x+1,y) - imgu(x,y);
+            du.x = imgu(x+1,y) - u;
         }
 
         if(y < imgu.h-1 ) {
-            du.y = imgu(x,y+1) - imgu(x,y);
+            du.y = imgu(x,y+1) - u;
         }
 
         const float2 np = (imgp(x,y) + sigma * du) / (1 + sigma*alpha);
@@ -121,15 +122,7 @@ __global__ void KernWeightedHuberGradU_DualAscentP(
 
     if( x < imgu.w && y < imgu.h ) {
         const float u = imgu(x,y);
-        float2 du = make_float2(0,0);
-
-        if(x < imgu.w-1 ) {
-            du.x = imgu(x+1,y) - u;
-        }
-
-        if(y < imgu.h-1 ) {
-            du.y = imgu(x,y+1) - u;
-        }
+        const float2 du = GradUFwd(imgu,u,x,y);
 
         const float w = imgw(x,y);
         const float2 np = (imgp(x,y) + sigma * w * du) / (1 + sigma*alpha);
@@ -176,6 +169,40 @@ void L2_u_minus_g_PrimalDescent(
     dim3 gridDim, blockDim;
     InitDimFromOutputImageOver(blockDim,gridDim, imgu);
     KernL2_u_minus_g_PrimalDescent<<<gridDim,blockDim>>>(imgu,imgp,imgg, tau, lambda);
+}
+
+//////////////////////////////////////////////////////
+// ROF u descent
+//////////////////////////////////////////////////////
+
+__global__ void KernL2_u_minus_g_PrimalDescent(
+        Image<float> imgu, const Image<float2> imgp, const Image<float> imgg,
+        const Image<float> imglambdaweight,
+        float tau, float lambda
+) {
+    const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( x < imgu.w && y < imgu.h ) {
+        lambda *= imglambdaweight(x,y);
+
+        const float divp_np1 = DivA(imgp,x,y);
+
+        const float g = imgg(x,y);
+        const float u_n = imgu(x,y);
+        const float u_np1 = (u_n + tau * (divp_np1 + lambda * g)) / (1.0f + tau*lambda);
+        imgu(x,y) = u_np1;
+    }
+}
+
+void L2_u_minus_g_PrimalDescent(
+        Image<float> imgu, const Image<float2> imgp, const Image<float> imgg,
+        const Image<float> imglambdaweight,
+        float tau, float lambda
+) {
+    dim3 gridDim, blockDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, imgu);
+    KernL2_u_minus_g_PrimalDescent<<<gridDim,blockDim>>>(imgu,imgp,imgg,imglambdaweight, tau, lambda);
 }
 
 //////////////////////////////////////////////////////

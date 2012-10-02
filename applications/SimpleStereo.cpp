@@ -158,7 +158,7 @@ int main( int argc, char* argv[] )
     Image<float4, TargetDevice, Manage>  d3d(lw,lh);
     Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
 
-    typedef unsigned long census_t;
+    typedef ulong4 census_t;
     Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
     // Stereo transformation (post-rectification)
@@ -183,8 +183,8 @@ int main( int argc, char* argv[] )
     Var<bool> do_dtam("ui.do dtam", false, true);
     Var<bool> dtam_reset("ui.reset", false, false);
 
-    Var<float> g_alpha("ui.g alpha", 4, 0,4);
-    Var<float> g_beta("ui.g beta", 1.0, 0,2);
+    Var<float> g_alpha("ui.g alpha", 14, 0,4);
+    Var<float> g_beta("ui.g beta", 2.5, 0,2);
 
 
     Var<float> theta("ui.theta", 100, 0,100);
@@ -321,10 +321,12 @@ int main( int argc, char* argv[] )
 
         static int n = 0;
 //        static float theta = 0;
-        go |= Pushed(dtam_reset);
-        if(go ) {
+//        go |= Pushed(dtam_reset);
+//        if(go )
+        if(Pushed(dtam_reset))
+        {
             n = 0;
-            theta = 1000;
+            theta.Reset();
 
             // Initialise primal and auxillary variables
             CostVolMinimumSubpix(imgd,vol[0], maxdisp,-1);
@@ -337,14 +339,14 @@ int main( int argc, char* argv[] )
         if(do_dtam && theta > 1E-3)
         {
             for(int i=0; i<5; ++i ) {
+                // Auxillary exhaustive search
+                CostVolMinimumSquarePenaltySubpix(imga, vol[0], imgd, maxdisp, -1, lambda, (theta) );
+
                 // Dual Ascent
                 Gpu::WeightedHuberGradU_DualAscentP(imgq, imgd, imgw, sigma_q, huber_alpha);
 
                 // Primal Descent
                 Gpu::WeightedL2_u_minus_g_PrimalDescent(imgd, imgq, imga, imgw, sigma_d, 1.0f / (theta) );
-
-                // Auxillary exhaustive search
-                CostVolMinimumSquarePenaltySubpix(imga, vol[0], imgd, maxdisp, -1, lambda, (theta) );
 
                 theta= theta * (1-beta*n);
                 ++n;

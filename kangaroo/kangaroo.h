@@ -26,6 +26,9 @@ void Disp2Depth(Image<float> dIn, const Image<float> dOut, float fu, float fBase
 
 //////////////////////////////////////////////////////
 
+template<typename T>
+void Fill(Image<T> img, T val);
+
 template<typename Tout, typename Tin, typename Tup>
 void ElementwiseScaleBias(Image<Tout> b, const Image<Tin> a, float s, Tup offset=0);
 
@@ -122,6 +125,7 @@ void DisparityImageCrossSection(
 //////////////////////////////////////////////////////
 
 void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth);
+void FilterBadKinectData(Image<float> dFiltered, Image<float> dKinectDepth);
 void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f);
 void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f);
 
@@ -408,5 +412,23 @@ inline void GuidedFilter(Image<float> q, const Image<float> covIP, const Image<f
     // q = mean_a .* I + mean_b; % Eqn. (8) in the paper;
     ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
 }
+
+//////////////////////////////////////////////////////
+
+void SegmentTest(
+    Image<unsigned char> out, const Image<unsigned char> img, unsigned char threshold, unsigned char min_segment_len
+);
+
+void HarrisScore(
+    Image<float> out, const Image<unsigned char> img, float lambda = 0.04
+);
+
+void NonMaximalSuppression(Image<unsigned char> out, Image<float> scores, int rad, float threshold);
+
+//////////////////////////////////////////////////////
+
+template<typename T>
+void PaintCircle(Image<T> img, T val, float x, float y, float r );
+
 
 }

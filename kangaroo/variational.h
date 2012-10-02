@@ -30,6 +30,12 @@ void L2_u_minus_g_PrimalDescent(
         float tau, float lambda
 );
 
+void L2_u_minus_g_PrimalDescent(
+        Image<float> imgu, const Image<float2> imgp, const Image<float> imgg,
+        const Image<float> imglambdaweight,
+        float tau, float lambda
+);
+
 void WeightedL2_u_minus_g_PrimalDescent(
         Image<float> imgu, const Image<float2> imgp, const Image<float> imgg, const Image<float> imgw,
         float tau, float lambda
@@ -45,6 +51,19 @@ void DeconvolutionDual_qAscent(
 void Deconvolution_uDescent(
         Image<float> imgu, const Image<float2> imgp, const Image<float> imgATq,
         float tau, float lambda
+);
+
+//////////////////////////////////////////////////////
+
+void GradU(Image<float2> imgv, Image<float> imgu);
+
+void TGV_L1_DenoisingIteration(
+    Image<float> imgu, Image<float2> imgv,
+    Image<float2> imgp, Image<float4> imgq, Image<float> imgr,
+    Image<float> imgf,
+    float alpha0, float alpha1,
+    float sigma, float tau,
+    float delta
 );
 
 }
