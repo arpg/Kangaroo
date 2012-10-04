@@ -152,6 +152,9 @@ public:
 //        options.check_gradients = true;
         options.update_state_every_iteration = true;
         options.max_num_iterations = 1000;
+        options.gradient_tolerance = 1E-50;
+        options.function_tolerance = 1E-50;
+        options.parameter_tolerance = 1E-50;
 
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
@@ -239,7 +242,7 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // Populate Pose Graph
-    for( int i=0; /*i < 1000 &&*/ i < hist_vis_odometry.m_T_on.size(); ++i )
+    for( int i=0; i < 1000 && i < hist_vis_odometry.m_T_on.size(); ++i )
     {
         const double vistime = hist_vis_odometry.m_time_s[i];
 
