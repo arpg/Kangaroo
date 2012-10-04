@@ -329,7 +329,7 @@ int main( int argc, char* argv[] )
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
 
     SceneGraph::GLCameraHistory history;
-    history.LoadFromAbsoluteCartesianFile(video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
+    history.LoadFromAbsoluteCartesianFile(video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), 10000, T_vis_ro, T_ro_vis);
     graph.AddChild(&glvbo);
     graph.AddChild(&history);
 
