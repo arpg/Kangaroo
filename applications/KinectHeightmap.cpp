@@ -298,7 +298,7 @@ int main( int /*argc*/, char* argv[] )
             }
 
             if(!img.empty()) {
-                texrgb.Upload(img[0].Image.data,GL_BGR, GL_UNSIGNED_BYTE);
+                texrgb.Upload(img[0].Image.data,GL_RGB, GL_UNSIGNED_BYTE);
                 texdepth.Upload(img[1].Image.data,GL_LUMINANCE, GL_UNSIGNED_SHORT);
             }
             texnorm << dN;
