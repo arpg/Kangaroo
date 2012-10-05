@@ -57,6 +57,25 @@ struct Keyframe {
     Sophus::SE3 m_T_wk;
 };
 
+struct UnaryEdgeXYCostFunction
+{
+    UnaryEdgeXYCostFunction( Eigen::Vector3d xy )
+        : mk_w(xy)
+    {
+    }
+
+    template <typename T>
+    bool operator()(const T* const t_wa, T* residuals) const
+    {
+        residuals[0] = (T)1E-2 * ((T)mk_w(0) - t_wa[0]);
+        residuals[1] = (T)1E-2 * ((T)mk_w(1) - t_wa[1]);
+        residuals[2] = (T)1E-2 * ((T)mk_w(2) - t_wa[2]);
+        return true;
+    }
+
+    Eigen::Vector3d mk_w;
+};
+
 struct BinaryEdgeXYZQuatCostFunction
 //    :   ceres::SizedCostFunction<7,7>
 {
@@ -79,9 +98,9 @@ struct BinaryEdgeXYZQuatCostFunction
         T R_a_ma[4]; T t_a_ma[3];
         XYZUnitQuatXYZWCompose(R_ab, t_ab, R_measured_ba, t_measured_ba, R_a_ma, t_a_ma);
 
-        residuals[0] = t_a_ma[0] / (T)10;
-        residuals[1] = t_a_ma[1] / (T)10;
-        residuals[2] = t_a_ma[2] / (T)10;
+        residuals[0] = t_a_ma[0];
+        residuals[1] = t_a_ma[1];
+        residuals[2] = t_a_ma[2];
         QuatXYZWToAngleAxis(R_a_ma, residuals+3);
         return true;
     }
@@ -98,7 +117,7 @@ public:
 
     int AddKeyframe(Keyframe* kf)
     {
-        int id = keyframes.size();
+        const int id = keyframes.size();
         keyframes.push_back( kf );
         problem.AddParameterBlock(pq(kf->m_T_wk), 4, quat_param);
         problem.AddParameterBlock(pt(kf->m_T_wk), 3, NULL);
@@ -107,10 +126,11 @@ public:
 
     int AddKeyframe()
     {
-        AddKeyframe(new Keyframe() );
+        return AddKeyframe(new Keyframe() );
     }
 
-    Keyframe& GetKeyframe(int a) {
+    Keyframe& GetKeyframe(int a)
+    {
         assert(a < keyframes.size());
         return keyframes[a];
     }
@@ -129,6 +149,18 @@ public:
         );
     }
 
+    void AddUnaryEdge(int a, Eigen::Vector3d xyz)
+    {
+        Keyframe& kfa = GetKeyframe(a);
+
+        problem.AddResidualBlock(
+            new ceres::AutoDiffCostFunction<UnaryEdgeXYCostFunction, 3, 3>(
+                new UnaryEdgeXYCostFunction(xyz)
+            ), NULL,
+            pt(kfa.m_T_wk)
+        );
+    }
+
     int AddRelativeKeyframe(int keyframe_a, Sophus::SE3 T_ak)
     {
         const int k = AddKeyframe();
@@ -136,8 +168,8 @@ public:
         Keyframe& kf_k = GetKeyframe(k);
 
         // Initialise keyframes pose based on relative transform
-//        kf_k.SetT_wk( kf_a.GetT_wk() * T_ak );
-        kf_k.SetT_wk(kf_a.GetT_wk() * Sophus::SE3(Sophus::SO3(), Vector3d(0.1,0,0)));
+        kf_k.SetT_wk( kf_a.GetT_wk() * T_ak );
+//        kf_k.SetT_wk(kf_a.GetT_wk() * Sophus::SE3(Sophus::SO3(), Vector3d(0.1,0,0)));
 
         AddBinaryEdge(keyframe_a,k,T_ak);
         return k;
@@ -148,13 +180,13 @@ public:
         ceres::Solver::Options options;
 //        options.linear_solver_type = ceres::DENSE_SCHUR;
         options.minimizer_progress_to_stdout = true;
-        options.num_threads = 8;
+        options.num_threads = 4;
 //        options.check_gradients = true;
         options.update_state_every_iteration = true;
         options.max_num_iterations = 1000;
-        options.gradient_tolerance = 1E-50;
-        options.function_tolerance = 1E-50;
-        options.parameter_tolerance = 1E-50;
+//        options.gradient_tolerance = 1E-50;
+//        options.function_tolerance = 1E-50;
+//        options.parameter_tolerance = 1E-50;
 
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
@@ -202,10 +234,9 @@ int main( int /*argc*/, char* argv[] )
 
     // Define 3D Objects
     SceneGraph::GLSceneGraph glGraph;
-    SceneGraph::GLGrid glGrid(50,2.0, true);
-    SceneGraph::GLAxis glAxis;
+    SceneGraph::GLGrid glGrid(50,10.0, true);
+    glGrid.SetPosition(0,0,20);
     glGraph.AddChild(&glGrid);
-    glGraph.AddChild(&glAxis);
 
     // RDF transforms
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
@@ -217,8 +248,8 @@ int main( int /*argc*/, char* argv[] )
 
     // Load Visual Odometry
     SceneGraph::GLCameraHistory hist_vis_odometry;
-    hist_vis_odometry.LoadFromTimeAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_1lap.txt", 0, 1E6, Matrix4d::Identity(), Matrix4d::Identity() );
-    glGraph.AddChild(&hist_vis_odometry);
+    hist_vis_odometry.LoadFromTimeAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_2laps.txt", 0, 1E6, Matrix4d::Identity(), Matrix4d::Identity() );
+//    glGraph.AddChild(&hist_vis_odometry);
 
     // Load GPS
     SceneGraph::GLCameraHistory hist_gps;
@@ -242,21 +273,24 @@ int main( int /*argc*/, char* argv[] )
     }
 
     // Populate Pose Graph
-    for( int i=0; i < 1000 && i < hist_vis_odometry.m_T_on.size(); ++i )
+    for( int i=0; /*i < 1000 &&*/ i < hist_vis_odometry.m_T_on.size(); ++i )
     {
         const double vistime = hist_vis_odometry.m_time_s[i];
 
+        int kfid = -1;
+
         if(i == 0 ) {
             Keyframe* kf = new Keyframe();
-            posegraph.AddKeyframe(kf);
-            posegraph.problem.SetParameterBlockConstant(pq(kf->m_T_wk));
-            posegraph.problem.SetParameterBlockConstant(pt(kf->m_T_wk));
+            kfid = posegraph.AddKeyframe(kf);
+//            posegraph.problem.SetParameterBlockConstant(pq(kf->m_T_wk));
+//            posegraph.problem.SetParameterBlockConstant(pt(kf->m_T_wk));
         }else{
-            posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
+            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
         }
 
         if(gpstime < vistime) {
-//            posegraph.AddUnaryEdge;
+            Eigen::Vector3d xyz_m = hist_gps.m_T_wh[gpsid].col(3).head<3>();
+            posegraph.AddUnaryEdge(kfid, xyz_m );
             while(gpstime < vistime) {
                 gpstime = hist_gps.m_time_s[++gpsid];
             }
@@ -269,12 +303,12 @@ int main( int /*argc*/, char* argv[] )
     // Define OpenGL Render state
     pangolin::OpenGlRenderState stacks3d;
     stacks3d.SetProjectionMatrix(ProjectionMatrix(640,480,420,420,320,240,0.1,1E6));
-    stacks3d.SetModelViewMatrix(ModelViewLookAt(0,5,5,0,0,0,0,0,1));
+    stacks3d.SetModelViewMatrix(ModelViewLookAt(0,5,-5,0,0,0,0,0,-1));
 
     // Create Interactive view of data
     View& d_cam = pangolin::CreateDisplay()
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
-      .SetHandler(new Handler3D(stacks3d,AxisZ))
+      .SetHandler(new Handler3D(stacks3d,AxisNegZ))
       .SetDrawFunction(SceneGraph::ActivateDrawFunctor(glGraph, stacks3d));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)

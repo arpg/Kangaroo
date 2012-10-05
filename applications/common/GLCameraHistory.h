@@ -181,6 +181,7 @@ inline void GLCameraHistory::LoadFromTimeLatLon( const std::string& filename)
     bool _np;
     double x_offset = 0;
     double y_offset = 0;
+    double z_offset = 0;
 
     // Parse Ground truth
     std::ifstream ifs(filename);
@@ -191,29 +192,37 @@ inline void GLCameraHistory::LoadFromTimeLatLon( const std::string& filename)
             double time_s = 0;
             double lat = 0;
             double lon = 0;
+            double height_geoid = 0;
+            double height_sealevel = 0;
             double consume;
 
             ifs >> time_s;
             ifs >> lat;
             ifs >> lon;
+            ifs >> height_geoid;
+            ifs >> height_sealevel;
 
-            for(int i=0; i<4; ++i ) {
+            for(int i=0; i<2; ++i ) {
                 ifs >> consume;
             }
             if(!ifs.fail()) {
                 double x_meters;
                 double y_meters;
+                double z_meters = -height_geoid;
                 GeographicLib::UTMUPS::Forward(lat, lon, _z,_np,x_meters,y_meters,_z);
+                y_meters *= -1;
 
                 if(m_T_on.size() == 0 ) {
                     x_offset = -x_meters;
                     y_offset = -y_meters;
+                    z_offset = -z_meters;
                 }
 
                 Eigen::Vector6d cart;
                 cart.setZero();
                 cart(0) = x_meters + x_offset;
                 cart(1) = y_meters + y_offset;
+                cart(2) = z_meters + z_offset;
 
 //                Eigen::Matrix4d T_on( mvl::Cart2T(cart)  );
 //                m_T_on.push_back(T_on);
