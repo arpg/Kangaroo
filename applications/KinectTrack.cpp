@@ -97,10 +97,10 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> save_ref("ui.Save Reference", true, false);
 
     Var<bool> tgv_do("ui.tgv", false, true);
-    Var<float> sigma("ui.sigma", 0.04, 0, 0.1);
-    Var<float> tau("ui.tau", 0.05, 0, 0.1);
-    Var<float> tgv_a1("ui.alpha1", 0.9, 0, 0.5);
-    Var<float> tgv_k("ui.k", 10, 1, 10);
+    Var<float> sigma("ui.sigma", 0.002, 0, 0.01);
+    Var<float> tau("ui.tau", 0.002, 0, 0.01);
+    Var<float> tgv_a1("ui.alpha1", 100, 0, 0.5);
+    Var<float> tgv_k("ui.k", 2, 1, 10);
     Var<float> tgv_delta("ui.delta", 0.1, 0, 0.2);
 
 
