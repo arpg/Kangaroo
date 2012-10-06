@@ -1,5 +1,6 @@
 #include "kangaroo.h"
 #include "launch_utils.h"
+#include "InvalidValue.h"
 
 namespace Gpu
 {
@@ -49,6 +50,57 @@ void BilateralFilter(
 
 template void BilateralFilter(Image<float>, const Image<float>, float, float, uint);
 template void BilateralFilter(Image<float>, const Image<unsigned char>, float, float, uint);
+
+/////////////////////////////////////////////////////
+// Bilateral Filter (Spatial and intensity weights) ignore vals below min
+//////////////////////////////////////////////////////
+
+template<typename To, typename Ti>
+__global__ void KernBilateralFilter(
+    Image<To> dOut, const Image<Ti> dIn, float gs, float gr, int size, Ti minval
+) {
+    const uint x = blockIdx.x*blockDim.x + threadIdx.x;
+    const uint y = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( dOut.InBounds(x,y)) {
+        const Ti p = dIn(x,y);
+        float sum = 0;
+        float sumw = 0;
+
+        if( p >= minval) {
+            for(int r = -size; r <= size; ++r ) {
+                for(int c = -size; c <= size; ++c ) {
+                    const Ti q = dIn.GetWithClampedRange(x+c, y+r);
+                    if(q >= minval) {
+                        const float sd2 = r*r + c*c;
+                        const float id = p-q;
+                        const float id2 = id*id;
+                        const float sw = __expf(-(sd2) / (2 * gs * gs));
+                        const float iw = __expf(-(id2) / (2 * gr * gr));
+                        const float w = sw*iw;
+                        sumw += w;
+                        sum += w * q;
+                    }
+                }
+            }
+        }
+
+        const To outval = (To)(sum / sumw);
+        dOut(x,y) = outval;
+    }
+}
+
+template<typename To, typename Ti>
+void BilateralFilter(
+    Image<To> dOut, const Image<Ti> dIn, float gs, float gr, uint size, Ti minval
+) {
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim,gridDim, dOut);
+    KernBilateralFilter<To,Ti><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size, minval);
+}
+
+template void BilateralFilter(Image<float>, const Image<float>, float, float, uint, float);
+template void BilateralFilter(Image<float>, const Image<unsigned short>, float, float, uint, unsigned short);
 
 /////////////////////////////////////////////////////
 // Bilateral Filter (Spatial, intensity and colour (external) weights)

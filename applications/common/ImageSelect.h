@@ -229,7 +229,7 @@ class ActivateDrawPyramid
 {
 public:
     ActivateDrawPyramid(const Gpu::Pyramid<T,Levels> pyramid, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
-        :pyramid(pyramid), glTex(pyramid[0].w,pyramid[0].h,internal_format,sampling_linear), flipy(flipy), level(0)
+        :pyramid(pyramid), glTex(pyramid[0].w,pyramid[0].h,internal_format,sampling_linear), flipy(flipy), pixScale(1), level(0)
     {
     }
 
@@ -248,11 +248,11 @@ public:
         glScalef(1.0f/(1<<level), 1.0f/(1<<level),1.0f);
 
         if(imageSelect) {
-            const float pixScale = imageSelect->PixelScale();
-            RenderToViewport(glTex,flipy,pixScale);
+            const float scale = pixScale * imageSelect->PixelScale();
+            RenderToViewport(glTex,flipy,scale);
             RenderImageSelect(*imageSelect, glTex.width, glTex.height, imageSelect->Level());
         }else{
-            glTex.RenderToViewport(flipy);
+            RenderToViewport(glTex,flipy,pixScale);
         }
 
         glMatrixMode(GL_TEXTURE);
@@ -267,10 +267,15 @@ public:
         level = l;
     }
 
+    void SetImageScale(float scale) {
+        pixScale = scale;
+    }
+
 protected:
     const Gpu::Pyramid<T,Levels> pyramid;
     pangolin::GlTextureCudaArray glTex;
     bool flipy;
+    float pixScale;
     unsigned level;
 
 private:
