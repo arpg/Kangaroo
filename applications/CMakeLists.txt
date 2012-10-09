@@ -194,4 +194,9 @@ if(Kangaroo_FOUND)
       add_executable( Features Features.cpp ${COMMON_HEADERS})
     endif()
 
+    set( BuildRaycast true CACHE "" force )
+    if( BuildRaycast )
+      add_executable( Raycast Raycast.cpp ${COMMON_HEADERS})
+    endif()
+
 endif()

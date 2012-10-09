@@ -32,6 +32,7 @@ list(APPEND SRC_CU
     cu_rof_denoising.cu cu_tgv.cu
     cu_segment_test.cu
     cu_painting.cu
+    cu_raycast.cu
 )
 
 include_directories( ${Boost_INCLUDE_DIRS} )

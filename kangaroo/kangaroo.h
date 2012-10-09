@@ -435,5 +435,15 @@ void NonMaximalSuppression(Image<unsigned char> out, Image<float> scores, int ra
 template<typename T>
 void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
+//////////////////////////////////////////////////////
+
+struct SDF_t {
+    float val;
+    int n;
+};
+
+void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far );
+
+void SDFSphere(Volume<SDF_t> vol, float3 xyz, float r);
 
 }
