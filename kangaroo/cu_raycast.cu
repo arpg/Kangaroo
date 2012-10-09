@@ -5,7 +5,7 @@
 namespace Gpu
 {
 
-__global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far )
+__global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -30,16 +30,24 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
 
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
+            float last_sdf = 0;
+            const float delta_lambda = (boxmax.x - boxmin.x) / vol.w;
+
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;
                 const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
                 const SDF_t val = vol.GetFractional(pos_v);
-                if(val.val / val.n <= 0 ) {
+                const float sdf = val.val / val.n;
+                if( sdf <= 0 ) {
                     // surface!
+                    if(subpix) {
+                        lambda = lambda - delta_lambda * last_sdf / (sdf - last_sdf);
+                    }
                     ret = (lambda - near) / (far - near);
                     break;
                 }
-                lambda += 0.01;
+                lambda += delta_lambda;
+                last_sdf = sdf;
             }
         }
 
@@ -47,32 +55,38 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
     }
 }
 
-void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far )
+void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {    
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycast<<<gridDim,blockDim>>>(img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far);
+    KernRaycast<<<gridDim,blockDim>>>(img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, subpix);
 }
 
-__global__ void KernSDFSphere(Volume<SDF_t> vol, float3 xyz, float r)
+__global__ void KernSDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r)
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
     const int z = blockIdx.z*blockDim.z + threadIdx.z;
 
-    const float3 pos = make_float3(x,y,z);
-    const float dist = length(pos - xyz);
+    const float3 vol_size = vol_max - vol_min;
+
+    const float3 pos = make_float3(
+                vol_min.x + vol_size.x*x/(float)vol.w,
+                vol_min.y + vol_size.y*y/(float)vol.h,
+                vol_min.z + vol_size.z*z/(float)vol.d
+                );
+    const float dist = length(pos - center);
     const float sdf = dist - r;
 
     vol(x,y,z) = SDF_t(sdf);
 }
 
-void SDFSphere(Volume<SDF_t> vol, float3 xyz, float r)
+void SDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r)
 {
     dim3 blockDim(8,8,8);
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
 
-    KernSDFSphere<<<gridDim,blockDim>>>(vol,xyz,r);
+    KernSDFSphere<<<gridDim,blockDim>>>(vol, vol_min, vol_max, center, r);
 }
 
 

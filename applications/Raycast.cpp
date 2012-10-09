@@ -36,7 +36,8 @@ int main( int argc, char* argv[] )
 
     // Allocate Camera Images on device for processing
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(128,128,128);
+//    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
 
     SceneGraph::GLSceneGraph graph;
@@ -56,16 +57,18 @@ int main( int argc, char* argv[] )
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( new SceneGraph::HandlerSceneGraph(graph, s_cam, AxisNone) );
 
-    Gpu::SDFSphere(vol, make_float3(vol.w/2,vol.h/2,vol.d/2), vol.w/2.2 );
+    const float3 boxmax = make_float3(1,1,1);
+    const float3 boxmin = make_float3(-1,-1,-1);
+    Gpu::SDFSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+
+    Var<bool> subpix("ui.subpix", true, true);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
         {
-            const float3 boxmin = make_float3(-1,-1,-1);
-            const float3 boxmax = make_float3(1,1,1);
-            Gpu::Raycast(img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far );
+            Gpu::Raycast(img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
         }
 
         /////////////////////////////////////////////////////////////

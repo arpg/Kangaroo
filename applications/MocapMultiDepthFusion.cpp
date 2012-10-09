@@ -52,6 +52,9 @@ struct GLSensor : SceneGraph::GLObject {
     {
         // Just draw axis for time being
         SceneGraph::GLAxis::DrawUnitAxis();
+
+        glColor3f(1,1,1);
+        pangolin::RenderVbo(sensor.vbo,sensor.w, sensor.h);
     }
 
 protected:
@@ -66,7 +69,7 @@ int main( int argc, char* argv[] )
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
     SceneGraph::GLSceneGraph graph;
-    SceneGraph::GLGrid glGrid(10,1,true);
+    SceneGraph::GLGrid glGrid(10,1,false);
     SceneGraph::GLAxis glAxis;
     graph.AddChild(&glGrid);
     graph.AddChild(&glAxis);
@@ -78,7 +81,7 @@ int main( int argc, char* argv[] )
 
     SetupContainer(container, 1, 640.0f/480.0f);
     container[0].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
-                .SetHandler( new pangolin::Handler3D(s_cam, pangolin::AxisZ) );
+                .SetHandler( new pangolin::Handler3D(s_cam/*, pangolin::AxisZ*/) );
 
     SensorPtrMap sensors;
 
@@ -86,21 +89,23 @@ int main( int argc, char* argv[] )
     std::vector<rpg::ImageWrapper> images;
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> imgd(MaxWidth,MaxHeight);
+    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgv(MaxWidth,MaxHeight);
+
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         if(video.Capture(images)) {
             // Which camera did this come from
-            std::string sensor_name = images[0].Map.GetProperty("DeviceName");
+            std::string sensor_name = images[0].Map.GetProperty("NodeName");
+
+            // Size of depthmap that this sensor will produce
+            const int dw = images[0].Image.cols;
+            const int dh = images[0].Image.rows;
 
             SensorPtrMap::iterator it = sensors.find(sensor_name);
             if( it == sensors.end() ) {
                 // create sensor
-                cout << "New sensor - " << sensor_name << endl;
-
-                // Size of depthmap that this sensor will produce
-                const int dw = images[0].Image.cols;
-                const int dh = images[0].Image.rows;
+                cout << "New sensor - " << sensor_name << " (" << dw << "x" << dh << ")" << endl;
 
                 // Create and Insert into map of active sensors
                 Sensor* newsensor = new Sensor(sensor_name, ViconIp, dw,dh);
@@ -111,10 +116,22 @@ int main( int argc, char* argv[] )
             }
 
             Sensor& sensor = *it->second;
-            cout << "Data from " << sensor.name << endl;
+//            cout << "Data from " << sensor.name << endl;
 
             // Update depth map. (lets assume we have a kinect for now)
-//            imgd.CopyFrom(images[0]);
+            imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[1].Image);
+            const float asusfocal = 570.342;
+            const float df = asusfocal;
+
+            // Convert to Vertex Buffer
+            Gpu::DepthToVbo(imgv, imgd, df, df, dw, dh, 1.0f/1000.0f );
+
+            // Copy to sensors vbo for display
+            {
+                pangolin::CudaScopedMappedPtr var(sensor.vbo);
+                Gpu::Image<float4> dVbo((float4*)*var,dw,dh);
+                dVbo.CopyFrom(imgv);
+            }
         }
 
         // Render stuff

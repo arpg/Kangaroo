@@ -1,9 +1,11 @@
 #ifndef CUDAIMAGE_H
 #define CUDAIMAGE_H
 
+#include <boost/type_traits.hpp>
+#include <boost/static_assert.hpp>
+
 #include <iostream>
 #include <assert.h>
-#include <boost/static_assert.hpp>
 
 #include <cuda_runtime.h>
 
@@ -209,13 +211,13 @@ struct Image {
     }
 
 #ifdef USE_OPENCV
-    inline __host__ __device__
+    inline __host__
     Image( const cv::Mat& img )
-        : pitch(img.step()), ptr((T*)img.data), w(img.cols), h(img.rows)
+        : pitch(img.step), ptr((T*)img.data), w(img.cols), h(img.rows)
     {
+        // TODO: Assert only TargetHost
         Management::AssignmentCheck();
     }
-
 #endif
 
 #if __cplusplus > 199711L

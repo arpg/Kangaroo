@@ -69,6 +69,10 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
     camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
 
+    camera.SetProperty("NumNodes", cl.follow("0", "-nodes"));
+    camera.SetProperty("Node-0", cl.follow("", "-n0"));
+    camera.SetProperty("Node-1", cl.follow("", "-n1"));
+
     camera.InitDriver( cl.follow( "FileReader", "-idev" ) );
 }
 
