@@ -199,4 +199,9 @@ if(Kangaroo_FOUND)
       add_executable( Raycast Raycast.cpp ${COMMON_HEADERS})
     endif()
 
+    set( BuildMocapMultiDepthFusion true CACHE "" force )
+    if( BuildMocapMultiDepthFusion )
+      add_executable( MocapMultiDepthFusion MocapMultiDepthFusion.cpp ${COMMON_HEADERS})
+    endif()
+
 endif()
