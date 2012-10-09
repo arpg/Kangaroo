@@ -7,6 +7,18 @@
 
 #include <cuda_runtime.h>
 
+#define HAVE_OPENCV
+
+#ifndef __CUDACC__
+    #ifdef HAVE_OPENCV
+    #define USE_OPENCV
+    #endif // HAVE_OPENCV
+#endif // __CUDACC__
+
+#ifdef USE_OPENCV
+#include <opencv.hpp>
+#endif // HAVE_OPENCV
+
 #define HAVE_THRUST
 #ifdef HAVE_THRUST
 #include <thrust/device_vector.h>
@@ -195,6 +207,16 @@ struct Image {
         : pitch(pitch), ptr(ptr), w(w), h(h)
     {
     }
+
+#ifdef USE_OPENCV
+    inline __host__ __device__
+    Image( const cv::Mat& img )
+        : pitch(img.step()), ptr((T*)img.data), w(img.cols), h(img.rows)
+    {
+        Management::AssignmentCheck();
+    }
+
+#endif
 
 #if __cplusplus > 199711L
     //////////////////////////////////////////////////////
@@ -558,19 +580,19 @@ struct Image {
     //! Only applicable for DontManage types
     template<typename TP>
     inline __device__ __host__
-    Image<TP,Target,DontManage> SplitAlignedImage(int nwidth, int nheight, int align_bytes=16)
+    Image<TP,Target,DontManage> SplitAlignedImage(unsigned int nwidth, unsigned int nheight, unsigned int align_bytes=16)
     {
         // Only let us split DontManage image types (so we can't orthan memory)
         Management::AssignmentCheck();
 
         // Extract aligned image of type TP from start of this image
-        const int wbytes = nwidth*sizeof(TP);
-        const int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
-        const TP* nptr = (TP*)ptr;
+        const unsigned int wbytes = nwidth*sizeof(TP);
+        const unsigned int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
+        TP* nptr = (TP*)ptr;
         assert(npitch*nheight <= h*pitch );
 
         // Update this image to reflect remainder (as single row image)
-        ptr = (T*)((char*)(ptr) + nheight*npitch);
+        ptr = (T*)((unsigned char*)(ptr) + nheight*npitch);
         pitch = (h*pitch - nheight*npitch);
         h = 1;
         w = pitch / sizeof(T);

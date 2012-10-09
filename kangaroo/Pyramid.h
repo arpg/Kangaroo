@@ -122,7 +122,7 @@ struct Pyramid {
 
         // Build power of two structure
         for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l ) {
-            imgs[l] = scratch.SplitAlignedImage(w>>l,h>>l);
+            imgs[l] = scratch.template SplitAlignedImage<T>(w>>l,h>>l);
         }
     }
 
