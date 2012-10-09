@@ -97,7 +97,7 @@ Mat<float,3,4> operator*(const Mat<float,3,4>& T_cb, const Mat<float,3,4>& T_ba)
 
 
 //////////////////////////////////////////////////////
-// Mat homegeneous multiplication with and floatx
+// Mat homegeneous multiplication with Mat and float
 //////////////////////////////////////////////////////
 
 __host__ __device__ inline
@@ -118,6 +118,52 @@ float3 operator*(const Mat<float,3,4>& T_ba, const float4& p_a)
             T_ba(1,0) * p_a.x + T_ba(1,1) * p_a.y + T_ba(1,2) * p_a.z + T_ba(1,3),
             T_ba(2,0) * p_a.x + T_ba(2,1) * p_a.y + T_ba(2,2) * p_a.z + T_ba(2,3)
     );
+}
+
+__host__ __device__ inline
+float3 mulSO3(const Mat<float,3,3>& R_ba, const float3& r_a)
+{
+    return make_float3(
+            R_ba(0,0) * r_a.x + R_ba(0,1) * r_a.y + R_ba(0,2) * r_a.z,
+            R_ba(1,0) * r_a.x + R_ba(1,1) * r_a.y + R_ba(1,2) * r_a.z,
+            R_ba(2,0) * r_a.x + R_ba(2,1) * r_a.y + R_ba(2,2) * r_a.z
+    );
+}
+
+__host__ __device__ inline
+float3 mulSO3(const Mat<float,3,4>& T_ba, const float3& r_a)
+{
+    return make_float3(
+            T_ba(0,0) * r_a.x + T_ba(0,1) * r_a.y + T_ba(0,2) * r_a.z,
+            T_ba(1,0) * r_a.x + T_ba(1,1) * r_a.y + T_ba(1,2) * r_a.z,
+            T_ba(2,0) * r_a.x + T_ba(2,1) * r_a.y + T_ba(2,2) * r_a.z
+    );
+}
+
+__host__ __device__ inline
+float3 mulSO3inv(const Mat<float,3,3>& R_ba, const float3& r_a)
+{
+    return make_float3(
+            R_ba(0,0) * r_a.x + R_ba(1,0) * r_a.y + R_ba(2,0) * r_a.z,
+            R_ba(0,1) * r_a.x + R_ba(1,1) * r_a.y + R_ba(2,1) * r_a.z,
+            R_ba(0,2) * r_a.x + R_ba(1,2) * r_a.y + R_ba(2,2) * r_a.z
+    );
+}
+
+__host__ __device__ inline
+float3 mulSO3inv(const Mat<float,3,4>& T_ba, const float3& r_a)
+{
+    return make_float3(
+            T_ba(0,0) * r_a.x + T_ba(1,0) * r_a.y + T_ba(2,0) * r_a.z,
+            T_ba(0,1) * r_a.x + T_ba(1,1) * r_a.y + T_ba(2,1) * r_a.z,
+            T_ba(0,2) * r_a.x + T_ba(1,2) * r_a.y + T_ba(2,2) * r_a.z
+    );
+}
+
+__host__ __device__ inline
+float3 SE3Translation(const Mat<float,3,4>& T_ba)
+{
+    return make_float3( T_ba(0,3), T_ba(1,3), T_ba(2,3) );
 }
 
 //////////////////////////////////////////////////////

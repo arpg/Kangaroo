@@ -104,7 +104,7 @@ __global__ void KernColourVbo(
     uchar4 Id;
     if( dIc.InBounds(pc(0), pc(1), 1) ) {
         const float3 v = dIc.GetBilinear<float3>(pc(0), pc(1));
-        Id = make_uchar4(v.z, v.y, v.x, 255);
+        Id = make_uchar4(v.x, v.y, v.z, 255);
     }else{
         Id = make_uchar4(0,0,0,0);
     }

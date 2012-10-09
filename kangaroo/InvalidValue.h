@@ -11,11 +11,11 @@ struct InvalidValue;
 template<>
 struct InvalidValue<float> {
     inline __host__ __device__ static float Value() {
-        return -1; //0.0f/0.0f;
+        return 0.0f/0.0f;
     }
 
     inline __host__ __device__ static bool IsValid(float val) {
-        return 0 <= val; //isfinite(val);
+        return isfinite(val);
     }
 };
 

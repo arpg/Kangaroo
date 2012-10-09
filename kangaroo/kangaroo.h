@@ -205,6 +205,11 @@ void BilateralFilter(
     Image<To> dOut, const Image<Ti> dIn, float gs, float gr, uint size
 );
 
+template<typename To, typename Ti>
+void BilateralFilter(
+    Image<To> dOut, const Image<Ti> dIn, float gs, float gr, uint size, Ti minval
+);
+
 template<typename To, typename Ti, typename Ti2>
 void BilateralFilter(
     Image<To> dOut, const Image<Ti> dIn, const Image<Ti2> dImg, float gs, float gr, float gc, uint size
@@ -430,5 +435,21 @@ void NonMaximalSuppression(Image<unsigned char> out, Image<float> scores, int ra
 template<typename T>
 void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
+//////////////////////////////////////////////////////
+
+struct SDF_t {
+    inline __host__ __device__ SDF_t() {}
+    inline __host__ __device__ SDF_t(float v) : val(v), n(1) {}
+    inline __host__ __device__ SDF_t(float v, int n) : val(v), n(n) {}
+    inline __host__ __device__ operator float() const {
+        return val / n;
+    }
+    float val;
+    int n;
+};
+
+void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far );
+
+void SDFSphere(Volume<SDF_t> vol, float3 xyz, float r);
 
 }
