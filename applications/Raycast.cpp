@@ -20,8 +20,8 @@ using namespace pangolin;
 
 int main( int argc, char* argv[] )
 {
-    const unsigned int w = 320;
-    const unsigned int h = 240;
+    const unsigned int w = 512;
+    const unsigned int h = 512;
     const float u0 = w /2;
     const float v0 = h /2;
     const float fu = 500;
@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
 
     // Allocate Camera Images on device for processing
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(128,128,128);
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
 
     SceneGraph::GLSceneGraph graph;
@@ -56,7 +56,7 @@ int main( int argc, char* argv[] )
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( new SceneGraph::HandlerSceneGraph(graph, s_cam, AxisNone) );
 
-    Gpu::SDFSphere(vol, make_float3(32,32,32), 20);
+    Gpu::SDFSphere(vol, make_float3(vol.w/2,vol.h/2,vol.d/2), vol.w/2.2 );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {

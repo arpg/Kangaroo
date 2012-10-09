@@ -438,6 +438,9 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r );
 //////////////////////////////////////////////////////
 
 struct SDF_t {
+    inline __host__ __device__ SDF_t() {}
+    inline __host__ __device__ SDF_t(float v) : val(v), n(1) {}
+    inline __host__ __device__ SDF_t(float v, int n) : val(v), n(n) {}
     float val;
     int n;
 };

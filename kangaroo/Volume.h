@@ -169,6 +169,19 @@ struct Volume
     }
 
     //////////////////////////////////////////////////////
+    // Interpolated / bounded access
+    //////////////////////////////////////////////////////
+
+    inline  __device__ __host__
+    const T& GetFractional(float3 pos) const
+    {
+        const int x = pos.x * (w-1);
+        const int y = pos.y * (h-1);
+        const int z = pos.z * (d-1);
+        return RowPtr(y,z)[x];
+    }
+
+    //////////////////////////////////////////////////////
     // Obtain slices / subimages
     //////////////////////////////////////////////////////
 
