@@ -33,7 +33,7 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;
                 const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
-                const SDF_t val = vol.GetFractional(pos_v);
+                const SDF_t val = vol.GetFractionalBilinear(pos_v);
                 if(val.val / val.n <= 0 ) {
                     // surface!
                     ret = (lambda - near) / (far - near);

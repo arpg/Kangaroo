@@ -173,12 +173,29 @@ struct Volume
     //////////////////////////////////////////////////////
 
     inline  __device__ __host__
-    const T& GetFractional(float3 pos) const
+    const T GetFractional(float3 pos) const
     {
-        const int x = pos.x * (w-1);
-        const int y = pos.y * (h-1);
-        const int z = pos.z * (d-1);
-        return RowPtr(y,z)[x];
+        const float3 pf = pos * make_float3(w-1, h-1, d-1);
+        return RowPtr((int)(pf.y+0.5),(int)(pf.z+0.5))[(int)(pf.x+0.5)];
+    }
+
+    inline  __device__ __host__
+    const T GetFractionalBilinear(float3 pos) const
+    {
+        const float3 pf = pos * make_float3(w-1, h-1, d-1);
+
+        const float ix = floorf(pf.x);
+        const float iy = floorf(pf.y);
+        const float iz = floorf(pf.z);
+        const float fx = pf.x - ix;
+        const float fy = pf.y - iy;
+        const float fz = pf.z - iz;
+
+        return lerp(
+            lerp(lerp(Get(ix,iy,iz),Get(ix+1,iy,iz),fx), lerp(Get(ix,iy+1,iz),Get(ix+1,iy+1,iz),fx), fy),
+            lerp(lerp(Get(ix,iy,iz+1),Get(ix+1,iy,iz+1),fx), lerp(Get(ix,iy+1,iz+1),Get(ix+1,iy+1,iz+1),fx), fy),
+            fz
+        );
     }
 
     //////////////////////////////////////////////////////
