@@ -2,7 +2,7 @@ find_package(CUDA REQUIRED)
 find_package(Boost REQUIRED)
 
 set(CUDA_PROPAGATE_HOST_FLAGS off)
-set(CUDA_NVCC_FLAGS "-arch=sm_30 -use_fast_math" )
+set(CUDA_NVCC_FLAGS "-arch=sm_20 -use_fast_math" )
 
 if(NOT CUDA_npp_LIBRARY)
     # Hack for old FindCUDA to locate libnpp.so

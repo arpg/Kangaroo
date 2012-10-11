@@ -3,7 +3,7 @@
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 #include <Eigen/Eigen>
-#include <Sophus/se3.h>
+#include <sophus/se3.h>
 
 #include "AssimpVboExport.h"
 

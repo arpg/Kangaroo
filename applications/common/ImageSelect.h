@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Pangolin/pangolin.h>
-#include <Pangolin/gl.h>
-#include <Pangolin/glsl.h>
+#include <pangolin/pangolin.h>
+#include <pangolin/gl.h>
+#include <pangolin/glsl.h>
 
 #include "DisplayUtils.h"
 

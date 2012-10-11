@@ -34,21 +34,18 @@ int main( int argc, char* argv[] )
              << ", Bytes Per Channel: " << img[i].Image.elemSize1() << endl;
     }
 
-    // Setup OpenGL Display (based on GLUT)
-    pangolin::CreateGlutWindowAndBind(__FILE__,N*w,h);
+    // Setup OpenGL Display (based on GLUT)    
+    pangolin::CreateGlutWindowAndBind(__FILE__,1024,768);
 
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
     GlTexture tex(w,h,GL_RGB8);
 
     // Create Smart viewports for each camera image that preserve aspect
-    View* view[N];
+    View& container = CreateDisplay().SetLayout(LayoutEqual);
     for(int i=0; i<N; ++i ) {
-        view[i] = &CreateDisplay().SetAspect((double)w/h);
+        container.AddDisplay(CreateDisplay().SetAspect((double)w/h));
     }
-
-    // Tell the base view to arrange its children equally
-    DisplayBase().SetLayout(LayoutEqual);
 
     bool run = true;
     bool step = false;
@@ -78,7 +75,7 @@ int main( int argc, char* argv[] )
         }
 
         for(int i=0; i<N; ++i ) {
-            view[i]->Activate();
+            container[i].Activate();
             tex.Upload(
                 img[i].Image.data,
                 img[i].Image.channels() == 1 ? GL_LUMINANCE : GL_RGB,

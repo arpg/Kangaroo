@@ -3,6 +3,7 @@
 #include <pangolin/pangolin.h>
 #include <RPG/Devices/Camera/CameraDevice.h>
 #include <RPG/Utils/GetPot>
+#include <boost/lexical_cast.hpp>
 
 CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels);
 
@@ -58,6 +59,8 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
         exit(0);
     }
 
+    std::cout << "Here!" << std::endl;
+
     GetPot cl(argc,argv);
 
     camera.SetProperty("NumChannels", numChannels);
@@ -70,8 +73,12 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
 
     int numNodes = 0;
-    while(cl.search( "-n" + numNodes)) {
-        camera.SetProperty("Node-" + numNodes, cl.follow("", "-n" + numNodes));
+
+    while(true) {
+        std::string arg = boost::lexical_cast<std::string>(numNodes);
+        if(!cl.search( ("-n"+arg).c_str() ) ) break;
+        std::cout << ("-n"+arg).c_str() << std::endl;
+        camera.SetProperty("Node-" + arg, cl.follow("", ("-n"+arg).c_str() ) );
         numNodes++;
     }
     camera.SetProperty("NumNodes", numNodes);

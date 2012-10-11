@@ -4,7 +4,7 @@
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
-#include <Pangolin/glsl.h>
+#include <pangolin/glsl.h>
 #include <npp.h>
 
 #include <SceneGraph/SceneGraph.h>
