@@ -69,9 +69,12 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
     camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
 
-    camera.SetProperty("NumNodes", cl.follow("0", "-nodes"));
-    camera.SetProperty("Node-0", cl.follow("", "-n0"));
-    camera.SetProperty("Node-1", cl.follow("", "-n1"));
+    int numNodes = 0;
+    while(cl.search( "-n" + numNodes)) {
+        camera.SetProperty("Node-" + numNodes, cl.follow("", "-n" + numNodes));
+        numNodes++;
+    }
+    camera.SetProperty("NumNodes", numNodes);
 
     camera.SetProperty("GetDepth", !cl.search("-no-depth"));
     camera.SetProperty("GetRGB", !cl.search("-no-rgb"));
