@@ -235,7 +235,7 @@ int main( int /*argc*/, char* argv[] )
     // Define 3D Objects
     SceneGraph::GLSceneGraph glGraph;
     SceneGraph::GLGrid glGrid(50,10.0, true);
-    glGrid.SetPosition(0,0,20);
+    glGrid.SetPosition(0,0,40);
     glGraph.AddChild(&glGrid);
 
     // RDF transforms

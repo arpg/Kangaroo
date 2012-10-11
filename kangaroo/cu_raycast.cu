@@ -15,6 +15,8 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
         const float3 ray_c = make_float3((u-u0)/fu,(v-v0)/fv, 1);
         const float3 ray_w = mulSO3(T_wc, ray_c);
 
+        // TODO: Ensure the bbox boundaries generate valid trilinear access
+
         // http://www.cs.utah.edu/~awilliam/box/box.pdf
         const float3 tminbound = (boxmin - c_w) / ray_w;
         const float3 tmaxbound = (boxmax - c_w) / ray_w;
@@ -26,12 +28,13 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
         float ret = 0.0f;
 
         if(max_tmin < min_tmax ) {
+//            // Raycast cube
 //            ret = (max_tmin - near) / (far - near);
 
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
             float last_sdf = 0;
-            const float delta_lambda = (boxmax.x - boxmin.x) / vol.w;
+            const float delta_lambda = (boxmax.x - boxmin.x) / (4*vol.w);
 
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;

@@ -176,13 +176,14 @@ struct Volume
     const T GetFractional(float3 pos) const
     {
         const float3 pf = pos * make_float3(w-1, h-1, d-1);
-        return RowPtr((int)(pf.y+0.5),(int)(pf.z+0.5))[(int)(pf.x+0.5)];
+        return Get(pf.x+0.5, pf.y+0.5, pf.z+0.5);
     }
 
     inline  __device__ __host__
-    const T GetFractionalBilinear(float3 pos) const
+    const T GetFractionalTrilinear(float3 pos) const
     {
-        const float3 pf = pos * make_float3(w-1, h-1, d-1);
+        // TODO: make coordinate system consistent with bbox intersection
+        const float3 pf = pos * make_float3(w-1.1, h-1.1, d-1.1);
 
         const float ix = floorf(pf.x);
         const float iy = floorf(pf.y);

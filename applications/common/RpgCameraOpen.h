@@ -73,6 +73,10 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.SetProperty("Node-0", cl.follow("", "-n0"));
     camera.SetProperty("Node-1", cl.follow("", "-n1"));
 
+    camera.SetProperty("GetDepth", !cl.search("-no-depth"));
+    camera.SetProperty("GetRGB", !cl.search("-no-rgb"));
+    camera.SetProperty("GetIr", cl.search("-with-ir"));
+
     camera.InitDriver( cl.follow( "FileReader", "-idev" ) );
 }
 
