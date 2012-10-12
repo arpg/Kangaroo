@@ -16,6 +16,7 @@
 #include "common/BaseDisplayCuda.h"
 #include "common/DisplayUtils.h"
 #include "common/HeightmapFusion.h"
+#include "common/ViconTracker.h"
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>

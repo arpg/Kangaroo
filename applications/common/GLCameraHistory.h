@@ -83,7 +83,7 @@ inline  void GLCameraHistory::LoadFromAbsoluteCartesianFile(
             }
             if(lines >= startframe) {
                 Eigen::Matrix4d T_wn( T_hf * mvl::Cart2T(row) * T_fh );
-//                vecT_wh.push_back(T_wr);
+                m_T_wh.push_back(T_wn);
                 Eigen::Matrix4d T_on = T_ow * T_wn;
                 m_T_on.push_back(T_on);
                 T_ow = T_wn.inverse();
@@ -113,7 +113,7 @@ inline  void GLCameraHistory::LoadFromTimeAbsoluteCartesianFile(
 
             if(lines >= startframe) {
                 Eigen::Matrix4d T_wn( T_hf * mvl::Cart2T(row) * T_fh );
-//                vecT_wh.push_back(T_wr);
+                m_T_wh.push_back(T_wn);
                 Eigen::Matrix4d T_on = T_ow * T_wn;
                 m_T_on.push_back(T_on);
                 T_ow = T_wn.inverse();
