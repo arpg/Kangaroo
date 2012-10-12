@@ -143,6 +143,18 @@ void XYZUnitQuatXYZWInverseCompose(
 }
 
 template <typename T> inline
+void XYZUnitQuatXYZWComposeInverse(
+    const T R_cb[4], const T t_cb[3],
+    const T R_ab[4], const T t_ab[3],
+    T R_ca[7], T t_ca[3]
+) {
+    T R_ba[4];
+    T t_ba[3];
+    XYZUnitQuatXYZWInverse(R_ab,t_ab, R_ba, t_ba);
+    XYZUnitQuatXYZWCompose(R_cb, t_cb, R_ba, t_ba, R_ca, t_ca);
+}
+
+template <typename T> inline
 void XYZQuatXYZWSetIdentity(
     T R_ab[4], T t_ab[3]
 )

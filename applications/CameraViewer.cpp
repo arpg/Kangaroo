@@ -7,6 +7,9 @@
 using namespace std;
 using namespace pangolin;
 
+const std::string str_prefix = "image_";
+const std::string str_extension = ".png";
+
 int main( int argc, char* argv[] )
 {
     // Open video device
@@ -35,7 +38,7 @@ int main( int argc, char* argv[] )
     }
 
     // Setup OpenGL Display (based on GLUT)    
-    pangolin::CreateGlutWindowAndBind(__FILE__,1024,768);
+    pangolin::CreateGlutWindowAndBind(__FILE__,N*w,h);
 
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
@@ -49,9 +52,11 @@ int main( int argc, char* argv[] )
 
     bool run = true;
     bool step = false;
+    bool save = false;
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback('s', [&save](){save = true;} );
 
     pangolin::Timer timer;
 
@@ -66,6 +71,16 @@ int main( int argc, char* argv[] )
             if(frame>0) {
                 camera.Capture(img);
             }
+
+            if(pangolin::Pushed(save)) {
+                const std::string strframe = boost::lexical_cast<std::string>(frame);
+                for(int i=0; i<N; ++i) {
+                    const std::string str_middle = (N==1?"":"_" + boost::lexical_cast<std::string>(i));
+                    const std::string filename = str_prefix + strframe + str_middle + str_extension;
+                    cv::imwrite(filename, img[i].Image);
+                }
+            }
+
             frame++;
 
             if(frame%30 == 0) {
