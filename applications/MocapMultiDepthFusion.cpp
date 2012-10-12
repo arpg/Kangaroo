@@ -18,8 +18,8 @@ const int MaxWidth = 640;
 const int MaxHeight = 480;
 
 struct Sensor {
-    Sensor(std::string name, std::string vicon_ip, int w, int h)
-        :name(name), tracker(name, vicon_ip), w(w), h(h),
+    Sensor(std::string name, ViconConnection& viconSharedConnection, int w, int h)
+        :name(name), tracker(name, viconSharedConnection), w(w), h(h),
          vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW )
     {
 
@@ -33,28 +33,24 @@ struct Sensor {
     float fu,fv,u0,v0;
 };
 
-struct GLSensor : SceneGraph::GLObject {
+struct GLSensor : public SceneGraph::GLObject {
     GLSensor(Sensor& sensor)
         : GLObject(sensor.name), sensor(sensor)
     {
     }
 
-    void DrawObjectAndChildren(SceneGraph::RenderMode renderMode)
-    {
-        // Update pose based on vicon
-        SetPose(sensor.tracker.T_wf().matrix());
-
-        // Render as usual
-        GLObject::DrawObjectAndChildren(renderMode);
-    }
-
     void DrawCanonicalObject()
     {
+        glPushMatrix();
+        glMultMatrixd(sensor.tracker.T_wf().matrix().data());
+
         // Just draw axis for time being
         SceneGraph::GLAxis::DrawUnitAxis();
 
         glColor3f(1,1,1);
         pangolin::RenderVbo(sensor.vbo,sensor.w, sensor.h);
+
+        glPopMatrix();
     }
 
 protected:
@@ -67,6 +63,8 @@ int main( int argc, char* argv[] )
 {
     pangolin::View& container = SetupPangoGLWithCuda(1024, 768);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
+    glDisable( GL_LIGHTING );
+    glDisable( GL_COLOR_MATERIAL);
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLGrid glGrid(10,1,false);
@@ -91,46 +89,49 @@ int main( int argc, char* argv[] )
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> imgd(MaxWidth,MaxHeight);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgv(MaxWidth,MaxHeight);
 
+    ViconConnection vicon(ViconIp);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         if(video.Capture(images)) {
-            // Which camera did this come from
-            std::string sensor_name = images[0].Map.GetProperty("NodeName");
+            for(int ni=0; ni < images.size(); ni++) {
+                // Which camera did this come from
+                std::string sensor_name = images[ni].Map.GetProperty("DeviceName");
 
-            // Size of depthmap that this sensor will produce
-            const int dw = images[0].Image.cols;
-            const int dh = images[0].Image.rows;
+                // Size of depthmap that this sensor will produce
+                const int dw = images[ni].Image.cols;
+                const int dh = images[ni].Image.rows;
 
-            SensorPtrMap::iterator it = sensors.find(sensor_name);
-            if( it == sensors.end() ) {
-                // create sensor
-                cout << "New sensor - " << sensor_name << " (" << dw << "x" << dh << ")" << endl;
+                SensorPtrMap::iterator it = sensors.find(sensor_name);
+                if( it == sensors.end() ) {
+                    // create sensor
+                    cout << "New sensor - " << sensor_name << " (" << dw << "x" << dh << ")" << endl;
 
-                // Create and Insert into map of active sensors
-                Sensor* newsensor = new Sensor(sensor_name, ViconIp, dw,dh);
-                it = sensors.insert(sensor_name, newsensor ).first;
+                    // Create and Insert into map of active sensors
+                    Sensor* newsensor = new Sensor(sensor_name, vicon, dw,dh);
+                    it = sensors.insert(sensor_name, newsensor ).first;
 
-                // add to posegraph
-                graph.AddChild(new GLSensor(*newsensor));
-            }
+                    // add to posegraph
+                    graph.AddChild(new GLSensor(*newsensor));
+                }
 
-            Sensor& sensor = *it->second;
-//            cout << "Data from " << sensor.name << endl;
+                Sensor& sensor = *it->second;
+    //            cout << "Data from " << sensor.name << endl;
 
-            // Update depth map. (lets assume we have a kinect for now)
-            imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[1].Image);
-            const float asusfocal = 570.342;
-            const float df = asusfocal;
+                // Update depth map. (lets assume we have a kinect for now)
+                imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[ni].Image);
+                const float asusfocal = 570.342;
+                const float df = asusfocal;
 
-            // Convert to Vertex Buffer
-            Gpu::DepthToVbo(imgv, imgd, df, df, dw, dh, 1.0f/1000.0f );
+                // Convert to Vertex Buffer
+                Gpu::DepthToVbo(imgv, imgd, df, df, dw/2.0f, dh/2.0f, 1.0f/1000.0f );
 
-            // Copy to sensors vbo for display
-            {
-                pangolin::CudaScopedMappedPtr var(sensor.vbo);
-                Gpu::Image<float4> dVbo((float4*)*var,dw,dh);
-                dVbo.CopyFrom(imgv);
+                // Copy to sensors vbo for display
+                {
+                    pangolin::CudaScopedMappedPtr var(sensor.vbo);
+                    Gpu::Image<float4> dVbo((float4*)*var,dw,dh);
+                    dVbo.CopyFrom(imgv);
+                }
             }
         }
 

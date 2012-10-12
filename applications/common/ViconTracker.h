@@ -6,24 +6,80 @@
 #include <Eigen/Geometry>
 #include <boost/thread.hpp>
 
+class ViconConnection
+{
+public:
+    inline ViconConnection(const std::string& host)
+        : m_run(true), m_host(host)
+    {
+        m_connection = vrpn_get_connection_by_name(host.c_str());
+        m_thread = boost::thread(&ViconConnection::EventLoop, this);
+    }
+
+    inline ~ViconConnection() {
+        m_run = false;
+        m_thread.join();
+        m_connection->removeReference();
+    }
+
+    inline void EventLoop() {
+        while(m_run) {
+            m_connection->mainloop();
+        }
+    }
+
+    inline std::string HostName() {
+        return m_host;
+    }
+
+    inline vrpn_Connection* Connection() {
+        return m_connection;
+    }
+
+protected:
+    bool m_run;
+    vrpn_Connection* m_connection;
+    std::string m_host;
+    boost::thread m_thread;
+};
+
 class ViconTracking
 {
 public:
     ViconTracking( std::string objectName, std::string host)
-        : m_connected(false), m_newdata(false), m_recordHistory(false)
+        : m_connected(false), m_newdata(false), m_run(false), m_recordHistory(false)
     {
         const std::string uri = objectName + "@" + host;
         m_object = new vrpn_Tracker_Remote( uri.c_str() );
+        RegisterHandlers();
+        StartThread();
+    }
+
+    ViconTracking( std::string objectName, ViconConnection& sharedConnection)
+        : m_connected(false), m_newdata(false), m_recordHistory(false)
+    {
+        const std::string uri = objectName + "@" + sharedConnection.HostName();
+        m_object = new vrpn_Tracker_Remote( uri.c_str(), sharedConnection.Connection() );
+        RegisterHandlers();
+    }
+
+    inline void RegisterHandlers() {
         m_object->shutup = true;
         m_object->register_change_handler(this, &ViconTracking::pose_callback );
 //        m_object->register_change_handler(this, &ViconTracking::velocity_callback );
 //        m_object->register_change_handler(this, &ViconTracking::workspace_callback );
-        Start();
+    }
+
+    inline void UnregisterHandlers() {
+        m_object->unregister_change_handler(this, &ViconTracking::pose_callback );
+//        m_object->register_change_handler(this, &ViconTracking::velocity_callback );
+//        m_object->register_change_handler(this, &ViconTracking::workspace_callback );
     }
 
     ~ViconTracking()
     {
-        Stop();
+        StopThread();
+        UnregisterHandlers();
         delete m_object;
     }
 
@@ -41,22 +97,6 @@ public:
     inline bool IsNewData()
     {
         return m_newdata;
-    }
-
-    void EventLoop() {
-        while(m_run) {
-            m_object->mainloop();
-        }
-    }
-
-    inline void Start() {
-        m_run = true;
-        m_event_thread = boost::thread(&ViconTracking::EventLoop, this);
-    }
-
-    inline void Stop() {
-        m_run = false;
-        m_event_thread.join();
     }
 
     inline void RecordHistory(bool record = true)
@@ -121,6 +161,25 @@ public:
 
 
 protected:
+    void EventLoop() {
+        while(m_run) {
+            m_object->mainloop();
+        }
+    }
+
+    // This should only be started if an external ViconConnection object isn't
+    // being used - (If only one tracker is running)
+    inline void StartThread() {
+        m_run = true;
+        m_event_thread = boost::thread(&ViconTracking::EventLoop, this);
+    }
+
+    // Stop thread if it exists
+    inline void StopThread() {
+        m_run = false;
+        m_event_thread.join();
+    }
+
     Sophus::SE3 m_T_wf;
     std::vector<Sophus::SE3> m_vecT_wf;
 

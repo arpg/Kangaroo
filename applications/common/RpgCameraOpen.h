@@ -59,8 +59,6 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
         exit(0);
     }
 
-    std::cout << "Here!" << std::endl;
-
     GetPot cl(argc,argv);
 
     camera.SetProperty("NumChannels", numChannels);
@@ -77,7 +75,6 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     while(true) {
         std::string arg = boost::lexical_cast<std::string>(numNodes);
         if(!cl.search( ("-n"+arg).c_str() ) ) break;
-        std::cout << ("-n"+arg).c_str() << std::endl;
         camera.SetProperty("Node-" + arg, cl.follow("", ("-n"+arg).c_str() ) );
         numNodes++;
     }

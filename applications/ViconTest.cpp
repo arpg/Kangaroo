@@ -31,7 +31,9 @@ int main( int /*argc*/, char* argv[] )
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
       .SetHandler(new Handler3D(s_cam,AxisZ));
 
-    ViconTracking tracker("GENLEE","192.168.10.1");
+    ViconConnection viconConnection("192.168.10.1");
+    ViconTracking tracker("Beef0", viconConnection);
+//    ViconTracking tracker2("QUAD1", viconConnection);
     int subsample = 1;
 
     pangolin::RegisterKeyPressCallback(' ', [&tracker](){tracker.ToggleRecordHistory();} );
@@ -64,6 +66,12 @@ int main( int /*argc*/, char* argv[] )
         glMultMatrix( tracker.T_wf().matrix() );
         glDrawAxis(1);
         glPopMatrix();
+
+//        // Draw Second Vicon Target
+//        glPushMatrix();
+//        glMultMatrix( tracker2.T_wf().matrix() );
+//        glDrawAxis(1);
+//        glPopMatrix();
 
         pangolin::FinishGlutFrame();
     }
