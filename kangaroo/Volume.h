@@ -184,9 +184,9 @@ struct Volume
     {
         const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 
-        const float ix = floorf(pf.x);
-        const float iy = floorf(pf.y);
-        const float iz = floorf(pf.z);
+        const int ix = floorf(pf.x);
+        const int iy = floorf(pf.y);
+        const int iz = floorf(pf.z);
         const float fx = pf.x - ix;
         const float fy = pf.y - iy;
         const float fz = pf.z - iz;
@@ -212,22 +212,21 @@ struct Volume
     {
         const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 
-        const int ix = floorf(pf.x);
-        const int iy = floorf(pf.y);
-        const int iz = floorf(pf.z);
+        const int ix = fmaxf(fminf(w-2, floorf(pf.x) ), 0);
+        const int iy = fmaxf(fminf(w-2, floorf(pf.y) ), 0);
+        const int iz = fmaxf(fminf(w-2, floorf(pf.z) ), 0);
         const float fx = pf.x - ix;
         const float fy = pf.y - iy;
         const float fz = pf.z - iz;
 
         const float v0 = Get(ix,iy,iz);
-        const float vx = (ix+1 < w) ? (float)Get(ix+1,iy,iz) : v0;
-        const float vy = (iy+1 < h) ? (float)Get(ix,iy+1,iz) : v0;
-        const float vxy = (ix+1 < w && iy+1 < h) ? (float)Get(ix+1,iy+1,iz) : (vx+vy)/2.0f;
-
-        const float vz = (iz+1 < d) ? (float)Get(ix,iy,iz+1) : v0;
-        const float vxz = (ix+1 < w && iz+1 < d) ? (float)Get(ix+1,iy,iz+1) : (vx+vz)/2.0f;
-        const float vyz = (ix+1 < w && iy+1 < h) ? (float)Get(ix,iy+1,iz+1) : (vy+vz)/2.0f;
-        const float vxyz = (ix+1 < w && iy+1 < h && iz+1 < d) ? (float)Get(ix+1,iy+1,iz+1) : (2*vxy+vz)/3.0f;
+        const float vx = Get(ix+1,iy,iz);
+        const float vy = Get(ix,iy+1,iz);
+        const float vxy = Get(ix+1,iy+1,iz);
+        const float vz = Get(ix,iy,iz+1);
+        const float vxz = Get(ix+1,iy,iz+1);
+        const float vyz = Get(ix,iy+1,iz+1);
+        const float vxyz = Get(ix+1,iy+1,iz+1);
 
         return lerp(
             lerp(lerp(v0,vx,fx),  lerp(vy,vxy,fx), fy),

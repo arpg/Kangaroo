@@ -8,7 +8,7 @@
 namespace Gpu
 {
 
-__global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
+__global__ void KernRaycastSDF(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -18,8 +18,7 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
         const float3 ray_c = make_float3((u-u0)/fu,(v-v0)/fv, 1);
         const float3 ray_w = mulSO3(T_wc, ray_c);
 
-        // TODO: Ensure the bbox boundaries generate valid trilinear access
-
+        // Raycast bounding box to find valid ray segment of sdf
         // http://www.cs.utah.edu/~awilliam/box/box.pdf
         const float3 tminbound = (boxmin - c_w) / ray_w;
         const float3 tmaxbound = (boxmax - c_w) / ray_w;
@@ -31,19 +30,16 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
         float ret = 0.0f;
 
         if(max_tmin < min_tmax ) {
-//            // Raycast cube
-//            ret = (max_tmin - near) / (far - near);
-
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
             float last_sdf = 0;
-            const float delta_lambda = (boxmax.x - boxmin.x) / (2*vol.w);
+            float delta_lambda = (boxmax.x - boxmin.x) / (vol.w-1);
 
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;
                 const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
-                const SDF_t val = vol.GetFractionalTrilinearClamped(pos_v);
-                const float sdf = val.val / val.n;
+                const float sdf = vol.GetFractionalTrilinearClamped(pos_v);
+//                const float sdf = val.val / val.n;
                 if( sdf <= 0 ) {
                     // surface!
                     if(subpix) {
@@ -52,7 +48,7 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
                     ret = (lambda - near) / (far - near);
                     break;
                 }
-                lambda += delta_lambda;
+                lambda += fmaxf(delta_lambda, sdf);
                 last_sdf = sdf;
             }
         }
@@ -65,7 +61,7 @@ void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, con
 {    
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycast<<<gridDim,blockDim>>>(img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, subpix);
+    KernRaycastSDF<<<gridDim,blockDim>>>(img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, subpix);
 }
 
 __global__ void KernSDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r)
