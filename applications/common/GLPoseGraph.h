@@ -20,7 +20,7 @@ public:
             const Keyframe& kf = posegraph.keyframes[i];
             glPushMatrix();
             Eigen::glMultMatrix(kf.GetT_wk().matrix());
-            SceneGraph::GLAxis::DrawUnitAxis();
+            SceneGraph::GLAxis::DrawAxis(0.1);
             glPopMatrix();
         }
     }

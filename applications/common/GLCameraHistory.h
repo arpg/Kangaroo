@@ -21,21 +21,31 @@ public:
     GLCameraHistory();
 
     void LoadFromAbsoluteCartesianFile(
-        const std::string& filename, int startframe, int endframe,
-        const Eigen::Matrix4d T_hf, const Eigen::Matrix4d T_fh
+        const std::string& filename,
+        int startframe = 0, int endframe = 1E6,
+        const Eigen::Matrix4d T_hf = Eigen::Matrix4d::Identity(),
+        const Eigen::Matrix4d T_fh = Eigen::Matrix4d::Identity()
     );
 
     void LoadFromTimeAbsoluteCartesianFile(
-        const std::string& filename, int startframe, int endframe,
-        const Eigen::Matrix4d T_hf, const Eigen::Matrix4d T_fh
+        const std::string& filename,
+        int startframe = 0, int endframe = 1E6,
+        const Eigen::Matrix4d T_hf = Eigen::Matrix4d::Identity(),
+        const Eigen::Matrix4d T_fh = Eigen::Matrix4d::Identity()
     );
 
     void LoadFromRelativeCartesianFile(
-        const std::string& filename, int startframe = 0
+        const std::string& filename,
+        int startframe = 0, int endframe = 1E6,
+        const Eigen::Matrix4d T_hf = Eigen::Matrix4d::Identity(),
+        const Eigen::Matrix4d T_fh = Eigen::Matrix4d::Identity()
     );
 
     void LoadFromTimeRelativeCartesianFile(
-        const std::string& filename, int startframe = 0
+        const std::string& filename,
+        int startframe = 0, int endframe = 1E6,
+        const Eigen::Matrix4d T_hf = Eigen::Matrix4d::Identity(),
+        const Eigen::Matrix4d T_fh = Eigen::Matrix4d::Identity()
     );
 
     void LoadFromTimeLatLon( const std::string& filename);
@@ -126,19 +136,20 @@ inline  void GLCameraHistory::LoadFromTimeAbsoluteCartesianFile(
 }
 
 inline void GLCameraHistory::LoadFromRelativeCartesianFile(
-    const std::string& filename, int startframe
+    const std::string& filename, int startframe, int endframe,
+    const Eigen::Matrix4d T_hf, const Eigen::Matrix4d T_fh
 ) {
     // Parse Ground truth
     std::ifstream ifs(filename);
     if(ifs.is_open()) {
         Eigen::Matrix<double,1,6> row;
-        for(unsigned long lines = 0; ifs.good() && lines < 10000;lines++)
+        for(unsigned long lines = 0; ifs.good() && lines < endframe;lines++)
         {
             for(int i=0; i<6; ++i ) {
                 ifs >> row(i);
             }
             if(lines >= startframe) {
-                Eigen::Matrix4d T_on( mvl::Cart2T(row)  );
+                Eigen::Matrix4d T_on( T_hf * mvl::Cart2T(row) * T_fh );
                 m_T_on.push_back(T_on);
                 T_ow = T_on.inverse() * T_ow;
             }
@@ -149,7 +160,8 @@ inline void GLCameraHistory::LoadFromRelativeCartesianFile(
 }
 
 inline void GLCameraHistory::LoadFromTimeRelativeCartesianFile(
-    const std::string& filename, int startframe
+    const std::string& filename, int startframe, int endframe,
+    const Eigen::Matrix4d T_hf, const Eigen::Matrix4d T_fh
 ) {
     // Parse Ground truth
     std::ifstream ifs(filename);
@@ -164,7 +176,7 @@ inline void GLCameraHistory::LoadFromTimeRelativeCartesianFile(
                 ifs >> row(i);
             }
             if(lines >= startframe) {
-                Eigen::Matrix4d T_on( mvl::Cart2T(row)  );
+                Eigen::Matrix4d T_on( T_hf * mvl::Cart2T(row) * T_fh  );
                 m_T_on.push_back(T_on);
                 T_ow = T_on.inverse() * T_ow;
                 m_time_s.push_back(time_s);
@@ -258,7 +270,7 @@ inline void GLCameraHistory::DrawCanonicalObject()
     for( unsigned int i=0; i < N; ++i )
     {
         glMultMatrix(m_T_on[i]);
-        GLAxis::DrawUnitAxis();
+        GLAxis::DrawAxis(0.1);
     }
 
     glPopMatrix();

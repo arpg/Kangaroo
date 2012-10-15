@@ -1,7 +1,3 @@
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/bind.hpp>
-
 #include <pangolin/pangolin.h>
 #include <sophus/se3.h>
 #include <SceneGraph/SceneGraph.h>
@@ -22,27 +18,38 @@ int main( int /*argc*/, char* argv[] )
 
     pangolin::CreateGlutWindowAndBind(__FILE__,w,h);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
+    glDisable( GL_LIGHTING );
 
     // Define 3D Objects
     SceneGraph::GLSceneGraph glGraph;
-    SceneGraph::GLGrid glGrid(50,10.0, true);
-    glGrid.SetPosition(0,0,40);
+    SceneGraph::GLAxis glAxis;
+    SceneGraph::GLGrid glGrid(5,1, true);
+//    glGrid.SetPosition(0,0,40);
     glGraph.AddChild(&glGrid);
+    glGraph.AddChild(&glAxis);
 
     // RDF transforms
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
+    Eigen::Matrix3d RDFvicon; RDFvicon << 0,-1,0,  0,0, -1,  1,0,0;
     Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();
     T_vis_ro.block<3,3>(0,0) = RDFvision.transpose() * RDFrobot;
     Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
     T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
+    Eigen::Matrix4d T_vis_vic = Eigen::Matrix4d::Identity();
+    T_vis_vic.block<3,3>(0,0) = RDFvision.transpose() * RDFvicon;
+    Eigen::Matrix4d T_vic_vis = Eigen::Matrix4d::Identity();
+    T_vic_vis.block<3,3>(0,0) = RDFvicon.transpose() * RDFvision;
 
     // Load Visual Odometry
     SceneGraph::GLCameraHistory hist_vis_odometry;
-    hist_vis_odometry.LoadFromTimeAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_2laps.txt", 0, 1E6, Matrix4d::Identity(), Matrix4d::Identity() );
-//    glGraph.AddChild(&hist_vis_odometry);
+//    hist_vis_odometry.LoadFromAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_2laps.txt", 0, 1E6, Matrix4d::Identity(), Matrix4d::Identity() );
+    hist_vis_odometry.LoadFromRelativeCartesianFile("/Users/slovegrove/code/kangaroo/build/applications/mocap_icp.txt",0, 1E6, T_ro_vis, T_vis_ro );
+    glGraph.AddChild(&hist_vis_odometry);
 
-    cout << "Visual Odometry Edges " << hist_vis_odometry.m_T_on.size() << endl;
+    SceneGraph::GLCameraHistory hist_vicon;
+    hist_vicon.LoadFromAbsoluteCartesianFile("/Users/slovegrove/code/Dev/Loggers/ImageLogger/build/kinect_vicon/Vicon.txt" );
+    glGraph.AddChild(&hist_vicon);
 
     // Define pose graph problem
     PoseGraph posegraph;
@@ -50,11 +57,16 @@ int main( int /*argc*/, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glGraph.AddChild(&glposegraph);
 
-    const Sophus::SE3 T_hz(Sophus::SO3(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
+//    const Sophus::SE3 T_hz(Sophus::SO3(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
     int coord_z = posegraph.AddSecondaryCoordinateFrame();
 
+    const int num_poses = std::min((unsigned long)100, std::min(hist_vis_odometry.m_T_on.size(), hist_vicon.m_T_wh.size()));
+    hist_vis_odometry.SetNumberToShow(num_poses);
+    hist_vicon.SetNumberToShow(num_poses);
+    cout << "Poses: " << num_poses << endl;
+
     // Populate Pose Graph
-    for( int i=0; /*i < 1000 &&*/ i < hist_vis_odometry.m_T_on.size(); ++i )
+    for( int i=0; /*i < 1000 &&*/ i < num_poses; ++i )
     {
         int kfid = -1;
 
@@ -65,21 +77,25 @@ int main( int /*argc*/, char* argv[] )
             kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
         }
 
-        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_wh[i] ) * T_hz );
+//        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_wh[i] ) * T_hz );
+        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vicon.m_T_wh[i] )  );
     }
 
-    boost::thread optThread( boost::bind( &PoseGraph::Solve, &posegraph ) );
-//    posegraph.Solve();
+
+    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
+    pangolin::RegisterKeyPressCallback('t', [&posegraph,coord_z]() {posegraph.SetSecondaryCoordinateFrameFree(coord_z);});
+    pangolin::RegisterKeyPressCallback('v', [&hist_vicon]() {hist_vicon.SetVisible(!hist_vicon.IsVisible());});
 
     // Define OpenGL Render state
     pangolin::OpenGlRenderState stacks3d;
     stacks3d.SetProjectionMatrix(ProjectionMatrix(640,480,420,420,320,240,0.1,1E6));
-    stacks3d.SetModelViewMatrix(ModelViewLookAt(0,5,-5,0,0,0,0,0,-1));
+    stacks3d.SetModelViewMatrix(ModelViewLookAt(0,5,5,0,0,0,0,0,1));
+
 
     // Create Interactive view of data
     View& d_cam = pangolin::CreateDisplay()
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
-      .SetHandler(new Handler3D(stacks3d,AxisNegZ))
+      .SetHandler(new Handler3D(stacks3d))
       .SetDrawFunction(SceneGraph::ActivateDrawFunctor(glGraph, stacks3d));
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
@@ -90,7 +106,7 @@ int main( int /*argc*/, char* argv[] )
     }
 
     cout << posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk().matrix3x4() << endl;
+    posegraph.Stop();
 
-    optThread.interrupt();
     exit(0);
 }

@@ -25,23 +25,23 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
-int main( int /*argc*/, char* argv[] )
+int main( int argc, char* argv[] )
 {
     // Initialise window
     View& container = SetupPangoGLWithCuda(1024, 768);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
     // Open video device
-    CameraDevice camera = OpenRpgCamera("Kinect://");
+    CameraDevice camera = OpenRpgCamera(argc,argv);
     std::vector<rpg::ImageWrapper> img;
     camera.Capture(img);
     const int w = img[0].width();
     const int h = img[0].height();
     const int MaxLevels = 4;
 
-    const double dfl = camera.GetProperty<double>("DepthFocalLength", 0);
+    const double dfl = camera.GetProperty<double>("DepthFocalLength", 570.342);
     const double ifl = dfl;
-    const double baseline = -camera.GetProperty<double>("RGBDepthBaseline", 0) / 1000.0;
+    const double baseline = -camera.GetProperty<double>("RGBDepthBaseline", 80) / 1000.0;
 
     Eigen::Matrix3d Krgb;
     Krgb << ifl, 0, w/2.0,   0, ifl, h/2.0,  0,0,1;
@@ -72,7 +72,7 @@ int main( int /*argc*/, char* argv[] )
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLAxis glaxis;
     graph.AddChild(&glaxis);
-    SceneGraph::GLAxis glcamera;
+    SceneGraph::GLAxis glcamera(0.1);
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
     graph.AddChild(&glcamera);
     glcamera.AddChild(&glvbo);
@@ -85,13 +85,13 @@ int main( int /*argc*/, char* argv[] )
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
-    Var<int> show_level("ui.Show Level", 0, 0, MaxLevels-1);
+    Var<int> show_level("ui.Show Level", 1, 0, MaxLevels-1);
     Var<float> scale("ui.scale",0.0001, 0, 0.001);
 
-    Var<bool> pose_refinement("ui.Pose Refinement", false, true);
+    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<bool> reset("ui.reset", false, false);
     Var<float> icp_c("ui.icp c",0.5, 1E-3, 1);
-    Var<int> pose_its("ui.pose_its", 2, 0, 10);
+    Var<int> pose_its("ui.pose_its", 10, 0, 10);
 
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
@@ -112,25 +112,28 @@ int main( int /*argc*/, char* argv[] )
 
     Sophus::SE3 T_wl;
 
+//    ViconTracking vicon("Beef0", "192.168.1.10");
+//    ofstream file_vicon("vicon.txt");
+    ofstream file_icp("icp.txt");
+
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
-            if(camera.Capture(img)) {
-                // Save current as last
-                pyrVprev.Swap(pyrV);
+            camera.Capture(img);
 
-                imgRGB.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
-                Gpu::ConvertImage<unsigned char, uchar3>(imgI, imgRGB);
-                dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
-                BilateralFilter<float,unsigned short>(pyrD[0],dKinect,5,300,5,200);
-                BoxReduceIgnoreInvalid<float,MaxLevels,float>(pyrD);
-                for(int l=0; l<MaxLevels; ++l) {
-                    DepthToVbo(pyrV[l], pyrD[l], dfl/(1<<l), dfl/(1<<l), w/(2 * 1<<l), h/(2 * 1<<l), 1.0f/1000.0f );
-                    NormalsFromVbo(pyrN[l], pyrV[l]);
-                }
-                frame++;
+            // Save current as last
+            pyrVprev.Swap(pyrV);
+
+            imgRGB.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
+            Gpu::ConvertImage<unsigned char, uchar3>(imgI, imgRGB);
+            dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+            BilateralFilter<float,unsigned short>(pyrD[0],dKinect,5,300,5,200);
+            BoxReduceIgnoreInvalid<float,MaxLevels,float>(pyrD);
+            for(int l=0; l<MaxLevels; ++l) {
+                DepthToVbo(pyrV[l], pyrD[l], dfl/(1<<l), dfl/(1<<l), w/(2 * 1<<l), h/(2 * 1<<l), 1.0f/1000.0f );
+                NormalsFromVbo(pyrN[l], pyrV[l]);
             }
 
             if( Pushed(reset) ) {
@@ -138,28 +141,34 @@ int main( int /*argc*/, char* argv[] )
             }
 
             if(pose_refinement) {
-                Sophus::SE3 T_pl;
-//                for(int l=MaxLevels-1; l >=0; --l)
-                {
-                    const int l = show_level;
-                    const int lits = pose_its;
-                    Eigen::Matrix3d Kdepth;
-                    Kdepth << dfl/(1<<l), 0, w/(2 * 1<<l),   0, dfl/(1<<l), h/(2 * 1<<l),  0,0,1;
+                if(frame > 0) {
+                    Sophus::SE3 T_pl;
+    //                for(int l=MaxLevels-1; l >=0; --l)
+                    {
+                        const int l = show_level;
+                        const int lits = pose_its;
+                        Eigen::Matrix3d Kdepth;
+                        Kdepth << dfl/(1<<l), 0, w/(2 * 1<<l),   0, dfl/(1<<l), h/(2 * 1<<l),  0,0,1;
 
-                    for(int i=0; i<lits; ++i ) {
-                        const Eigen::Matrix<double, 3,4> mKT_pl = Kdepth * T_pl.matrix3x4();
-                        const Eigen::Matrix<double, 3,4> mT_lp = T_pl.inverse().matrix3x4();
-                        Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementProjectiveIcpPointPlane(
-                                    pyrVprev[l], pyrV[l], pyrN[l], mKT_pl, mT_lp, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
-                        );
-                        Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                        Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                        T_pl = T_pl * Sophus::SE3::exp(x);
+                        for(int i=0; i<lits; ++i ) {
+                            const Eigen::Matrix<double, 3,4> mKT_pl = Kdepth * T_pl.matrix3x4();
+                            const Eigen::Matrix<double, 3,4> mT_lp = T_pl.inverse().matrix3x4();
+                            Gpu::LeastSquaresSystem<float,6> lss = PoseRefinementProjectiveIcpPointPlane(
+                                        pyrVprev[l], pyrV[l], pyrN[l], mKT_pl, mT_lp, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
+                            );
+                            Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                            Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
+                            T_pl = T_pl * Sophus::SE3::exp(x);
+                        }
                     }
-                }
 
-                T_wl = T_wl * T_pl;
-                glcamera.SetPose(T_wl.matrix());
+                    T_wl = T_wl * T_pl;
+                    glcamera.SetPose(T_wl.matrix());
+
+                    file_icp << SceneGraph::GLT2Cart(T_pl.matrix()).transpose() << endl;
+                }else{
+                    file_icp << SceneGraph::GLT2Cart(Sophus::SE3().matrix()).transpose() << endl;
+                }
             }
 
 //            if(frame==0 | Pushed(save_ref))
@@ -176,6 +185,7 @@ int main( int /*argc*/, char* argv[] )
                 dVbo.CopyFrom(pyrV[0]);
             }
 
+            frame++;
         }
 
         /////////////////////////////////////////////////////////////

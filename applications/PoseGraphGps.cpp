@@ -1,7 +1,3 @@
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/bind.hpp>
-
 #include <pangolin/pangolin.h>
 #include <sophus/se3.h>
 #include <SceneGraph/SceneGraph.h>
@@ -39,7 +35,7 @@ int main( int /*argc*/, char* argv[] )
 
     // Load Visual Odometry
     SceneGraph::GLCameraHistory hist_vis_odometry;
-    hist_vis_odometry.LoadFromTimeAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_2laps.txt", 0, 1E6, Matrix4d::Identity(), Matrix4d::Identity() );
+    hist_vis_odometry.LoadFromTimeAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_2laps.txt" );
 //    glGraph.AddChild(&hist_vis_odometry);
 
     // Load GPS
@@ -86,9 +82,6 @@ int main( int /*argc*/, char* argv[] )
         }
     }
 
-    boost::thread optThread( boost::bind( &PoseGraph::Solve, &posegraph ) );
-//    posegraph.Solve();
-
     // Define OpenGL Render state
     pangolin::OpenGlRenderState stacks3d;
     stacks3d.SetProjectionMatrix(ProjectionMatrix(640,480,420,420,320,240,0.1,1E6));
@@ -100,6 +93,8 @@ int main( int /*argc*/, char* argv[] )
       .SetHandler(new Handler3D(stacks3d,AxisNegZ))
       .SetDrawFunction(SceneGraph::ActivateDrawFunctor(glGraph, stacks3d));
 
+    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
+
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         d_cam.ActivateScissorAndClear(stacks3d);
@@ -107,6 +102,6 @@ int main( int /*argc*/, char* argv[] )
         pangolin::FinishGlutFrame();
     }
 
-    optThread.interrupt();
+    posegraph.Stop();
     exit(0);
 }

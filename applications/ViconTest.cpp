@@ -32,7 +32,7 @@ int main( int /*argc*/, char* argv[] )
       .SetHandler(new Handler3D(s_cam,AxisZ));
 
     ViconConnection viconConnection("192.168.10.1");
-    ViconTracking tracker("Beef0", viconConnection);
+    ViconTracking tracker("ASUS", viconConnection);
 //    ViconTracking tracker2("QUAD1", viconConnection);
     int subsample = 1;
 

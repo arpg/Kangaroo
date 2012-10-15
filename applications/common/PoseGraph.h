@@ -1,5 +1,9 @@
 #pragma once
 
+#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/bind.hpp>
+
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -44,37 +48,52 @@ struct Keyframe {
     Sophus::SE3 m_T_wk;
 };
 
+struct UnaryEdge6DofCostFunction
+{
+    UnaryEdge6DofCostFunction( Sophus::SE3 T_wk )
+        : m_T_wk(T_wk)
+    {
+    }
+
+    template <typename T>
+    bool operator()(const T* const R_wk, const T* const t_wk, T* residuals) const
+    {
+        const double* _R_wk = pq(m_T_wk);
+        const double* _t_wk = pt(m_T_wk);
+        const T measR_wk[4] = {(T)_R_wk[0],(T)_R_wk[1],(T)_R_wk[2],(T)_R_wk[3] };
+        const T meast_wk[3] = {(T)_t_wk[0],(T)_t_wk[1],(T)_t_wk[2] };
+        XYZUnitQuatXYZWPoseResidual(R_wk, t_wk, measR_wk, meast_wk, residuals);
+        return true;
+    }
+
+    Sophus::SE3 m_T_wk;
+};
+
 // Indirect measurement of T_wk through T_wz given frame transform T_zk
 struct UnaryEdgeIndirect6DofCostFunction
 {
     UnaryEdgeIndirect6DofCostFunction( Sophus::SE3 T_wz )
-        : m_T_wz(T_wz)
+        : m_T_zw_zk(T_wz)
     {
     }
 
     template <typename T>
     bool operator()(const T* const R_kz, const T* const t_kz, const T* const R_wk, const T* const t_wk, T* residuals) const
     {
-        const double* _R_wz = pq(m_T_wz);
-        const double* _t_wz = pt(m_T_wz);
-        const T R_measured_wz[4] = {(T)_R_wz[0],(T)_R_wz[1],(T)_R_wz[2],(T)_R_wz[3] };
-        const T t_measured_wz[3] = {(T)_t_wz[0],(T)_t_wz[1],(T)_t_wz[2] };
+        const double* _R_zw_zk = pq(m_T_zw_zk);
+        const double* _t_zw_zk = pt(m_T_zw_zk);
+        const T measR_zw_zk[4] = {(T)_R_zw_zk[0],(T)_R_zw_zk[1],(T)_R_zw_zk[2],(T)_R_zw_zk[3] };
+        const T meast_zw_zk[3] = {(T)_t_zw_zk[0],(T)_t_zw_zk[1],(T)_t_zw_zk[2] };
 
-        T R_measured_kw[4];
-        T t_measured_kw[3];
-        XYZUnitQuatXYZWComposeInverse(R_kz, t_kz, R_measured_wz, t_measured_wz, R_measured_kw, t_measured_kw );
+        T measR_w_k[4];
+        T meast_w_k[3];
 
-        T R_w_mw[4]; T t_w_mw[3];
-        XYZUnitQuatXYZWCompose(R_wk, t_wk, R_measured_kw, t_measured_kw, R_w_mw, t_w_mw);
-
-        residuals[0] = t_w_mw[0];
-        residuals[1] = t_w_mw[1];
-        residuals[2] = t_w_mw[2];
-        QuatXYZWToAngleAxis(R_w_mw, residuals+3);
+        XYZUnitQuatXYZWChangeFrame(measR_zw_zk, meast_zw_zk, R_kz, t_kz, measR_w_k, meast_w_k);
+        XYZUnitQuatXYZWPoseResidual(R_wk, t_wk, measR_w_k, meast_w_k, residuals);
         return true;
     }
 
-    Sophus::SE3 m_T_wz;
+    Sophus::SE3 m_T_zw_zk;
 };
 
 struct UnaryEdgeXYCostFunction
@@ -112,16 +131,9 @@ struct BinaryEdgeXYZQuatCostFunction
         const T R_measured_ba[4] = {(T)_R_ba[0],(T)_R_ba[1],(T)_R_ba[2],(T)_R_ba[3] };
         const T t_measured_ba[3] = {(T)_t_ba[0],(T)_t_ba[1],(T)_t_ba[2] };
 
-        T R_ab[4]; T t_ab[3];
-        XYZUnitQuatXYZWInverseCompose(R_wa, t_wa, R_wb, t_wb, R_ab, t_ab);
-
-        T R_a_ma[4]; T t_a_ma[3];
-        XYZUnitQuatXYZWCompose(R_ab, t_ab, R_measured_ba, t_measured_ba, R_a_ma, t_a_ma);
-
-        residuals[0] = t_a_ma[0];
-        residuals[1] = t_a_ma[1];
-        residuals[2] = t_a_ma[2];
-        QuatXYZWToAngleAxis(R_a_ma, residuals+3);
+        T R_ba[4]; T t_ba[3];
+        XYZUnitQuatXYZWInverseCompose(R_wb, t_wb, R_wa, t_wa, R_ba, t_ba);
+        XYZUnitQuatXYZWPoseResidual(R_ba, t_ba, R_measured_ba, t_measured_ba, residuals);
         return true;
     }
 
@@ -131,7 +143,9 @@ struct BinaryEdgeXYZQuatCostFunction
 
 class PoseGraph {
 public:
-    PoseGraph() {
+    PoseGraph()
+        : running(false)
+    {
         quat_param = new QuatXYZWParameterization;
     }
 
@@ -225,7 +239,14 @@ public:
         );
 
 //        // Only optimise rotation
-//        problem.SetParameterBlockConstant( pt(coz.m_T_wk) );
+        problem.SetParameterBlockConstant( pt(coz.m_T_wk) );
+//        problem.SetParameterBlockConstant( pq(coz.m_T_wk) );
+    }
+
+    void SetSecondaryCoordinateFrameFree(int coord_z) {
+        Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
+        problem.SetParameterBlockVariable( pt(coz.m_T_wk) );
+        problem.SetParameterBlockVariable( pq(coz.m_T_wk) );
     }
 
     void Solve()
@@ -244,6 +265,18 @@ public:
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
         std::cout << summary.FullReport() << std::endl;
+        running = false;
+    }
+
+    void Start() {
+        if(!running) {
+            running = true;
+            optThread = boost::thread(boost::bind( &PoseGraph::Solve, this )) ;
+        }
+    }
+
+    void Stop() {
+        optThread.interrupt();
     }
 
 //protected:
@@ -251,4 +284,6 @@ public:
     boost::ptr_vector<Keyframe> keyframes;
     boost::ptr_vector<Keyframe> coord_frames;
     ceres::Problem problem;
+    boost::thread optThread;
+    bool running;
 };

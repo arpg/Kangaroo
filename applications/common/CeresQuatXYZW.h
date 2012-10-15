@@ -134,7 +134,7 @@ template <typename T> inline
 void XYZUnitQuatXYZWInverseCompose(
     const T R_bc[4], const T t_bc[3],
     const T R_ba[4], const T t_ba[3],
-    T R_ca[7], T t_ca[3]
+    T R_ca[4], T t_ca[3]
 ) {
     T R_cb[4];
     T t_cb[3];
@@ -146,12 +146,25 @@ template <typename T> inline
 void XYZUnitQuatXYZWComposeInverse(
     const T R_cb[4], const T t_cb[3],
     const T R_ab[4], const T t_ab[3],
-    T R_ca[7], T t_ca[3]
+    T R_ca[4], T t_ca[3]
 ) {
     T R_ba[4];
     T t_ba[3];
     XYZUnitQuatXYZWInverse(R_ab,t_ab, R_ba, t_ba);
     XYZUnitQuatXYZWCompose(R_cb, t_cb, R_ba, t_ba, R_ca, t_ca);
+}
+
+template <typename T> inline
+void XYZUnitQuatXYZWChangeFrame(
+    const T R_eb_ea[4], const T t_eb_ea[3],
+    const T R_fe[4], const T t_fe[3],
+    T R_fb_fa[4], T t_fb_fa[3]
+) {
+    // return T_fe * T_eb_ea * (T_fe)^(-1)
+    T R_fb_ea[4];
+    T t_fb_ea[3];
+    XYZUnitQuatXYZWCompose(R_fe, t_fe, R_eb_ea, t_eb_ea, R_fb_ea, t_fb_ea);
+    XYZUnitQuatXYZWComposeInverse(R_fb_ea, t_fb_ea, R_fe, t_fe, R_fb_fa, t_fb_fa);
 }
 
 template <typename T> inline
@@ -210,6 +223,22 @@ inline void QuatXYZWToAngleAxis(const T* quaternion, T* angle_axis) {
     angle_axis[2] = q3 * k;
   }
 }
+
+template <typename T> inline
+void XYZUnitQuatXYZWPoseResidual(
+    const T R_ab[4], const T t_ab[3],
+    const T R_measured_ab[4], const T t_measured_ab[3],
+    T* residuals
+) {
+    T R_a_ma[4]; T t_a_ma[3];
+    XYZUnitQuatXYZWComposeInverse(R_ab, t_ab, R_measured_ab, t_measured_ab, R_a_ma, t_a_ma);
+
+    residuals[0] = t_a_ma[0];
+    residuals[1] = t_a_ma[1];
+    residuals[2] = t_a_ma[2];
+    QuatXYZWToAngleAxis(R_a_ma, residuals+3);
+}
+
 
 // Plus(x, delta) = [cos(|delta|), sin(|delta|) delta / |delta|] * x
 // with * being the quaternion multiplication operator. Here we assume

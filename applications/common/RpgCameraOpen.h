@@ -63,8 +63,8 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
 
     camera.SetProperty("NumChannels", numChannels);
     camera.SetProperty("DataSourceDir", cl.follow( ".", "-sdir"  ) );
-    camera.SetProperty("Channel-0", cl.follow( ".*left.*", "-lfile" ) );
-    camera.SetProperty("Channel-1", cl.follow( ".*right.*", "-rfile" ) );
+    camera.SetProperty("Channel-0", cl.follow( ".*left.*pgm", "-lfile" ) );
+    camera.SetProperty("Channel-1", cl.follow( ".*right.*pgm", "-rfile" ) );
     camera.SetProperty("StartFrame", cl.follow(0,"-sf") );
     camera.SetProperty("lcmod", cl.follow( "lcmod.xml", "-lcmod" ) );
     camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
