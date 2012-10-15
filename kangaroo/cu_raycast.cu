@@ -1,6 +1,9 @@
-#include "kangaroo.h"
-#include "launch_utils.h"
 #include "Mat.h"
+#include "MatUtils.h"
+#include "Image.h"
+#include "Volume.h"
+#include "Sdf.h"
+#include "launch_utils.h"
 
 namespace Gpu
 {
@@ -34,12 +37,12 @@ __global__ void KernRaycast(Image<float> img, const Volume<SDF_t> vol, const flo
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
             float last_sdf = 0;
-            const float delta_lambda = (boxmax.x - boxmin.x) / (4*vol.w);
+            const float delta_lambda = (boxmax.x - boxmin.x) / (2*vol.w);
 
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;
                 const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
-                const SDF_t val = vol.GetFractional(pos_v);
+                const SDF_t val = vol.GetFractionalTrilinearClamped(pos_v);
                 const float sdf = val.val / val.n;
                 if( sdf <= 0 ) {
                     // surface!
@@ -74,9 +77,9 @@ __global__ void KernSDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max,
     const float3 vol_size = vol_max - vol_min;
 
     const float3 pos = make_float3(
-                vol_min.x + vol_size.x*x/(float)vol.w,
-                vol_min.y + vol_size.y*y/(float)vol.h,
-                vol_min.z + vol_size.z*z/(float)vol.d
+                vol_min.x + vol_size.x*x/(float)(vol.w-1),
+                vol_min.y + vol_size.y*y/(float)(vol.h-1),
+                vol_min.z + vol_size.z*z/(float)(vol.d-1)
                 );
     const float dist = length(pos - center);
     const float sdf = dist - r;

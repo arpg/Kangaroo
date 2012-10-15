@@ -1,4 +1,3 @@
-#include "kangaroo.h"
 #include "Image.h"
 #include "LeastSquareSum.h"
 #include "launch_utils.h"

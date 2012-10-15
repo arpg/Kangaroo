@@ -13,6 +13,8 @@
 #include "MatUtils.h"
 #include "reduce.h"
 #include "CudaTimer.h"
+#include "Sdf.h"
+#include "CostVolElem.h"
 
 namespace Gpu
 {
@@ -262,17 +264,6 @@ void GenerateWorldVboAndImageFromHeightmap(Image<float4> dVbo, Image<unsigned ch
 
 void CostVolumeFromStereoTruncatedAbsAndGrad(Volume<float> dvol, Image<float> dimgl, Image<float> dimgr, float sd, float alpha, float r1, float r2 );
 
-struct __align__(8) CostVolElem
-{
-    inline __host__ __device__
-    operator float() {
-        return n > 0 ? sum / n : 1E30;
-    }
-
-    int n;
-    float sum;
-};
-
 void CostVolumeZero(Volume<CostVolElem> costvol );
 
 void CostVolumeFromStereo(Volume<CostVolElem> dvol, Image<unsigned char> dimgl, Image<unsigned char> dimgr );
@@ -436,17 +427,6 @@ template<typename T>
 void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
 //////////////////////////////////////////////////////
-
-struct SDF_t {
-    inline __host__ __device__ SDF_t() {}
-    inline __host__ __device__ SDF_t(float v) : val(v), n(1) {}
-    inline __host__ __device__ SDF_t(float v, int n) : val(v), n(n) {}
-    inline __host__ __device__ operator float() const {
-        return val / n;
-    }
-    float val;
-    int n;
-};
 
 void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix );
 

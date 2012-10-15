@@ -1,4 +1,3 @@
-#include "kangaroo.h"
 #include "Image.h"
 #include "launch_utils.h"
 #include "CUDA_SDK/sharedmem.h"

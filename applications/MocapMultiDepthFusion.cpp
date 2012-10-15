@@ -45,7 +45,7 @@ struct GLSensor : public SceneGraph::GLObject {
         glMultMatrixd(sensor.tracker.T_wf().matrix().data());
 
         // Just draw axis for time being
-        SceneGraph::GLAxis::DrawUnitAxis();
+        SceneGraph::GLAxis::DrawAxis();
 
         glColor3f(1,1,1);
         pangolin::RenderVbo(sensor.vbo,sensor.w, sensor.h);

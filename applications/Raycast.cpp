@@ -37,7 +37,7 @@ int main( int argc, char* argv[] )
     // Allocate Camera Images on device for processing
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
 
     SceneGraph::GLSceneGraph graph;

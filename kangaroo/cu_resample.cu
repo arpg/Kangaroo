@@ -1,4 +1,4 @@
-#include "kangaroo.h"
+#include "Image.h"
 #include "launch_utils.h"
 #include "sampling.h"
 #include "InvalidValue.h"

@@ -1,7 +1,6 @@
-#include "kangaroo.h"
-#include "launch_utils.h"
+#include "MatUtils.h"
 #include "Image.h"
-
+#include "launch_utils.h"
 #include "CUDA_SDK/sharedmem.h"
 
 

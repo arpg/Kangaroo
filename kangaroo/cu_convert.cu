@@ -1,4 +1,4 @@
-#include "kangaroo.h"
+#include "Image.h"
 #include "launch_utils.h"
 #include "pixel_convert.h"
 

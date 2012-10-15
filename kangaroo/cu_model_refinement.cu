@@ -1,4 +1,5 @@
-#include "kangaroo.h"
+#include "MatUtils.h"
+#include "Image.h"
 #include "launch_utils.h"
 #include "reweighting.h"
 #include "disparity.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kangaroo.h"
+#include "Image.h"
 
 namespace Gpu {
 

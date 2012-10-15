@@ -1,9 +1,12 @@
-#include "kangaroo.h"
+#include "MatUtils.h"
+#include "Image.h"
+#include "Volume.h"
 #include "launch_utils.h"
 #include "patch_score.h"
 #include "disparity.h"
 #include "InvalidValue.h"
 #include "ImageApron.h"
+#include "CostVolElem.h"
 
 namespace Gpu
 {

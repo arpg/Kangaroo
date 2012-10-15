@@ -1,8 +1,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
-
-namespace Gpu {
+#include "CUDA_SDK/cutil_math.h"
 
 //////////////////////////////////////////////////////
 // Additional lerp definitions for integral vector types
@@ -39,6 +38,8 @@ inline __device__ __host__ float4 lerp(uchar4 a, uchar4 b, float t)
         a.w + t*(b.w-a.w)
     );
 }
+
+namespace Gpu {
 
 //////////////////////////////////////////////////////
 // Sampling

@@ -182,8 +182,7 @@ struct Volume
     inline  __device__ __host__
     const T GetFractionalTrilinear(float3 pos) const
     {
-        // TODO: make coordinate system consistent with bbox intersection
-        const float3 pf = pos * make_float3(w-1.1, h-1.1, d-1.1);
+        const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 
         const float ix = floorf(pf.x);
         const float iy = floorf(pf.y);
@@ -192,9 +191,47 @@ struct Volume
         const float fy = pf.y - iy;
         const float fz = pf.z - iz;
 
+        const float v0 = Get(ix,iy,iz);
+        const float vx = Get(ix+1,iy,iz);
+        const float vy = Get(ix,iy+1,iz);
+        const float vxy = Get(ix+1,iy+1,iz);
+        const float vz = Get(ix,iy,iz+1);
+        const float vxz = Get(ix+1,iy,iz+1);
+        const float vyz = Get(ix,iy+1,iz+1);
+        const float vxyz = Get(ix+1,iy+1,iz+1);
+
         return lerp(
-            lerp(lerp(Get(ix,iy,iz),Get(ix+1,iy,iz),fx), lerp(Get(ix,iy+1,iz),Get(ix+1,iy+1,iz),fx), fy),
-            lerp(lerp(Get(ix,iy,iz+1),Get(ix+1,iy,iz+1),fx), lerp(Get(ix,iy+1,iz+1),Get(ix+1,iy+1,iz+1),fx), fy),
+            lerp(lerp(v0,vx,fx),  lerp(vy,vxy,fx), fy),
+            lerp(lerp(vz,vxz,fx), lerp(vyz,vxyz,fx), fy),
+            fz
+        );
+    }
+
+    inline  __device__ __host__
+    const T GetFractionalTrilinearClamped(float3 pos) const
+    {
+        const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
+
+        const int ix = floorf(pf.x);
+        const int iy = floorf(pf.y);
+        const int iz = floorf(pf.z);
+        const float fx = pf.x - ix;
+        const float fy = pf.y - iy;
+        const float fz = pf.z - iz;
+
+        const float v0 = Get(ix,iy,iz);
+        const float vx = (ix+1 < w) ? (float)Get(ix+1,iy,iz) : v0;
+        const float vy = (iy+1 < h) ? (float)Get(ix,iy+1,iz) : v0;
+        const float vxy = (ix+1 < w && iy+1 < h) ? (float)Get(ix+1,iy+1,iz) : (vx+vy)/2.0f;
+
+        const float vz = (iz+1 < d) ? (float)Get(ix,iy,iz+1) : v0;
+        const float vxz = (ix+1 < w && iz+1 < d) ? (float)Get(ix+1,iy,iz+1) : (vx+vz)/2.0f;
+        const float vyz = (ix+1 < w && iy+1 < h) ? (float)Get(ix,iy+1,iz+1) : (vy+vz)/2.0f;
+        const float vxyz = (ix+1 < w && iy+1 < h && iz+1 < d) ? (float)Get(ix+1,iy+1,iz+1) : (2*vxy+vz)/3.0f;
+
+        return lerp(
+            lerp(lerp(v0,vx,fx),  lerp(vy,vxy,fx), fy),
+            lerp(lerp(vz,vxz,fx), lerp(vyz,vxyz,fx), fy),
             fz
         );
     }
