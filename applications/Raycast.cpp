@@ -31,14 +31,17 @@ int main( int argc, char* argv[] )
     View& container = SetupPangoGLWithCuda(2*w, h);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
-    Var<float> near("ui.near",1, 0, 10);
+    Var<float> near("ui.near",0, 0, 10);
     Var<float> far("ui.far",10, 0, 10);
 
     // Allocate Camera Images on device for processing
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
+    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> norm(w,h);
+//    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLAxis glaxis;
@@ -52,9 +55,10 @@ int main( int argc, char* argv[] )
     );
 
     Handler2dImageSelect handler2d(w,h);
-    SetupContainer(container, 2, (float)w/h);
+    SetupContainer(container, 3, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
+    container[1].SetDrawFunction(boost::ref(adn)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( new SceneGraph::HandlerSceneGraph(graph, s_cam, AxisNone) );
 
     const float3 boxmax = make_float3(1,1,1);
@@ -68,7 +72,7 @@ int main( int argc, char* argv[] )
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
         {
-            Gpu::Raycast(img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::Raycast(img, norm, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
         }
 
         /////////////////////////////////////////////////////////////

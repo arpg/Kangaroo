@@ -428,7 +428,7 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
 //////////////////////////////////////////////////////
 
-void Raycast(Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix );
+void Raycast(Image<float> img, Image<float4> norm, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix );
 
 void SDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r);
 

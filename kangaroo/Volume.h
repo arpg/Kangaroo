@@ -173,7 +173,7 @@ struct Volume
     //////////////////////////////////////////////////////
 
     inline  __device__ __host__
-    const T GetFractional(float3 pos) const
+    const T GetFractionalNearestNeighbour(float3 pos) const
     {
         const float3 pf = pos * make_float3(w-1, h-1, d-1);
         return Get(pf.x+0.5, pf.y+0.5, pf.z+0.5);
@@ -233,6 +233,55 @@ struct Volume
             lerp(lerp(vz,vxz,fx), lerp(vyz,vxyz,fx), fy),
             fz
         );
+    }
+
+    //////////////////////////////////////////////////////
+    // Finite differences
+    //////////////////////////////////////////////////////
+
+    inline __device__ __host__
+    float3 GetBackwardDiffDxDyDz(int x, int y, int z) const
+    {
+        const float v0 = Get(x, y, z);
+        return make_float3(
+            v0 - Get(x-1, y, z),
+            v0 - Get(x, y-1, z),
+            v0 - Get(x, y, z-1)
+        );
+    }
+
+    inline __device__ __host__
+    float3 GetFractionalBackwardDiffDxDyDz(float3 pos) const
+    {
+        const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
+
+        const int ix = fmaxf(fminf(w-2, floorf(pf.x) ), 1);
+        const int iy = fmaxf(fminf(w-2, floorf(pf.y) ), 1);
+        const int iz = fmaxf(fminf(w-2, floorf(pf.z) ), 1);
+//        const int ix = floorf(pf.x);
+//        const int iy = floorf(pf.y);
+//        const int iz = floorf(pf.z);
+        const float fx = pf.x - ix;
+        const float fy = pf.y - iy;
+        const float fz = pf.z - iz;
+
+        const float3 v0 = GetBackwardDiffDxDyDz(ix,iy,iz);
+        const float3 vx = GetBackwardDiffDxDyDz(ix+1,iy,iz);
+        const float3 vy = GetBackwardDiffDxDyDz(ix,iy+1,iz);
+        const float3 vxy = GetBackwardDiffDxDyDz(ix+1,iy+1,iz);
+        const float3 vz = GetBackwardDiffDxDyDz(ix,iy,iz+1);
+        const float3 vxz = GetBackwardDiffDxDyDz(ix+1,iy,iz+1);
+        const float3 vyz = GetBackwardDiffDxDyDz(ix,iy+1,iz+1);
+        const float3 vxyz = GetBackwardDiffDxDyDz(ix+1,iy+1,iz+1);
+
+        return lerp(
+            lerp(lerp(v0,vx,fx),  lerp(vy,vxy,fx), fy),
+            lerp(lerp(vz,vxz,fx), lerp(vyz,vxyz,fx), fy),
+            fz
+        );
+
+//        const int3 p = make_int3(pf);
+//        return GetBackwardDiffDxDyDz(p);
     }
 
     //////////////////////////////////////////////////////
