@@ -44,7 +44,7 @@ int main( int /*argc*/, char* argv[] )
     // Load Visual Odometry
     SceneGraph::GLCameraHistory hist_vis_odometry;
 //    hist_vis_odometry.LoadFromAbsoluteCartesianFile("/Users/slovegrove/data/Monument/Trajectory_ts_2laps.txt", 0, 1E6, Matrix4d::Identity(), Matrix4d::Identity() );
-    hist_vis_odometry.LoadFromRelativeCartesianFile("/Users/slovegrove/code/kangaroo/build/applications/mocap_icp.txt",0, 1E6, T_ro_vis, T_vis_ro );
+    hist_vis_odometry.LoadFromRelativeCartesianFile("/Users/slovegrove/code/kangaroo/build/applications/mocap_icp.txt",0, 1E6/*, T_ro_vis, T_vis_ro*/ );
     glGraph.AddChild(&hist_vis_odometry);
 
     SceneGraph::GLCameraHistory hist_vicon;
@@ -58,27 +58,39 @@ int main( int /*argc*/, char* argv[] )
     glGraph.AddChild(&glposegraph);
 
 //    const Sophus::SE3 T_hz(Sophus::SO3(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
-    int coord_z = posegraph.AddSecondaryCoordinateFrame();
+//    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_vis_ro);
+    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_ro_vis);
 
-    const int num_poses = std::min((unsigned long)100, std::min(hist_vis_odometry.m_T_on.size(), hist_vicon.m_T_wh.size()));
+    const int num_poses = std::min((unsigned long)1000, std::min(hist_vis_odometry.m_T_on.size(), hist_vicon.m_T_wh.size()));
     hist_vis_odometry.SetNumberToShow(num_poses);
     hist_vicon.SetNumberToShow(num_poses);
     cout << "Poses: " << num_poses << endl;
 
+//    // Populate Pose Graph
+//    for( int i=0; /*i < 1000 &&*/ i < num_poses; ++i )
+//    {
+//        int kfid = -1;
+
+//        if(i == 0 ) {
+//            Keyframe* kf = new Keyframe();
+//            kfid = posegraph.AddKeyframe(kf);
+//        }else{
+//            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
+//        }
+
+////        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_wh[i] ) * T_hz );
+//        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vicon.m_T_wh[i] )  );
+//    }
+
     // Populate Pose Graph
     for( int i=0; /*i < 1000 &&*/ i < num_poses; ++i )
     {
-        int kfid = -1;
-
-        if(i == 0 ) {
-            Keyframe* kf = new Keyframe();
-            kfid = posegraph.AddKeyframe(kf);
-        }else{
-            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
+        Keyframe* kf = new Keyframe(Sophus::SE3(hist_vicon.m_T_wh[i]) );
+        const int kfid = posegraph.AddKeyframe(kf);
+        posegraph.AddUnaryEdge(kfid, Sophus::SE3(hist_vicon.m_T_wh[i] )  );
+        if(i > 0 ) {
+            posegraph.AddIndirectBinaryEdge(kfid-1, kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
         }
-
-//        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_wh[i] ) * T_hz );
-        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vicon.m_T_wh[i] )  );
     }
 
 

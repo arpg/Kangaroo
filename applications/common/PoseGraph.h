@@ -73,27 +73,27 @@ struct UnaryEdge6DofCostFunction
 struct UnaryEdgeIndirect6DofCostFunction
 {
     UnaryEdgeIndirect6DofCostFunction( Sophus::SE3 T_wz )
-        : m_T_zw_zk(T_wz)
+        : m_T_wz(T_wz)
     {
     }
 
     template <typename T>
     bool operator()(const T* const R_kz, const T* const t_kz, const T* const R_wk, const T* const t_wk, T* residuals) const
     {
-        const double* _R_zw_zk = pq(m_T_zw_zk);
-        const double* _t_zw_zk = pt(m_T_zw_zk);
-        const T measR_zw_zk[4] = {(T)_R_zw_zk[0],(T)_R_zw_zk[1],(T)_R_zw_zk[2],(T)_R_zw_zk[3] };
-        const T meast_zw_zk[3] = {(T)_t_zw_zk[0],(T)_t_zw_zk[1],(T)_t_zw_zk[2] };
+        const double* _R_wz = pq(m_T_wz);
+        const double* _t_wz = pt(m_T_wz);
+        const T measR_wz[4] = {(T)_R_wz[0],(T)_R_wz[1],(T)_R_wz[2],(T)_R_wz[3] };
+        const T meast_wz[3] = {(T)_t_wz[0],(T)_t_wz[1],(T)_t_wz[2] };
 
-        T measR_w_k[4];
-        T meast_w_k[3];
+        T measR_wk[4];
+        T meast_wk[3];
 
-        XYZUnitQuatXYZWChangeFrame(measR_zw_zk, meast_zw_zk, R_kz, t_kz, measR_w_k, meast_w_k);
-        XYZUnitQuatXYZWPoseResidual(R_wk, t_wk, measR_w_k, meast_w_k, residuals);
+        XYZUnitQuatXYZWComposeInverse(measR_wz, meast_wz, R_kz, t_kz, measR_wk, meast_wk);
+        XYZUnitQuatXYZWPoseResidual(R_wk, t_wk, measR_wk, meast_wk, residuals);
         return true;
     }
 
-    Sophus::SE3 m_T_zw_zk;
+    Sophus::SE3 m_T_wz;
 };
 
 struct UnaryEdgeXYCostFunction
@@ -116,7 +116,6 @@ struct UnaryEdgeXYCostFunction
 };
 
 struct BinaryEdgeXYZQuatCostFunction
-//    :   ceres::SizedCostFunction<7,7>
 {
     BinaryEdgeXYZQuatCostFunction( Sophus::SE3 T_ba)
         : m_T_ba(T_ba)
@@ -141,12 +140,44 @@ struct BinaryEdgeXYZQuatCostFunction
     Sophus::SE3 m_T_ba;
 };
 
+struct BinaryEdgeXYZQuatIndirectCostFunction
+{
+    BinaryEdgeXYZQuatIndirectCostFunction( Sophus::SE3 T_zb_za)
+        : m_T_zb_za(T_zb_za)
+    {
+    }
+
+    template <typename T>
+    bool operator()(const T* const R_kz, const T* const t_kz, const T* const R_wb, const T* const t_wb, const T* const R_wa, const T* const t_wa, T* residuals) const
+    {
+        const double* _R_zb_za = pq(m_T_zb_za);
+        const double* _t_zb_za = pt(m_T_zb_za);
+        const T measR_zb_za[4] = {(T)_R_zb_za[0],(T)_R_zb_za[1],(T)_R_zb_za[2],(T)_R_zb_za[3] };
+        const T meast_zb_za[3] = {(T)_t_zb_za[0],(T)_t_zb_za[1],(T)_t_zb_za[2] };
+
+
+        T measR_ba[4]; T meast_ba[3];
+        XYZUnitQuatXYZWChangeFrame(measR_zb_za,meast_zb_za, R_kz, t_kz, measR_ba, meast_ba);
+
+        T R_ba[4]; T t_ba[3];
+        XYZUnitQuatXYZWInverseCompose(R_wb, t_wb, R_wa, t_wa, R_ba, t_ba);
+
+        XYZUnitQuatXYZWPoseResidual(R_ba, t_ba, measR_ba, meast_ba, residuals);
+        return true;
+    }
+
+    // Observed transformation
+    Sophus::SE3 m_T_zb_za;
+};
+
 class PoseGraph {
 public:
     PoseGraph()
         : running(false)
     {
         quat_param = new QuatXYZWParameterization;
+        huber_loss = new ceres::HuberLoss(0.01);
+        cauchy_loss = new ceres::CauchyLoss(0.001);
     }
 
     int AddKeyframe(Keyframe* kf)
@@ -193,7 +224,7 @@ public:
         problem.AddResidualBlock(
             new ceres::AutoDiffCostFunction<BinaryEdgeXYZQuatCostFunction, 6, 4, 3, 4, 3>(
                 new BinaryEdgeXYZQuatCostFunction(T_ba)
-            ), NULL,
+            ), cauchy_loss,
             pq(kfb.m_T_wk), pt(kfb.m_T_wk),
             pq(kfa.m_T_wk), pt(kfa.m_T_wk)
         );
@@ -211,6 +242,19 @@ public:
         );
     }
 
+    void AddUnaryEdge(int a, Sophus::SE3 T_wa)
+    {
+        Keyframe& kfa = GetKeyframe(a);
+
+        problem.AddResidualBlock(
+            new ceres::AutoDiffCostFunction<UnaryEdge6DofCostFunction, 6, 4, 3>(
+                new UnaryEdge6DofCostFunction(T_wa)
+            ), NULL,
+            pq(kfa.m_T_wk),
+            pt(kfa.m_T_wk)
+        );
+    }
+
     int AddRelativeKeyframe(int keyframe_a, Sophus::SE3 T_ak)
     {
         const int k = AddKeyframe();
@@ -219,8 +263,6 @@ public:
 
         // Initialise keyframes pose based on relative transform
         kf_k.SetT_wk( kf_a.GetT_wk() * T_ak );
-//        kf_k.SetT_wk(kf_a.GetT_wk() * Sophus::SE3(Sophus::SO3(), Vector3d(0.1,0,0)));
-
         AddBinaryEdge(keyframe_a,k,T_ak);
         return k;
     }
@@ -239,9 +281,26 @@ public:
         );
 
 //        // Only optimise rotation
-        problem.SetParameterBlockConstant( pt(coz.m_T_wk) );
+//        problem.SetParameterBlockConstant( pt(coz.m_T_wk) );
 //        problem.SetParameterBlockConstant( pq(coz.m_T_wk) );
     }
+
+    void AddIndirectBinaryEdge(int b, int a, int coord_z, Sophus::SE3 T_zb_za)
+    {
+        Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
+        Keyframe& kfa = GetKeyframe(a);
+        Keyframe& kfb = GetKeyframe(b);
+
+        problem.AddResidualBlock(
+            new ceres::AutoDiffCostFunction<BinaryEdgeXYZQuatIndirectCostFunction, 6, 4, 3, 4, 3, 4, 3>(
+                new BinaryEdgeXYZQuatIndirectCostFunction(T_zb_za)
+            ), NULL,
+            pq(coz.m_T_wk), pt(coz.m_T_wk),
+            pq(kfb.m_T_wk), pt(kfb.m_T_wk),
+            pq(kfa.m_T_wk), pt(kfa.m_T_wk)
+        );
+    }
+
 
     void SetSecondaryCoordinateFrameFree(int coord_z) {
         Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
@@ -259,8 +318,8 @@ public:
         options.update_state_every_iteration = true;
         options.max_num_iterations = 1000;
 //        options.gradient_tolerance = 1E-50;
-//        options.function_tolerance = 1E-50;
-//        options.parameter_tolerance = 1E-50;
+        options.function_tolerance = 1E-50;
+        options.parameter_tolerance = 1E-50;
 
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
@@ -280,6 +339,8 @@ public:
     }
 
 //protected:
+    ceres::HuberLoss* huber_loss;
+    ceres::CauchyLoss* cauchy_loss;
     ceres::LocalParameterization* quat_param;
     boost::ptr_vector<Keyframe> keyframes;
     boost::ptr_vector<Keyframe> coord_frames;
