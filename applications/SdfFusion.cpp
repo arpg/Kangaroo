@@ -33,7 +33,7 @@ int main( int argc, char* argv[] )
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
     Var<float> near("ui.near",0, 0, 10);
-    Var<float> far("ui.far",10, 0, 10);
+    Var<float> far("ui.far",100, 0, 100);
 
     // Allocate Camera Images on device for processing
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
@@ -53,7 +53,7 @@ int main( int argc, char* argv[] )
 
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1,1E3),
-        ModelViewLookAtRDF(0,0,0,0,0,1,0,-1,0)
+        ModelViewLookAtRDF(0,0,-4,0,0,1,0,-1,0)
     );
 
     Handler3DGpuDepth handler(depth,s_cam, AxisNone);

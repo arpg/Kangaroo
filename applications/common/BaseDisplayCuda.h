@@ -5,9 +5,9 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
-inline pangolin::View& SetupPangoGLWithCuda(int w, int h, int ui_width = 180, int min_gpu_mem_mb = 100 )
+inline pangolin::View& SetupPangoGLWithCuda(int w, int h, int ui_width = 180, std::string window_title = "-", int min_gpu_mem_mb = 100 )
 {
-    pangolin::View& container = SetupPangoGL(w,h,ui_width);
+    pangolin::View& container = SetupPangoGL(w,h,ui_width, window_title);
 
     // Initialise CUDA, allowing it to use OpenGL context
     if( cudaGLSetGLDevice(0) != cudaSuccess ) {
