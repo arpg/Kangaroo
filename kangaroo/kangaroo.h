@@ -428,10 +428,17 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
 //////////////////////////////////////////////////////
 
-void Raycast(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix );
+void Raycast(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist = 1E10, bool subpix = true);
 
 void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r);
 
-void SDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r);
+//////////////////////////////////////////////////////
+
+void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist );
+
+void SdfReset(Volume<SDF_t> vol, float trunc_dist);
+
+void SdfSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r);
+
 
 }

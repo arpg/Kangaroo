@@ -7,13 +7,22 @@ namespace Gpu
 
 struct SDF_t {
     inline __host__ __device__ SDF_t() {}
-    inline __host__ __device__ SDF_t(float v) : val(v), n(1) {}
-    inline __host__ __device__ SDF_t(float v, int n) : val(v), n(n) {}
+    inline __host__ __device__ SDF_t(float v) : val(v), w(1) {}
+    inline __host__ __device__ SDF_t(float v, int w) : val(v), w(w) {}
     inline __host__ __device__ operator float() const {
-        return val / n;
-    }
+        return val;
+    }    
+    float w;
     float val;
-    int n;
 };
+
+inline __host__ __device__ SDF_t operator+(SDF_t lhs, SDF_t rhs)
+{
+    SDF_t res;
+    res.w = lhs.w + rhs.w;
+    res.val = (lhs.w * lhs.val + rhs.w * rhs.val) / res.w;
+    return res;
+}
+
 
 }

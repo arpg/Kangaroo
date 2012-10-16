@@ -66,7 +66,7 @@ int main( int argc, char* argv[] )
 
     const float3 boxmax = make_float3(1,1,1);
     const float3 boxmin = make_float3(-1,-1,-1);
-    Gpu::SDFSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+    Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
 
@@ -75,7 +75,7 @@ int main( int argc, char* argv[] )
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
         {
-            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, 1E10, subpix );
         }
 
         /////////////////////////////////////////////////////////////

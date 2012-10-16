@@ -180,7 +180,7 @@ struct Volume
     }
 
     inline  __device__ __host__
-    const T GetFractionalTrilinear(float3 pos) const
+    float GetFractionalTrilinear(float3 pos) const
     {
         const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 
@@ -208,7 +208,7 @@ struct Volume
     }
 
     inline  __device__ __host__
-    const T GetFractionalTrilinearClamped(float3 pos) const
+    float GetFractionalTrilinearClamped(float3 pos) const
     {
         const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 

@@ -12,7 +12,7 @@ namespace Gpu
 // Raycast SDF
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastSDF(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
+__global__ void KernRaycastSDF(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -54,7 +54,7 @@ __global__ void KernRaycastSDF(Image<float> imgdepth, Image<float4> norm, Image<
                     depth = lambda;
                     break;
                 }
-                lambda += fmaxf(delta_lambda, sdf);
+                lambda += delta_lambda; //fminf(trunc_dist, fmaxf(delta_lambda, sdf));
                 last_sdf = sdf;
             }
         }
@@ -63,7 +63,8 @@ __global__ void KernRaycastSDF(Image<float> imgdepth, Image<float4> norm, Image<
         const float3 pos_w = c_w + depth * ray_w;
         const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
         const float3 _n_w = vol.GetFractionalBackwardDiffDxDyDz(pos_v);
-        const float3 n_w = _n_w / length(_n_w);
+        const float len_n_w = length(_n_w);
+        const float3 n_w = len_n_w > 0 ? _n_w / len_n_w : make_float3(0,0,1);
         const float3 n_c = mulSO3inv(T_wc,n_w);
         const float3 p_c = depth * ray_c;
 
@@ -90,11 +91,11 @@ __global__ void KernRaycastSDF(Image<float> imgdepth, Image<float4> norm, Image<
     }
 }
 
-void Raycast(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
+void Raycast(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
 {    
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycastSDF<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, subpix);
+    KernRaycastSDF<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
 }
 
 //////////////////////////////////////////////////////
@@ -124,37 +125,5 @@ void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, floa
     InitDimFromOutputImageOver(blockDim, gridDim, depth);
     KernRaycastSphere<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, center, r);
 }
-
-//////////////////////////////////////////////////////
-// Create SDF representation of sphere
-//////////////////////////////////////////////////////
-
-__global__ void KernSDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r)
-{
-    const int x = blockIdx.x*blockDim.x + threadIdx.x;
-    const int y = blockIdx.y*blockDim.y + threadIdx.y;
-    const int z = blockIdx.z*blockDim.z + threadIdx.z;
-
-    const float3 vol_size = vol_max - vol_min;
-
-    const float3 pos = make_float3(
-                vol_min.x + vol_size.x*x/(float)(vol.w-1),
-                vol_min.y + vol_size.y*y/(float)(vol.h-1),
-                vol_min.z + vol_size.z*z/(float)(vol.d-1)
-                );
-    const float dist = length(pos - center);
-    const float sdf = dist - r;
-
-    vol(x,y,z) = SDF_t(sdf);
-}
-
-void SDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r)
-{
-    dim3 blockDim(8,8,8);
-    dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-
-    KernSDFSphere<<<gridDim,blockDim>>>(vol, vol_min, vol_max, center, r);
-}
-
 
 }

@@ -81,6 +81,15 @@ inline Eigen::Matrix3d ScaleK(const Eigen::Matrix3d& K, double imageScale)
     return rK;
 }
 
+inline Eigen::Matrix3d MakeK(float fu, float fv, float u0, float v0)
+{
+    Eigen::Matrix3d K;
+    K << fu, 0, u0,
+         0, fv, v0,
+         0,0,1;
+    return K;
+}
+
 inline Eigen::Matrix3d MakeKinv(const Eigen::Matrix3d& K)
 {
     Eigen::Matrix3d Kinv = Eigen::Matrix3d::Identity();

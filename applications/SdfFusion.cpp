@@ -13,6 +13,7 @@
 #include "common/BaseDisplayCuda.h"
 #include "common/ImageSelect.h"
 #include "common/Handler3dGpuDepth.h"
+#include "common/CameraModelPyramid.h"
 
 #include <kangaroo/kangaroo.h>
 
@@ -46,7 +47,7 @@ int main( int argc, char* argv[] )
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
     Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
-    ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float> adg(depth, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
 
     SceneGraph::GLSceneGraph graph;
@@ -76,28 +77,47 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
+    float trunc_dist = 0.2;
+
     const float3 boxmax = make_float3(1,1,1);
     const float3 boxmin = make_float3(-1,-1,-1);
-    Gpu::SDFSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+    Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
+    Var<bool> sdfreset("ui.reset", false, false);
+    Var<bool> sdfsphere("ui.sphere", false, false);
+    Var<bool> fuse("ui.fuse", false, false);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
         Sophus::SE3 T_vw(stacks_view.GetModelViewMatrix());
         Sophus::SE3 T_cw(stacks_capture.GetModelViewMatrix());
 
+        if(Pushed(sdfreset)) {
+            Gpu::SdfReset(vol, trunc_dist);
+        }
+
+        if(Pushed(sdfsphere)) {
+            Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+        }
+
         // Raycast current view
         {
-            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, trunc_dist, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
         {
             Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(0,0,0), 0.9);
             CudaScopedMappedPtr dvbo(vbo);
-            Gpu::DepthToVbo(Gpu::Image<float4>((float4*)*dvbo,w,h), gtd, fu,fv,u0,v0, 1.0f);
+            Gpu::Image<float4> vboimg((float4*)*dvbo,w,h);
+            Gpu::DepthToVbo(vboimg, gtd, fu,fv,u0,v0, 1.0f);
             glvbo.SetPose(T_cw.inverse().matrix());
+        }
+
+        if(Pushed(fuse)) {
+            // integrate gtd into TSDF
+            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist );
         }
 
         /////////////////////////////////////////////////////////////
