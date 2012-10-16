@@ -39,6 +39,10 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> depth(w,h);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> norm(w,h);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> gtd(w,h);
+
+    pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
+
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
     Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
@@ -48,21 +52,29 @@ int main( int argc, char* argv[] )
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLAxis glaxis;
     SceneGraph::GLAxisAlignedBox glbox;
+    SceneGraph::GLVbo glvbo(&vbo);
     graph.AddChild(&glaxis);
     graph.AddChild(&glbox);
+    graph.AddChild(&glvbo);
 
-    pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1,1E3),
+    pangolin::OpenGlRenderState stacks_view(
+        ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1E-2,1E3),
         ModelViewLookAtRDF(0,0,-4,0,0,1,0,-1,0)
     );
 
-    Handler3DGpuDepth handler(depth,s_cam, AxisNone);
-    SceneGraph::HandlerSceneGraph handler3d(graph, s_cam, AxisNone);
-    SetupContainer(container, 3, (float)w/h);
+    pangolin::OpenGlRenderState stacks_capture(
+        ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1E-2,1E3),
+        ModelViewLookAtRDF(0,0,-4,0,0,1,0,-1,0)
+    );
+
+    Handler3DGpuDepth handler(depth,stacks_view, AxisNone);
+    SceneGraph::HandlerSceneGraph handlerView(graph, stacks_view, AxisNone);
+    SceneGraph::HandlerSceneGraph handlerCapture(graph, stacks_capture, AxisNone);
+    SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler);
     container[1].SetDrawFunction(boost::ref(adn)).SetHandler(&handler);
-    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
-                .SetHandler( &handler3d  );
+    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
+    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
     const float3 boxmax = make_float3(1,1,1);
     const float3 boxmin = make_float3(-1,-1,-1);
@@ -72,10 +84,20 @@ int main( int argc, char* argv[] )
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
-        Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
+        Sophus::SE3 T_vw(stacks_view.GetModelViewMatrix());
+        Sophus::SE3 T_cw(stacks_capture.GetModelViewMatrix());
 
+        // Raycast current view
         {
-            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+        }
+
+        // Generate depthmap by raycasting against groundtruth object
+        {
+            Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(0,0,0), 0.9);
+            CudaScopedMappedPtr dvbo(vbo);
+            Gpu::DepthToVbo(Gpu::Image<float4>((float4*)*dvbo,w,h), gtd, fu,fv,u0,v0, 1.0f);
+            glvbo.SetPose(T_cw.inverse().matrix());
         }
 
         /////////////////////////////////////////////////////////////

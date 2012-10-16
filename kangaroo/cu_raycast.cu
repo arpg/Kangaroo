@@ -8,6 +8,10 @@
 namespace Gpu
 {
 
+//////////////////////////////////////////////////////
+// Raycast SDF
+//////////////////////////////////////////////////////
+
 __global__ void KernRaycastSDF(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
@@ -92,6 +96,38 @@ void Raycast(Image<float> depth, Image<float4> norm, Image<float> img, const Vol
     InitDimFromOutputImageOver(blockDim, gridDim, img);
     KernRaycastSDF<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, subpix);
 }
+
+//////////////////////////////////////////////////////
+// Raycast sphere
+//////////////////////////////////////////////////////
+
+__global__ void KernRaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r)
+{
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( u < depth.w && v < depth.h ) {
+        const float3 center_c = mulSE3inv(T_wc, center);
+        const float3 ray_c = make_float3((u-u0)/fu,(v-v0)/fv, 1);
+
+        const float ldotc = dot(ray_c,center_c);
+        const float lsq = dot(ray_c,ray_c);
+        const float csq = dot(center_c,center_c);
+        float dm = (ldotc - sqrt(ldotc*ldotc - lsq*(csq - r*r) )) / lsq;
+        depth(u,v) = dm;
+    }
+}
+
+void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim, gridDim, depth);
+    KernRaycastSphere<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, center, r);
+}
+
+//////////////////////////////////////////////////////
+// Create SDF representation of sphere
+//////////////////////////////////////////////////////
 
 __global__ void KernSDFSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center, float r)
 {

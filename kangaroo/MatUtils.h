@@ -131,22 +131,22 @@ float3 mulSO3(const Mat<float,3,3>& R_ba, const float3& r_a)
 }
 
 __host__ __device__ inline
-float3 mulSO3(const Mat<float,3,4>& T_ba, const float3& r_a)
+float3 mulSO3(const Mat<float,3,4>& T_ab, const float3& r_a)
 {
     return make_float3(
-            T_ba(0,0) * r_a.x + T_ba(0,1) * r_a.y + T_ba(0,2) * r_a.z,
-            T_ba(1,0) * r_a.x + T_ba(1,1) * r_a.y + T_ba(1,2) * r_a.z,
-            T_ba(2,0) * r_a.x + T_ba(2,1) * r_a.y + T_ba(2,2) * r_a.z
+            T_ab(0,0) * r_a.x + T_ab(0,1) * r_a.y + T_ab(0,2) * r_a.z,
+            T_ab(1,0) * r_a.x + T_ab(1,1) * r_a.y + T_ab(1,2) * r_a.z,
+            T_ab(2,0) * r_a.x + T_ab(2,1) * r_a.y + T_ab(2,2) * r_a.z
     );
 }
 
 __host__ __device__ inline
-float3 mulSO3inv(const Mat<float,3,3>& R_ba, const float3& r_a)
+float3 mulSO3inv(const Mat<float,3,3>& R_ab, const float3& r_a)
 {
     return make_float3(
-            R_ba(0,0) * r_a.x + R_ba(1,0) * r_a.y + R_ba(2,0) * r_a.z,
-            R_ba(0,1) * r_a.x + R_ba(1,1) * r_a.y + R_ba(2,1) * r_a.z,
-            R_ba(0,2) * r_a.x + R_ba(1,2) * r_a.y + R_ba(2,2) * r_a.z
+            R_ab(0,0) * r_a.x + R_ab(1,0) * r_a.y + R_ab(2,0) * r_a.z,
+            R_ab(0,1) * r_a.x + R_ab(1,1) * r_a.y + R_ab(2,1) * r_a.z,
+            R_ab(0,2) * r_a.x + R_ab(1,2) * r_a.y + R_ab(2,2) * r_a.z
     );
 }
 
@@ -157,6 +157,16 @@ float3 mulSO3inv(const Mat<float,3,4>& T_ba, const float3& r_a)
             T_ba(0,0) * r_a.x + T_ba(1,0) * r_a.y + T_ba(2,0) * r_a.z,
             T_ba(0,1) * r_a.x + T_ba(1,1) * r_a.y + T_ba(2,1) * r_a.z,
             T_ba(0,2) * r_a.x + T_ba(1,2) * r_a.y + T_ba(2,2) * r_a.z
+    );
+}
+
+__host__ __device__ inline
+float3 mulSE3inv(const Mat<float,3,4>& T_ab, const float3& r_a)
+{
+    return make_float3(
+            T_ab(0,0) * (r_a.x-T_ab(0,3)) + T_ab(1,0) * (r_a.y-T_ab(1,3)) + T_ab(2,0) * (r_a.z-T_ab(2,3)),
+            T_ab(0,1) * (r_a.x-T_ab(0,3)) + T_ab(1,1) * (r_a.y-T_ab(1,3)) + T_ab(2,1) * (r_a.z-T_ab(2,3)),
+            T_ab(0,2) * (r_a.x-T_ab(0,3)) + T_ab(1,2) * (r_a.y-T_ab(1,3)) + T_ab(2,2) * (r_a.z-T_ab(2,3))
     );
 }
 

@@ -55,14 +55,14 @@ void FilterBadKinectData(Image<float> dFiltered, Image<float> dKinectDepth)
 
 template<typename Ti>
 __global__ void KernDepthToVbo(
-    Image<float4> dVbo, const Image<Ti> dKinectDepth, float fu, float fv, float u0, float v0, float depthscale
+    Image<float4> dVbo, const Image<Ti> dDepth, float fu, float fv, float u0, float v0, float depthscale
 ) {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
-    const float kz = depthscale * dKinectDepth(u,v);
+    const float kz = depthscale * dDepth(u,v);
 
     // (x,y,1) = kinv * (u,v,1)'
-    const float z = (kz > 0.1) ? kz : NAN;
+    const float z = kz;
     const float x = z * (u-u0) / fu;
     const float y = z * (v-v0) / fv;
 
