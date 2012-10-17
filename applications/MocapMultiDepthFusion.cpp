@@ -33,7 +33,7 @@ struct Sensor {
         ifs >> p;
         ifs >> q;
         ifs >> r;
-        T_vs = SceneGraph::GLCart2T(x,y,z,p,q,r);
+        T_vs = Sophus::SE3(SceneGraph::GLCart2T(x,y,z,p,q,r));
         cout << SceneGraph::GLT2Cart(T_vs.matrix()) << endl;
     }
 
@@ -55,8 +55,7 @@ struct GLSensor : public SceneGraph::GLObject {
     void DrawCanonicalObject()
     {
         glPushMatrix();
-//        glMultMatrixd(sensor.T_ws.matrix().data);
-        glMultMatrixd(sensor.tracker.T_wf().matrix().data());
+        glMultMatrixd(sensor.T_ws.matrix().data());
 
         // Just draw axis for time being
         SceneGraph::GLAxis::DrawAxis();

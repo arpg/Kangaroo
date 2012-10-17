@@ -27,6 +27,17 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
+void Save(std::string prefix, Sophus::SE3 T_vc, float f)
+{
+    const Eigen::Matrix<double,6,1> cartT_vc = SceneGraph::GLT2Cart(T_vc.matrix());
+    cout << cartT_vc << endl;
+
+    ofstream ft(prefix + "_f_T_vc.txt");
+    ft << f << endl;
+    ft << cartT_vc;
+    ft.close();
+}
+
 int main( int argc, char* argv[] )
 {
     // RDF transforms
@@ -139,10 +150,14 @@ int main( int argc, char* argv[] )
 
     Sophus::SE3 T_wl;
 
-    ViconTracking vicon("Local1", "192.168.10.1");
+    GetPot cl(argc,argv);
+    const int nid = cl.follow(0, "-camid");
+    const std::string cam_name = "Local" + boost::lexical_cast<std::string>(nid);
+    ViconTracking vicon(cam_name, "192.168.10.1");
 
     pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
     pangolin::RegisterKeyPressCallback('t', [&posegraph,coord_z]() {posegraph.SetSecondaryCoordinateFrameFree(coord_z);});
+    pangolin::RegisterKeyPressCallback('s', [cam_name,&posegraph,coord_z,dfl]() {Save(cam_name, posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk(), dfl);});
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -157,8 +172,8 @@ int main( int argc, char* argv[] )
             pyrVprev.Swap(pyrV);
 
 //            imgRGB.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
-            Gpu::ConvertImage<unsigned char, uchar3>(imgI, imgRGB);
-            dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+//            Gpu::ConvertImage<unsigned char, uchar3>(imgI, imgRGB);
+            dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[nid].Image.data,w,h));
             BilateralFilter<float,unsigned short>(pyrD[0],dKinect,bigs,bigr,biwin,200);
             BoxReduceIgnoreInvalid<float,MaxLevels,float>(pyrD);
             for(int l=0; l<MaxLevels; ++l) {
@@ -248,13 +263,7 @@ int main( int argc, char* argv[] )
         pangolin::FinishGlutFrame();
     }
 
+//    Save(strnid, posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk(), dfl);
+
     posegraph.Stop();
-
-    const Eigen::Matrix<double,6,1> cartT_vc = SceneGraph::GLT2Cart(posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk().matrix());
-    cout << cartT_vc << endl;
-
-    ofstream ft("f_T_vc.txt");
-    ft << dfl << endl;
-    ft << cartT_vc;
-    ft.close();
 }
