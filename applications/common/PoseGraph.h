@@ -16,11 +16,11 @@ double* pt(Sophus::SE3& T) {
 }
 
 double* pq(Sophus::SE3& T) {
-    return T.so3().unit_quaternion().coeffs().data();
+    return const_cast<double*>(T.so3().unit_quaternion().coeffs().data());
 }
 
 const double* pt(const Sophus::SE3& T) {
-    return T.translation().data();
+    return const_cast<double*>(T.translation().data());
 }
 
 const double* pq(const Sophus::SE3& T) {
@@ -207,6 +207,8 @@ public:
         coord_frames.push_back( kf );
         problem.AddParameterBlock(pq(kf->m_T_wk), 4, quat_param);
         problem.AddParameterBlock(pt(kf->m_T_wk), 3, NULL);
+
+        problem.SetParameterBlockConstant( pt(kf->m_T_wk) );
         return id;
     }
 

@@ -17,6 +17,8 @@
 #include "common/DisplayUtils.h"
 #include "common/HeightmapFusion.h"
 #include "common/ViconTracker.h"
+#include "common/PoseGraph.h"
+#include "common/GLPoseGraph.h"
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
@@ -27,6 +29,19 @@ using namespace Gpu;
 
 int main( int argc, char* argv[] )
 {
+    // RDF transforms
+    Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
+    Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
+    Eigen::Matrix3d RDFvicon; RDFvicon << 0,-1,0,  0,0, -1,  1,0,0;
+    Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();
+    T_vis_ro.block<3,3>(0,0) = RDFvision.transpose() * RDFrobot;
+    Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
+    T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
+    Eigen::Matrix4d T_vis_vic = Eigen::Matrix4d::Identity();
+    T_vis_vic.block<3,3>(0,0) = RDFvision.transpose() * RDFvicon;
+    Eigen::Matrix4d T_vic_vis = Eigen::Matrix4d::Identity();
+    T_vic_vis.block<3,3>(0,0) = RDFvicon.transpose() * RDFvision;
+
     // Initialise window
     View& container = SetupPangoGLWithCuda(1024, 768);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
@@ -69,17 +84,25 @@ int main( int argc, char* argv[] )
         GenerateTriangleStripIndexBuffer(dIbo);
     }
 
-    SceneGraph::GLSceneGraph graph;
-    SceneGraph::GLAxis glaxis;
-    graph.AddChild(&glaxis);
+    SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
-    graph.AddChild(&glcamera);
+    SceneGraph::GLAxis glvicon;
+    SceneGraph::GLGrid glGrid(10,1,false);
+    glgraph.AddChild(&glcamera);
     glcamera.AddChild(&glvbo);
+    glgraph.AddChild(&glvicon);
+    glgraph.AddChild(&glGrid);
+
+    PoseGraph posegraph;
+    GLPoseGraph glposegraph(posegraph);
+    glgraph.AddChild(&glposegraph);
+
+    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_vic_vis);
 
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrixRDF_TopLeft(w,h,dfl,dfl, w/2, h/2,1E-2,1E3),
-        ModelViewLookAtRDF(0,0,0,0,0,1,0,-1,0)
+        ProjectionMatrix(640,480,420,420,320,240,0.1,1000),
+        ModelViewLookAt(0,5,5,0,0,0,0,0,1)
     );
 
     Var<bool> step("ui.step", false, false);
@@ -92,7 +115,7 @@ int main( int argc, char* argv[] )
     Var<float> bigs("ui.gs",10, 1E-3, 5);
     Var<float> bigr("ui.gr",700, 1E-3, 200);
 
-    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
+    Var<bool> pose_refinement("ui.Pose Refinement", false, true);
     Var<bool> reset("ui.reset", false, false);
     Var<float> icp_c("ui.icp c",0.5, 1E-3, 1);
     Var<int> pose_its("ui.pose_its", 10, 0, 10);
@@ -111,14 +134,16 @@ int main( int argc, char* argv[] )
     container[0].SetDrawFunction(boost::ref(addebug));
     container[1].SetDrawFunction(boost::ref(addepth));
     container[2].SetDrawFunction(boost::ref(adnormals));
-    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
+    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
 
     Sophus::SE3 T_wl;
 
-//    ViconTracking vicon("Beef0", "192.168.1.10");
+    ViconTracking vicon("Local1", "192.168.10.1");
 //    ofstream file_vicon("vicon.txt");
     ofstream file_icp("icp.txt");
+
+    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -126,6 +151,8 @@ int main( int argc, char* argv[] )
 
         if(go) {
             camera.Capture(img);
+            const bool newViconData = vicon.IsNewData();
+            const Sophus::SE3 T_wv = vicon.T_wf();
 
             // Save current as last
             pyrVprev.Swap(pyrV);
@@ -140,13 +167,17 @@ int main( int argc, char* argv[] )
                 NormalsFromVbo(pyrN[l], pyrV[l]);
             }
 
-            if( Pushed(reset) ) {
+            if( Pushed(reset) || frame == 0 ) {
                 T_wl = Sophus::SE3();
+                if(vicon.IsConnected()) {
+                    T_wl = vicon.T_wf();
+                }
             }
 
             if(pose_refinement) {
+                Sophus::SE3 T_pl;
+
                 if(frame > 0) {
-                    Sophus::SE3 T_pl;
     //                for(int l=MaxLevels-1; l >=0; --l)
                     {
                         const int l = show_level;
@@ -167,13 +198,30 @@ int main( int argc, char* argv[] )
                     }
 
                     T_wl = T_wl * T_pl;
-                    glcamera.SetPose(T_wl.matrix());
 
                     file_icp << SceneGraph::GLT2Cart(T_pl.matrix()).transpose() << endl;
                 }else{
                     file_icp << SceneGraph::GLT2Cart(Sophus::SE3().matrix()).transpose() << endl;
                 }
+
+
+                {
+                    // Add to pose graph
+                    Keyframe* kf = new Keyframe(T_wv);
+                    const int kfid = posegraph.AddKeyframe(kf);
+                    if(newViconData) {
+                        posegraph.AddUnaryEdge(kfid, T_wv);
+                    }
+                    if(kfid > 0 ) {
+                        posegraph.AddIndirectBinaryEdge(kfid-1, kfid, coord_z, T_pl );
+                    }
+                }
             }
+
+//            glcamera.SetPose(T_wl.matrix());
+            glcamera.SetPose(T_wv.matrix());
+            glvbo.SetPose(posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk().matrix());
+//            glvicon.SetPose(T_wv.matrix());
 
 //            if(frame==0 | Pushed(save_ref))
             {
@@ -204,4 +252,7 @@ int main( int argc, char* argv[] )
         glColor3f(1,1,1);
         pangolin::FinishGlutFrame();
     }
+
+    cout << posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk().matrix3x4() << endl;
+    posegraph.Stop();
 }

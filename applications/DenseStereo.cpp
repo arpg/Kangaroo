@@ -351,7 +351,7 @@ int main( int argc, char* argv[] )
     container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
 
-    for(unsigned long frame=0; !pangolin::ShouldQuit();)
+    for(int frame=0; !pangolin::ShouldQuit();)
     {
         const bool go = frame==0 || jump_frames > 0 || run || Pushed(step);
 

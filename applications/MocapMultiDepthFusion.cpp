@@ -61,7 +61,7 @@ typedef boost::ptr_map<std::string,Sensor> SensorPtrMap;
 
 int main( int argc, char* argv[] )
 {
-    pangolin::View& container = SetupPangoGLWithCuda(1024, 768);
+    pangolin::View& container = SetupPangoGLWithCuda(1024, 768, 180, __FILE__);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
     glDisable( GL_LIGHTING );
     glDisable( GL_COLOR_MATERIAL);

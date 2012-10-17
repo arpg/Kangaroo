@@ -23,9 +23,10 @@ int main( int /*argc*/, char* argv[] )
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    pangolin::OpenGlRenderState s_cam;
-    s_cam.SetProjectionMatrix(ProjectionMatrix(640,480,420,420,320,240,0.1,1000));
-    s_cam.SetModelViewMatrix(ModelViewLookAt(0,5,5,0,0,0,0,0,1));
+    pangolin::OpenGlRenderState s_cam(
+        ProjectionMatrix(640,480,420,420,320,240,0.1,1000),
+        ModelViewLookAt(0,5,5,0,0,0,0,0,1)
+    );
 
     View& d_cam = pangolin::CreateDisplay()
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
