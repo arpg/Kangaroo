@@ -88,6 +88,10 @@ int main( int argc, char* argv[] )
     Var<int> show_level("ui.Show Level", 1, 0, MaxLevels-1);
     Var<float> scale("ui.scale",0.0001, 0, 0.001);
 
+    Var<int> biwin("ui.size",10, 1, 20);
+    Var<float> bigs("ui.gs",10, 1E-3, 5);
+    Var<float> bigr("ui.gr",700, 1E-3, 200);
+
     Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<bool> reset("ui.reset", false, false);
     Var<float> icp_c("ui.icp c",0.5, 1E-3, 1);
@@ -126,10 +130,10 @@ int main( int argc, char* argv[] )
             // Save current as last
             pyrVprev.Swap(pyrV);
 
-            imgRGB.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
+//            imgRGB.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
             Gpu::ConvertImage<unsigned char, uchar3>(imgI, imgRGB);
             dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
-            BilateralFilter<float,unsigned short>(pyrD[0],dKinect,5,300,5,200);
+            BilateralFilter<float,unsigned short>(pyrD[0],dKinect,bigs,bigr,biwin,200);
             BoxReduceIgnoreInvalid<float,MaxLevels,float>(pyrD);
             for(int l=0; l<MaxLevels; ++l) {
                 DepthToVbo(pyrV[l], pyrD[l], dfl/(1<<l), dfl/(1<<l), w/(2 * 1<<l), h/(2 * 1<<l), 1.0f/1000.0f );
