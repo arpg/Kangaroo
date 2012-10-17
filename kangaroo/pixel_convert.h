@@ -51,6 +51,13 @@ uchar4 ConvertPixel(uchar3 p)
 
 template<>
 __host__ __device__ inline
+uchar4 ConvertPixel(float4 p)
+{
+    return make_uchar4(p.x*255,p.y*255,p.z*255,p.w*255);
+}
+
+template<>
+__host__ __device__ inline
 uchar3 ConvertPixel(uchar4 p)
 {
     return make_uchar3(p.x,p.y,p.z);

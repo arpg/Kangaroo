@@ -55,13 +55,13 @@ int main( int argc, char* argv[] )
     const int MaxLevels = 4;
 
     const double dfl = camera.GetProperty<double>("DepthFocalLength", 570.342);
-    const double ifl = dfl;
-    const double baseline = -camera.GetProperty<double>("RGBDepthBaseline", 80) / 1000.0;
 
-    Eigen::Matrix3d Krgb;
-    Krgb << ifl, 0, w/2.0,   0, ifl, h/2.0,  0,0,1;
-    const Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),Eigen::Vector3d(baseline,0,0)).inverse();
-    Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
+//    const double ifl = dfl;
+//    const double baseline = -camera.GetProperty<double>("RGBDepthBaseline", 80) / 1000.0;
+//    Eigen::Matrix3d Krgb;
+//    Krgb << ifl, 0, w/2.0,   0, ifl, h/2.0,  0,0,1;
+//    const Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),Eigen::Vector3d(baseline,0,0)).inverse();
+//    Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
     Image<uchar3, TargetDevice, Manage>  imgRGB(w,h);
@@ -140,10 +140,9 @@ int main( int argc, char* argv[] )
     Sophus::SE3 T_wl;
 
     ViconTracking vicon("Local1", "192.168.10.1");
-//    ofstream file_vicon("vicon.txt");
-    ofstream file_icp("icp.txt");
 
     pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
+    pangolin::RegisterKeyPressCallback('t', [&posegraph,coord_z]() {posegraph.SetSecondaryCoordinateFrameFree(coord_z);});
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
     {
@@ -198,12 +197,7 @@ int main( int argc, char* argv[] )
                     }
 
                     T_wl = T_wl * T_pl;
-
-                    file_icp << SceneGraph::GLT2Cart(T_pl.matrix()).transpose() << endl;
-                }else{
-                    file_icp << SceneGraph::GLT2Cart(Sophus::SE3().matrix()).transpose() << endl;
                 }
-
 
                 {
                     // Add to pose graph
@@ -227,7 +221,8 @@ int main( int argc, char* argv[] )
             {
                 CudaScopedMappedPtr var(cbo);
                 Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-                ColourVbo(dCbo, pyrV[0], imgRGB, KT_cd);
+                Gpu::ConvertImage<uchar4,float4>(dCbo,pyrN[0]);
+//                ColourVbo(dCbo, pyrV[0], imgRGB, KT_cd);
             }
 
 
@@ -253,6 +248,13 @@ int main( int argc, char* argv[] )
         pangolin::FinishGlutFrame();
     }
 
-    cout << posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk().matrix3x4() << endl;
     posegraph.Stop();
+
+    const Eigen::Matrix<double,6,1> cartT_vc = SceneGraph::GLT2Cart(posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk().matrix());
+    cout << cartT_vc << endl;
+
+    ofstream ft("f_T_vc.txt");
+    ft << dfl << endl;
+    ft << cartT_vc;
+    ft.close();
 }

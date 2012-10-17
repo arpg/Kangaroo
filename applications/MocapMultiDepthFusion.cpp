@@ -10,6 +10,7 @@
 #include <kangaroo/kangaroo.h>
 
 #include <SceneGraph/SceneGraph.h>
+#include <unsupported/Eigen/OpenGLSupport>
 
 using namespace std;
 
@@ -22,7 +23,18 @@ struct Sensor {
         :name(name), tracker(name, viconSharedConnection), w(w), h(h),
          vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW )
     {
-
+        ifstream ifs(name + "_f_T_vc.txt");
+        ifs >> fu;
+        fv = fu;
+        double x,y,z,p,q,r;
+        ifs >> x;
+        ifs >> y;
+        ifs >> z;
+        ifs >> p;
+        ifs >> q;
+        ifs >> r;
+        T_vs = SceneGraph::GLCart2T(x,y,z,p,q,r);
+        cout << SceneGraph::GLT2Cart(T_vs.matrix()) << endl;
     }
 
     std::string name;
@@ -30,6 +42,7 @@ struct Sensor {
     int w, h;
     pangolin::GlBufferCudaPtr vbo;
     Sophus::SE3 T_ws;
+    Sophus::SE3 T_vs;
     float fu,fv,u0,v0;
 };
 
@@ -42,6 +55,7 @@ struct GLSensor : public SceneGraph::GLObject {
     void DrawCanonicalObject()
     {
         glPushMatrix();
+//        glMultMatrixd(sensor.T_ws.matrix().data);
         glMultMatrixd(sensor.tracker.T_wf().matrix().data());
 
         // Just draw axis for time being
@@ -96,7 +110,7 @@ int main( int argc, char* argv[] )
         if(video.Capture(images)) {
             for(int ni=0; ni < images.size(); ni++) {
                 // Which camera did this come from
-                std::string sensor_name = images[ni].Map.GetProperty("DeviceName");
+                std::string sensor_name = images[ni].Map.GetProperty("DeviceName", "Local" + boost::lexical_cast<std::string>(ni) );
 
                 // Size of depthmap that this sensor will produce
                 const int dw = images[ni].Image.cols;
@@ -117,6 +131,8 @@ int main( int argc, char* argv[] )
 
                 Sensor& sensor = *it->second;
     //            cout << "Data from " << sensor.name << endl;
+
+                sensor.T_ws = sensor.tracker.T_wf() * sensor.T_vs;
 
                 // Update depth map. (lets assume we have a kinect for now)
                 imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[ni].Image);

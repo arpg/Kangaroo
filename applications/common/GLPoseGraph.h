@@ -14,6 +14,9 @@ public:
 
     void DrawCanonicalObject()
     {
+        glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT);
+        glDisable( GL_LIGHTING );
+
         // Draw each keyframe
         const int N = posegraph.keyframes.size();
         const int M = posegraph.coord_frames.size();
@@ -26,11 +29,13 @@ public:
                 const Keyframe& cf = posegraph.coord_frames[j];
                 glPushMatrix();
                 Eigen::glMultMatrix(cf.GetT_wk().matrix());
-                SceneGraph::GLAxis::DrawAxis(0.01);
+                SceneGraph::GLAxis::DrawAxis(0.05);
                 glPopMatrix();
             }
             glPopMatrix();
         }
+
+        glPopAttrib();
     }
 
     const PoseGraph& posegraph;
