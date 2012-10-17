@@ -47,7 +47,7 @@ int main( int argc, char* argv[] )
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
     Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
-    ActivateDrawImage<float> adg(depth, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
 
     SceneGraph::GLSceneGraph graph;
@@ -77,8 +77,6 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
-    float trunc_dist = 0.2;
-
     const float3 boxmax = make_float3(1,1,1);
     const float3 boxmin = make_float3(-1,-1,-1);
     Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
@@ -86,7 +84,10 @@ int main( int argc, char* argv[] )
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> sdfreset("ui.reset", false, false);
     Var<bool> sdfsphere("ui.sphere", false, false);
-    Var<bool> fuse("ui.fuse", false, false);
+    Var<bool> fuse("ui.fuse", false, true);
+    Var<bool> fuseonce("ui.fuse once", false, false);
+    Var<float> trunc_dist("ui.trunc dist", 0.3, 0,0.5);
+    Var<float> max_w("ui.max w", 10, 1, 100);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -115,9 +116,9 @@ int main( int argc, char* argv[] )
             glvbo.SetPose(T_cw.inverse().matrix());
         }
 
-        if(Pushed(fuse)) {
+        if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist );
+            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w );
         }
 
         /////////////////////////////////////////////////////////////

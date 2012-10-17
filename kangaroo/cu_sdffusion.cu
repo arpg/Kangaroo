@@ -10,7 +10,7 @@ namespace Gpu
 // Truncated SDF Fusion
 //////////////////////////////////////////////////////
 
-__global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist )
+__global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w )
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -30,29 +30,34 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
 
     if( 0 <= xy.x && xy.x < depth.w && 0 <= xy.y && xy.y < depth.h)
     {
-        const float vd = length(P_c);
-        const float md = depth.Get(xy.x, xy.y);
-        const float sd = md - vd;
+        const float vd = P_c.z;
+//        const float md = depth(xy.x, xy.y);
+        const float md = depth.GetBilinear<float>(p_c);
+        const float xoz = P_c.x/P_c.z;
+        const float yoz = P_c.y/P_c.z;
+        const float sd = (md - vd) * sqrt(1 + xoz*xoz + yoz*yoz);
 
 //        const float dist = length(P_w - make_float3(0,0,0));
 //        vol(x,y,z) = SDF_t(dist - 0.95);
 
-        if(sd < -trunc_dist) {
+        if(sd <= -trunc_dist) {
             // Further than truncation distance from surface
             // We do nothing.
         }else{
-            const float val = fminf(1, sd / trunc_dist) * (sd / abs(sd));
-            const SDF_t current = vol(x,y,z);
-            vol(x,y,z) = SDF_t(val);
+            SDF_t sdf = SDF_t( fminf(1, sd / trunc_dist), 1) + vol(x,y,z);
+            sdf.val = clamp(-1.0f, 1.0f, sdf.val);
+            sdf.w   = fminf(sdf.w, max_w);
+            vol(x,y,z) = sdf;
         }
     }
  }
 
-void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist )
+using namespace std;
+void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w )
 {
     dim3 blockDim(8,8,8);
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-    KernSdfFuse<<<gridDim,blockDim>>>(vol, vol_min, vol_max, depth, T_cw, fu, fv, u0, v0, trunc_dist);
+    KernSdfFuse<<<gridDim,blockDim>>>(vol, vol_min, vol_max, depth, T_cw, fu, fv, u0, v0, trunc_dist, max_w);
 }
 
 //////////////////////////////////////////////////////
