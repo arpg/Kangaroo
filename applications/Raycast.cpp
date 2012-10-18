@@ -53,7 +53,7 @@ int main( int argc, char* argv[] )
 
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1,1E3),
-        ModelViewLookAtRDF(0,0,0,0,0,1,0,-1,0)
+        ModelViewLookAtRDF(0,0,-4,0,0,0,0,-1,0)
     );
 
     Handler3DGpuDepth handler(depth,s_cam, AxisNone);
@@ -75,7 +75,7 @@ int main( int argc, char* argv[] )
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
         {
-            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, 1E10, subpix );
+            Gpu::RaycastSdf(depth, norm, img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, 1E10, subpix );
         }
 
         /////////////////////////////////////////////////////////////

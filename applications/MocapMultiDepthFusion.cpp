@@ -1,6 +1,8 @@
 #include "common/ViconTracker.h"
 #include "common/BaseDisplayCuda.h"
 #include "common/RpgCameraOpen.h"
+#include "common/Handler3dGpuDepth.h"
+#include "common/ImageSelect.h"
 
 #include <boost/ptr_container/ptr_map.hpp>
 
@@ -66,23 +68,6 @@ int main( int argc, char* argv[] )
     glDisable( GL_LIGHTING );
     glDisable( GL_COLOR_MATERIAL);
 
-    SceneGraph::GLSceneGraph graph;
-    SceneGraph::GLGrid glGrid(10,1,false);
-    SceneGraph::GLAxis glAxis;
-    graph.AddChild(&glGrid);
-    graph.AddChild(&glAxis);
-
-    pangolin::OpenGlRenderState s_cam(
-        pangolin::ProjectionMatrix(640,480,420,420,320,240,0.1,1000),
-        pangolin::ModelViewLookAt(0,5,5,0,0,0,0,0,1)
-    );
-
-    SetupContainer(container, 1, 640.0f/480.0f);
-    container[0].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
-                .SetHandler( new SceneGraph::HandlerSceneGraph(graph,s_cam, pangolin::AxisZ) );
-
-    SensorPtrMap sensors;
-
     CameraDevice video = OpenRpgCamera(argc,argv,1);
     std::vector<rpg::ImageWrapper> images;
 
@@ -91,11 +76,50 @@ int main( int argc, char* argv[] )
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgv(MaxWidth,MaxHeight);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgn(MaxWidth,MaxHeight);
 
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  rayi(MaxWidth,MaxHeight);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  rayd(MaxWidth,MaxHeight);
+    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> rayn(MaxWidth,MaxHeight);
+
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
+    const float3 boxmax = make_float3(1,1,2);
+    const float3 boxmin = make_float3(-1,-1,0);
+    const float3 boxsize = boxmax - boxmin;
+    const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
+    Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,1), 0.9 );
+
+    SceneGraph::GLSceneGraph graph;
+    SceneGraph::GLGrid glGrid(10,1,false);
+    SceneGraph::GLAxis glAxis;
+    SceneGraph::GLAxisAlignedBox glbbox;
+    glbbox.SetBounds(boxmin.x,boxmin.y,boxmin.z,boxmax.x,boxmax.y,boxmax.z);
+    graph.AddChild(&glGrid);
+    graph.AddChild(&glAxis);
+    graph.AddChild(&glbbox);
+
+    pangolin::OpenGlRenderState s_cam(
+        pangolin::ProjectionMatrix(640,480,420,420,320,240,0.1,1000),
+        pangolin::ModelViewLookAt(0,5,5,0,0,0,0,0,1)
+    );
+
+    SetupContainer(container, 3, 640.0f/480.0f);
+    Handler3DGpuDepth handler(rayd, s_cam, pangolin::AxisZ);
+    pangolin::ActivateDrawImage<float> adrayi(rayi, GL_LUMINANCE32F_ARB, true, true);
+    pangolin::ActivateDrawImage<float4> adrayn(rayn, GL_RGBA32F, true, true);
+    container[0].SetDrawFunction(boost::ref(adrayi)).SetHandler(&handler);
+    container[1].SetDrawFunction(boost::ref(adrayn)).SetHandler(&handler);
+    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
+                .SetHandler( new SceneGraph::HandlerSceneGraph(graph,s_cam, pangolin::AxisZ) );
+
+    SensorPtrMap sensors;
+
     ViconConnection vicon(ViconIp);
 
     pangolin::Var<int> biwin("ui.size",10, 1, 20);
     pangolin::Var<float> bigs("ui.gs",10, 1E-3, 5);
     pangolin::Var<float> bigr("ui.gr",700, 1E-3, 200);
+
+    pangolin::Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    pangolin::Var<float> max_w("ui.max w", 10, 1E-4, 10);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -143,6 +167,12 @@ int main( int argc, char* argv[] )
                     dCbo.CopyFrom(imgn);
                 }
             }
+        }
+
+        // Raycast current view
+        {
+            Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
+            Gpu::RaycastSdf(rayd, rayn, rayi, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, trunc_dist, true );
         }
 
         // Render stuff
