@@ -46,8 +46,8 @@ int main( int argc, char* argv[] )
     pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
 
 //    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(8,8,8);
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
-//    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
+//    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(256,256,256);
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
 
@@ -80,14 +80,17 @@ int main( int argc, char* argv[] )
 
     const float3 boxmax = make_float3(1,1,1);
     const float3 boxmin = make_float3(-1,-1,-1);
+    const float3 boxsize = boxmax - boxmin;
+    const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
     Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> sdfreset("ui.reset", false, false);
+    Var<int>  shape("ui.shape", 0, 0,1);
     Var<bool> sdfsphere("ui.sphere", false, false);
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> fuseonce("ui.fuse once", false, false);
-    Var<float> trunc_dist("ui.trunc dist", 0.3, 0,0.5);
+    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
@@ -105,12 +108,16 @@ int main( int argc, char* argv[] )
 
         // Raycast current view
         {
-            Gpu::Raycast(depth, norm, img, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, trunc_dist, subpix );
+            Gpu::RaycastSdf(depth, norm, img, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, trunc_dist, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
         {
-            Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(0,0,0), 0.9);
+            if(shape == 0) {
+                Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9) );
+            }else if(shape ==1) {
+                Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(0,0,0), 0.9);
+            }
             CudaScopedMappedPtr dvbo(vbo);
             Gpu::Image<float4> vboimg((float4*)*dvbo,w,h);
             Gpu::DepthToVbo(vboimg, gtd, fu,fv,u0,v0, 1.0f);

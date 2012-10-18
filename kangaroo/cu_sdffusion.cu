@@ -46,8 +46,8 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
         }else{
             if(isfinite(w) && w > 0.5 ) {
 //                SDF_t sdf = SDF_t( fminf(1, sd / trunc_dist), w) + vol(x,y,z);
-                SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
 //                sdf.val = clamp(-1.0f, 1.0f, sdf.val);
+                SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
                 sdf.val = clamp(-trunc_dist, trunc_dist, sdf.val);
                 sdf.w   = fminf(sdf.w, max_w);
                 vol(x,y,z) = sdf;
