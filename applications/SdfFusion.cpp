@@ -41,6 +41,7 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> depth(w,h);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> norm(w,h);
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> gtd(w,h);
+    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> gtn(w,h);
 
     pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
 
@@ -87,7 +88,7 @@ int main( int argc, char* argv[] )
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> fuseonce("ui.fuse once", false, false);
     Var<float> trunc_dist("ui.trunc dist", 0.3, 0,0.5);
-    Var<float> max_w("ui.max w", 10, 1, 100);
+    Var<float> max_w("ui.max w", 10, 1E-4, 10);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -113,12 +114,13 @@ int main( int argc, char* argv[] )
             CudaScopedMappedPtr dvbo(vbo);
             Gpu::Image<float4> vboimg((float4*)*dvbo,w,h);
             Gpu::DepthToVbo(vboimg, gtd, fu,fv,u0,v0, 1.0f);
+            Gpu::NormalsFromVbo(gtn,vboimg);
             glvbo.SetPose(T_cw.inverse().matrix());
         }
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w );
+            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w );
         }
 
         /////////////////////////////////////////////////////////////

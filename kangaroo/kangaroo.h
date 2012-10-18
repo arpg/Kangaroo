@@ -434,7 +434,7 @@ void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, floa
 
 //////////////////////////////////////////////////////
 
-void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float maxw );
+void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float maxw );
 
 void SdfReset(Volume<SDF_t> vol, float trunc_dist);
 
