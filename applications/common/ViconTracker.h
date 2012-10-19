@@ -3,6 +3,7 @@
 #include <vrpn_Tracker.h>
 #include <quat.h>
 #include <sophus/se3.h>
+#include <Eigen/Eigen>
 #include <Eigen/Geometry>
 #include <boost/thread.hpp>
 
@@ -47,7 +48,8 @@ class ViconTracking
 {
 public:
     ViconTracking( std::string objectName, std::string host)
-        : m_connected(false), m_newdata(false), m_run(false), m_recordHistory(false)
+        : m_workspace_min(0,0,0), m_workspace_max(0,0,0), m_workspace_size(0,0,0),
+          m_connected(false), m_newdata(false), m_run(false), m_recordHistory(false)
     {
         const std::string uri = objectName + "@" + host;
         m_object = new vrpn_Tracker_Remote( uri.c_str() );
@@ -66,14 +68,17 @@ public:
     inline void RegisterHandlers() {
         m_object->shutup = true;
         m_object->register_change_handler(this, &ViconTracking::pose_callback );
-//        m_object->register_change_handler(this, &ViconTracking::velocity_callback );
-//        m_object->register_change_handler(this, &ViconTracking::workspace_callback );
+        m_object->register_change_handler(this, &ViconTracking::velocity_callback );
+        m_object->register_change_handler(this, &ViconTracking::workspace_callback );
+        m_object->request_t2r_xform();
+        m_object->request_u2s_xform();
+        m_object->request_workspace();
     }
 
     inline void UnregisterHandlers() {
         m_object->unregister_change_handler(this, &ViconTracking::pose_callback );
-//        m_object->register_change_handler(this, &ViconTracking::velocity_callback );
-//        m_object->register_change_handler(this, &ViconTracking::workspace_callback );
+        m_object->register_change_handler(this, &ViconTracking::velocity_callback );
+        m_object->register_change_handler(this, &ViconTracking::workspace_callback );
     }
 
     ~ViconTracking()
@@ -81,6 +86,18 @@ public:
         StopThread();
         UnregisterHandlers();
         delete m_object;
+    }
+
+    inline const Eigen::Vector3d& WorkspaceMin() {
+        return m_workspace_min;
+    }
+
+    inline const Eigen::Vector3d& WorkspaceMax() {
+        return m_workspace_max;
+    }
+
+    inline const Eigen::Vector3d& WorkspaceSize() {
+        return m_workspace_size;
     }
 
     inline const Sophus::SE3& T_wf()
@@ -131,34 +148,35 @@ public:
         }
     }
 
+    inline void TrackingEvent(const vrpn_TRACKERVELCB tData )
+    {
+        std::cout << "Velocity event" << std::endl;
+    }
+
+    inline void TrackingEvent(const vrpn_TRACKERWORKSPACECB tData )
+    {
+        m_workspace_min = Eigen::Map<const Eigen::Vector3d>(tData.workspace_min);
+        m_workspace_max = Eigen::Map<const Eigen::Vector3d>(tData.workspace_max);
+        m_workspace_size = m_workspace_max - m_workspace_min;
+    }
+
     static void VRPN_CALLBACK pose_callback(void* userData, const vrpn_TRACKERCB tData )
     {
         ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
         self->TrackingEvent(tData);
     }
 
-//    inline void TrackingEvent(const vrpn_TRACKERVELCB tData )
-//    {
-//        std::cout << "Velocity event" << std::endl;
-//    }
+    static void VRPN_CALLBACK velocity_callback(void* userData, const vrpn_TRACKERVELCB tData )
+    {
+        ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
+        self->TrackingEvent(tData);
+    }
 
-//    static void VRPN_CALLBACK velocity_callback(void* userData, const vrpn_TRACKERVELCB tData )
-//    {
-//        ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
-//        self->TrackingEvent(tData);
-//    }
-
-//    inline void TrackingEvent(const vrpn_TRACKERWORKSPACECB tData )
-//    {
-//        std::cout << "Workspace event" << std::endl;
-//    }
-
-//    static void VRPN_CALLBACK workspace_callback(void* userData, const vrpn_TRACKERWORKSPACECB tData )
-//    {
-//        ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
-//        self->TrackingEvent(tData);
-//    }
-
+    static void VRPN_CALLBACK workspace_callback(void* userData, const vrpn_TRACKERWORKSPACECB tData )
+    {
+        ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
+        self->TrackingEvent(tData);
+    }
 
 protected:
     void EventLoop() {
@@ -179,6 +197,10 @@ protected:
         m_run = false;
         m_event_thread.join();
     }
+
+    Eigen::Vector3d m_workspace_min;
+    Eigen::Vector3d m_workspace_max;
+    Eigen::Vector3d m_workspace_size;
 
     Sophus::SE3 m_T_wf;
     std::vector<Sophus::SE3> m_vecT_wf;

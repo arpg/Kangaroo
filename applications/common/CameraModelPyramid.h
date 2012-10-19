@@ -90,6 +90,15 @@ inline Eigen::Matrix3d MakeK(float fu, float fv, float u0, float v0)
     return K;
 }
 
+inline Eigen::Matrix3d MakeKinv(float fu, float fv, float u0, float v0)
+{
+    Eigen::Matrix3d K;
+    K << 1.0/fu, 0, -u0/fu,
+         0, 1.0/fv, -v0/fv,
+         0,0,1;
+    return K;
+}
+
 inline Eigen::Matrix3d MakeKinv(const Eigen::Matrix3d& K)
 {
     Eigen::Matrix3d Kinv = Eigen::Matrix3d::Identity();

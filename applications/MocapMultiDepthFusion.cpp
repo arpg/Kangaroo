@@ -3,6 +3,9 @@
 #include "common/RpgCameraOpen.h"
 #include "common/Handler3dGpuDepth.h"
 #include "common/ImageSelect.h"
+#include "common/CameraModelPyramid.h"
+#include "common/CVarHelpers.h"
+#include <CVars/CVar.h>
 
 #include <boost/ptr_container/ptr_map.hpp>
 
@@ -19,6 +22,24 @@ using namespace std;
 const std::string ViconIp = "192.168.10.1";
 const int MaxWidth = 640;
 const int MaxHeight = 480;
+const int w = MaxWidth;
+const int h = MaxHeight;
+
+namespace CVarUtils {
+    inline std::ostream& operator<<( std::ostream& Stream, const SceneGraph::GLObject& object )
+    {
+        CVarUtils::operator <<(Stream, object.GetPose());
+        return Stream;
+    }
+
+    inline std::istream& operator>>( std::istream& Stream, SceneGraph::GLObject& object )
+    {
+        Eigen::Matrix<double,6,1> pose;
+        CVarUtils::operator >>(Stream, pose);
+        object.SetPose(pose);
+        return Stream;
+    }
+}
 
 struct Sensor {
     Sensor(std::string name, ViconConnection& viconSharedConnection, int w, int h)
@@ -28,23 +49,24 @@ struct Sensor {
     {
         u0 = w/2.0f;
         v0 = h/2.0f;
-        ifstream ifs(name + "_f_T_vc.txt");
-        ifs >> fu;
-        fv = fu;
-        double x,y,z,p,q,r;
-        ifs >> x;
-        ifs >> y;
-        ifs >> z;
-        ifs >> p;
-        ifs >> q;
-        ifs >> r;
 
         glT_wv = new SceneGraph::GLAxis(0.1);
-        glT_vs = new SceneGraph::GLMovableAxis();
-        glT_vs->SetPose(SceneGraph::GLCart2T(x,y,z,p,q,r));
+        glT_vs = new SceneGraph::GLMovableAxis(0.001,false,false);
+        glplane = new SceneGraph::GLGrid(10,1,false);
+        glxytheta = new SceneGraph::GLWayPoint();
+        glxytheta->ClampToPlane(Eigen::Vector4d(0,0,1,0));
+
+//        glT_vs->SetPose(SceneGraph::GLCart2T(x,y,z,p,q,r));
         glvbo  = new SceneGraph::GLVbo(&vbo,0, &cbo);
         glT_wv->AddChild(glT_vs);
         glT_vs->AddChild(glvbo);
+//        glT_vs->AddChild(glplane);
+
+        nd_c << 0, 0, -1;
+
+        CVarUtils::AttachCVar<SceneGraph::GLObject>("pose_"+name, glxytheta);
+        CVarUtils::AttachCVar<Eigen::Vector3d>("plane_"+name, &nd_c);
+
     }
 
     std::string name;
@@ -54,9 +76,13 @@ struct Sensor {
     pangolin::GlBufferCudaPtr cbo;
     float fu,fv,u0,v0;
 
+    Eigen::Vector3d nd_c;
+
     SceneGraph::GLAxis* glT_wv;
     SceneGraph::GLMovableAxis* glT_vs;
     SceneGraph::GLVbo* glvbo;
+    SceneGraph::GLGrid* glplane;
+    SceneGraph::GLWayPoint* glxytheta;
 };
 
 typedef boost::ptr_map<std::string,Sensor> SensorPtrMap;
@@ -75,21 +101,21 @@ int main( int argc, char* argv[] )
     Gpu::Image<float,  Gpu::TargetDevice, Gpu::Manage> imgf(MaxWidth,MaxHeight);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgv(MaxWidth,MaxHeight);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgn(MaxWidth,MaxHeight);
-
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  rayi(MaxWidth,MaxHeight);
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  rayd(MaxWidth,MaxHeight);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> rayn(MaxWidth,MaxHeight);
+    Gpu::Image<unsigned char,Gpu::TargetDevice,Gpu::Manage> scratch(MaxWidth*sizeof(Gpu::LeastSquaresSystem<float,6>),MaxHeight);
+    Gpu::Image<float,Gpu::TargetDevice,Gpu::Manage>  imgerr(w,h);
 
-    const int res = 256;
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(res,res,res);
-    const float3 boxmax = make_float3(1,1,2);
-    const float3 boxmin = make_float3(-1,-1,0);
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(4*64,4*64,2*64);
+    const float3 boxmax = make_float3(2,2,1.8);
+    const float3 boxmin = make_float3(-2,-2,-0.2);
     const float3 boxsize = boxmax - boxmin;
     const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
     Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,1), 0.9 );
 
     SceneGraph::GLSceneGraph graph;
-    SceneGraph::GLGrid glGrid(10,1,false);
+    SceneGraph::GLGrid glGrid(10,1,true);
     SceneGraph::GLAxis glAxis;
     SceneGraph::GLAxisAlignedBox glbbox;
     glbbox.SetBounds(boxmin.x,boxmin.y,boxmin.z,boxmax.x,boxmax.y,boxmax.z);
@@ -115,9 +141,9 @@ int main( int argc, char* argv[] )
 
     ViconConnection vicon(ViconIp);
 
-    pangolin::Var<int> only("ui.only",-1, -1, 2);
+    pangolin::Var<int> only("ui.only",-1, -1, 3);
     pangolin::Var<bool> fuse("ui.fuse", false, true);
-    pangolin::Var<bool> fuseonce("ui.fuse once", false, false);
+    pangolin::Var<bool> fuseonce("ui.fuse_once", false, false);
 
     pangolin::Var<bool> sdfreset("ui.reset", false, false);
     pangolin::Var<bool> sdfsphere("ui.sphere", false, false);
@@ -126,9 +152,13 @@ int main( int argc, char* argv[] )
     pangolin::Var<float> bigs("ui.gs",10, 1E-3, 5);
     pangolin::Var<float> bigr("ui.gr",700, 1E-3, 200);
 
-    pangolin::Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
-    pangolin::Var<float> max_w("ui.max w", 10, 1E-4, 10);
-    pangolin::Var<float> mincostheta("ui.min cos theta", 0.5, 0, 1);
+    pangolin::Var<float> trunc_dist("ui.trunc_dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    pangolin::Var<float> max_w("ui.max_w", 10, 1E-4, 10);
+    pangolin::Var<float> mincostheta("ui.min_cos_theta", 0.5, 0, 1);
+
+    pangolin::Var<bool> plane_do("ui.Compute_Ground_Plane", false, true);
+    pangolin::Var<float> plane_maxz("ui.Plane_Within",20, 0.1, 100);
+    pangolin::Var<float> plane_c("ui.Plane_c", 0.5, 0.0001, 1);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -138,6 +168,34 @@ int main( int argc, char* argv[] )
 
         if(Pushed(sdfsphere)) {
             Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,1), 0.9 );
+        }
+
+        if(plane_do) {
+            int ni = 0;
+            for(SensorPtrMap::iterator si= sensors.begin(); si != sensors.end(); si++) {
+                if(only >-1 && only != ni++) continue;
+                Sensor& sensor = *si->second;
+                pangolin::CudaScopedMappedPtr var(sensor.vbo);
+                Gpu::Image<float4> imgvbo((float4*)*var, sensor.w, sensor.h);
+
+                Eigen::Matrix3d U; U << sensor.w, 0, sensor.w,  sensor.h/2, sensor.h, sensor.h,  1, 1, 1;
+                Eigen::Matrix3d Q = -(MakeKinv(sensor.fu,sensor.fv,sensor.u0,sensor.v0) * U).transpose();
+                Eigen::Matrix3d Qinv = Q.inverse();
+                Eigen::Vector3d plane_invz = Q * sensor.nd_c;
+
+                for(int i=0; i<5; ++i )
+                {
+                    Gpu::LeastSquaresSystem<float,3> lss = Gpu::PlaneFitGN(imgvbo, Qinv, plane_invz, scratch, imgerr, 0.2, plane_maxz, plane_c);
+                    Eigen::FullPivLU<Eigen::Matrix3d> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
+                    Eigen::Vector3d x = -1.0 * lu_JTJ.solve( (Eigen::Vector3d)lss.JTy );
+                    if( x.norm() > 1 ) x = x / x.norm();
+                    for(int i=0; i<3; ++i ) {
+                        plane_invz(i) *= exp(x(i));
+                    }
+                    sensor.nd_c = Qinv * plane_invz;
+                    sensor.glplane->SetPlane(sensor.nd_c);
+                }
+            }
         }
 
         if(video.Capture(images)) {
@@ -160,13 +218,29 @@ int main( int argc, char* argv[] )
                     Sensor* newsensor = new Sensor(sensor_name, vicon, dw,dh);
                     it = sensors.insert(sensor_name, newsensor ).first;
 
+                    newsensor->fu = video.GetProperty<float>("Depth" +  boost::lexical_cast<std::string>(ni) + "FocalLength",0);
+                    newsensor->fv = newsensor->fu;
+
                     // add to posegraph
                     graph.AddChild(newsensor->glT_wv);
+                    graph.AddChild(newsensor->glxytheta);
                 }
 
                 Sensor& sensor = *it->second;
 
-                sensor.glT_wv->SetPose(sensor.tracker.T_wf().matrix());
+//                // Set from vicon
+//                sensor.glT_wv->SetPose(sensor.tracker.T_wf().matrix());
+
+                // Set based on waypoint
+                double d_c = 1.0 / sensor.nd_c.norm();
+                Eigen::Vector3d n_c = d_c * sensor.nd_c;
+                sensor.glT_vs->SetPose(0,0,0,0,0,0);
+                Eigen::Matrix4d T_wc = sensor.glxytheta->GetPose4x4_po();
+                T_wc(2,3) = d_c;
+                Eigen::Matrix4d T_cc = Eigen::Matrix4d::Identity();
+                T_cc.block<3,3>(0,0) = SceneGraph::Rotation_a2b(n_c, Eigen::Vector3d(0,0,1) );
+                T_wc = T_wc * T_cc;
+                sensor.glT_wv->SetPose(T_wc);
 
                 // Update depth map. (lets assume we have a kinect for now)
                 imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[ni].Image);
@@ -177,7 +251,7 @@ int main( int argc, char* argv[] )
 
                 if(Pushed(fuseonce) || fuse) {
                     // integrate gtd into TSDF
-                    Eigen::Matrix<double,3,4> T_cw = (sensor.tracker.T_wf() * Sophus::SE3(sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
+                    Eigen::Matrix<double,3,4> T_cw = (Sophus::SE3(sensor.glT_wv->GetPose4x4_po() * sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
                     Gpu::SdfFuse(vol, boxmin, boxmax, imgf, imgn, T_cw, sensor.fu, sensor.fv, sensor.u0, sensor.v0, trunc_dist, max_w, mincostheta );
                 }
 
@@ -200,6 +274,14 @@ int main( int argc, char* argv[] )
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
             Gpu::RaycastSdf(rayd, rayn, rayi, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, trunc_dist, true );
         }
+
+        int sn = 0;
+        for(SensorPtrMap::iterator si= sensors.begin(); si != sensors.end(); si++) {
+            Sensor& sensor = *si->second;
+            sensor.glT_wv->SetVisible(only==-1 || only==sn);
+            sn++;
+        }
+
 
         // Render stuff
         glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);

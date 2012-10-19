@@ -213,8 +213,8 @@ struct Volume
         const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 
         const int ix = fmaxf(fminf(w-2, floorf(pf.x) ), 0);
-        const int iy = fmaxf(fminf(w-2, floorf(pf.y) ), 0);
-        const int iz = fmaxf(fminf(w-2, floorf(pf.z) ), 0);
+        const int iy = fmaxf(fminf(h-2, floorf(pf.y) ), 0);
+        const int iz = fmaxf(fminf(d-2, floorf(pf.z) ), 0);
         const float fx = pf.x - ix;
         const float fy = pf.y - iy;
         const float fz = pf.z - iz;
@@ -256,8 +256,8 @@ struct Volume
         const float3 pf = pos * make_float3(w-1.f, h-1.f, d-1.f);
 
         const int ix = fmaxf(fminf(w-2, floorf(pf.x) ), 1);
-        const int iy = fmaxf(fminf(w-2, floorf(pf.y) ), 1);
-        const int iz = fmaxf(fminf(w-2, floorf(pf.z) ), 1);
+        const int iy = fmaxf(fminf(h-2, floorf(pf.y) ), 1);
+        const int iz = fmaxf(fminf(d-2, floorf(pf.z) ), 1);
 //        const int ix = floorf(pf.x);
 //        const int iy = floorf(pf.y);
 //        const int iz = floorf(pf.z);

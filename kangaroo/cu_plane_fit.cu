@@ -5,7 +5,7 @@
 namespace Gpu
 {
 
-__global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<LeastSquaresSystem<float,3> > dSum, Image<float> dErr, float within, float c )
+__global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<LeastSquaresSystem<float,3> > dSum, Image<float> dErr, float zmin, float zmax, float c )
 {
     const unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -14,7 +14,7 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
     __shared__ SumLeastSquaresSystem<float,3,32,32> lss;
     LeastSquaresSystem<float,3>& sum = lss.ThisObs();
 
-    if( isfinite(P.z) && length(P) < within ) {
+    if( isfinite(P.z) && zmin < P.z && P.z < zmax ) {
         const Mat<float,3,1> nhat = Qinv * zhat;
         const float dinv = sqrt(nhat * nhat);
         const float d = 1.0 / dinv;
@@ -47,13 +47,13 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
     lss.ReducePutBlock(dSum);
 }
 
-LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<unsigned char> dWorkspace, Image<float> dErr, float within, float c )
+LeastSquaresSystem<float,3> PlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<unsigned char> dWorkspace, Image<float> dErr, float zmin, float zmax, float c )
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim, gridDim, dVbo, 32, 32);
 
     HostSumLeastSquaresSystem<float,3> lss(dWorkspace, blockDim, gridDim);
-    KernPlaneFitGN<<<gridDim,blockDim>>>(dVbo, Qinv, zhat, lss.LeastSquareImage(), dErr, within, c );
+    KernPlaneFitGN<<<gridDim,blockDim>>>(dVbo, Qinv, zhat, lss.LeastSquareImage(), dErr, zmin, zmax, c );
     return lss.FinalSystem();
 }
 
