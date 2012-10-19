@@ -455,7 +455,7 @@ int main(int argc, char** argv)
         }
         else if( string(argv[i]) == "-sq" )
         {
-            if( sscanf(argv[++i], "%d", &squareLength) != 1 || squareLength <= 0 )
+            if( sscanf(argv[++i], "%f", &squareLength) != 1 || squareLength <= 0 )
             {
                 cout << "invalid square length" << endl;
                 return print_help();

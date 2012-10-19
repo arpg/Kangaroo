@@ -69,8 +69,8 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
         const float3 p_c = depth * ray_c;
 
         if(depth > 0 ) {
-            const float lambient = 0.1;
-            const float diffuse = 0.9;
+            const float ambient = 0.2;
+            const float diffuse = 0.8;
             const float specular = 0.1;
             const float3 eyedir = -1.0f * p_c / length(p_c);
             const float3 _lightdir = make_float3(0.4,0.4,-1);
@@ -81,7 +81,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 
 //          img(u,v) = (depth - near) / (far - near);
             imgdepth(u,v) = depth;
-            img(u,v) = lambient + diffuse * dot(n_c, lightdir )  + specular * spec;
+            img(u,v) = ambient + diffuse * dot(n_c, lightdir )  + specular * spec;
             norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
         }else{
             imgdepth(u,v) = 0.0f/0.0f;
@@ -94,8 +94,9 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
 {    
     dim3 blockDim, gridDim;
-    InitDimFromOutputImageOver(blockDim, gridDim, img);
+    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
     KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
+    GpuCheckErrors();
 }
 
 //////////////////////////////////////////////////////
@@ -124,6 +125,7 @@ void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, floa
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, depth);
     KernRaycastSphere<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, center, r);
+    GpuCheckErrors();
 }
 
 //////////////////////////////////////////////////////
@@ -167,6 +169,7 @@ void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float f
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, depth);
     KernRaycastBox<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, boxmin, boxmax);
+    GpuCheckErrors();
 }
 
 }

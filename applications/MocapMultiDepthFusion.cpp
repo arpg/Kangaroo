@@ -80,7 +80,8 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  rayd(MaxWidth,MaxHeight);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> rayn(MaxWidth,MaxHeight);
 
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(64,64,64);
+    const int res = 256;
+    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(res,res,res);
     const float3 boxmax = make_float3(1,1,2);
     const float3 boxmin = make_float3(-1,-1,0);
     const float3 boxsize = boxmax - boxmin;
@@ -97,22 +98,29 @@ int main( int argc, char* argv[] )
     graph.AddChild(&glbbox);
 
     pangolin::OpenGlRenderState s_cam(
-        pangolin::ProjectionMatrix(640,480,420,420,320,240,0.1,1000),
-        pangolin::ModelViewLookAt(0,5,5,0,0,0,0,0,1)
+        pangolin::ProjectionMatrixRDF_TopLeft(640,480,420,420,320,240,0.1,1000),
+        pangolin::ModelViewLookAtRDF(0,5,5,0,0,0,0,0,1)
     );
 
-    SetupContainer(container, 3, 640.0f/480.0f);
-    Handler3DGpuDepth handler(rayd, s_cam, pangolin::AxisZ);
+    SetupContainer(container, 3, (float)MaxWidth / (float)MaxHeight);
+    Handler3DGpuDepth handler(rayd, s_cam);
     pangolin::ActivateDrawImage<float> adrayi(rayi, GL_LUMINANCE32F_ARB, true, true);
     pangolin::ActivateDrawImage<float4> adrayn(rayn, GL_RGBA32F, true, true);
     container[0].SetDrawFunction(boost::ref(adrayi)).SetHandler(&handler);
     container[1].SetDrawFunction(boost::ref(adrayn)).SetHandler(&handler);
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
-                .SetHandler( new SceneGraph::HandlerSceneGraph(graph,s_cam, pangolin::AxisZ) );
+                .SetHandler( new SceneGraph::HandlerSceneGraph(graph,s_cam) );
 
     SensorPtrMap sensors;
 
     ViconConnection vicon(ViconIp);
+
+    pangolin::Var<int> only("ui.only",-1, -1, 2);
+    pangolin::Var<bool> fuse("ui.fuse", false, true);
+    pangolin::Var<bool> fuseonce("ui.fuse once", false, false);
+
+    pangolin::Var<bool> sdfreset("ui.reset", false, false);
+    pangolin::Var<bool> sdfsphere("ui.sphere", false, false);
 
     pangolin::Var<int> biwin("ui.size",10, 1, 20);
     pangolin::Var<float> bigs("ui.gs",10, 1E-3, 5);
@@ -120,11 +128,22 @@ int main( int argc, char* argv[] )
 
     pangolin::Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
     pangolin::Var<float> max_w("ui.max w", 10, 1E-4, 10);
+    pangolin::Var<float> mincostheta("ui.min cos theta", 0.5, 0, 1);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
+        if(Pushed(sdfreset)) {
+            Gpu::SdfReset(vol, trunc_dist);
+        }
+
+        if(Pushed(sdfsphere)) {
+            Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,1), 0.9 );
+        }
+
         if(video.Capture(images)) {
             for(int ni=0; ni < images.size(); ni++) {
+                if(only >-1 && only != ni) continue;
+
                 // Which camera did this come from
                 std::string sensor_name = images[ni].Map.GetProperty("DeviceName", "Local" + boost::lexical_cast<std::string>(ni) );
 
@@ -152,8 +171,15 @@ int main( int argc, char* argv[] )
                 // Update depth map. (lets assume we have a kinect for now)
                 imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[ni].Image);
                 Gpu::BilateralFilter<float,unsigned short>(imgf,imgd,bigs,bigr,biwin,200);
-                Gpu::DepthToVbo(imgv, imgf, sensor.fu, sensor.fv, sensor.u0, sensor.v0, 1.0f/1000.0f );
+                Gpu::ElementwiseScaleBias<float,float,float>(imgf,imgf, 1.0f/1000.0f);
+                Gpu::DepthToVbo(imgv, imgf, sensor.fu, sensor.fv, sensor.u0, sensor.v0 );
                 Gpu::NormalsFromVbo(imgn, imgv);
+
+                if(Pushed(fuseonce) || fuse) {
+                    // integrate gtd into TSDF
+                    Eigen::Matrix<double,3,4> T_cw = (sensor.tracker.T_wf() * Sophus::SE3(sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
+                    Gpu::SdfFuse(vol, boxmin, boxmax, imgf, imgn, T_cw, sensor.fu, sensor.fv, sensor.u0, sensor.v0, trunc_dist, max_w, mincostheta );
+                }
 
                 {
                     pangolin::CudaScopedMappedPtr var(sensor.vbo);

@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "Volume.h"
 #include "Sdf.h"
+#include "launch_utils.h"
 
 namespace Gpu
 {
@@ -10,7 +11,7 @@ namespace Gpu
 // Truncated SDF Fusion
 //////////////////////////////////////////////////////
 
-__global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Image<float4> normals, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w )
+__global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Image<float4> normals, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w, float mincostheta )
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -44,7 +45,7 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
             // Further than truncation distance from surface
             // We do nothing.
         }else{
-            if(isfinite(w) && w > 0.5 ) {
+            if(isfinite(w) && w > mincostheta ) {
 //                SDF_t sdf = SDF_t( fminf(1, sd / trunc_dist), w) + vol(x,y,z);
 //                sdf.val = clamp(-1.0f, 1.0f, sdf.val);
                 SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
@@ -57,11 +58,12 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
  }
 
 using namespace std;
-void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w )
+void SdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w, float mincostheta )
 {
     dim3 blockDim(8,8,8);
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-    KernSdfFuse<<<gridDim,blockDim>>>(vol, vol_min, vol_max, depth, norm, T_cw, fu, fv, u0, v0, trunc_dist, max_w);
+    KernSdfFuse<<<gridDim,blockDim>>>(vol, vol_min, vol_max, depth, norm, T_cw, fu, fv, u0, v0, trunc_dist, max_w, mincostheta);
+    GpuCheckErrors();
 }
 
 //////////////////////////////////////////////////////
@@ -82,6 +84,7 @@ void SdfReset(Volume<SDF_t> vol, float trunc_dist)
     dim3 blockDim(8,8,8);
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
     KernSdfReset<<<gridDim,blockDim>>>(vol, trunc_dist);
+    GpuCheckErrors();
 }
 
 //////////////////////////////////////////////////////
@@ -113,6 +116,7 @@ void SdfSphere(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, float3 center,
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
 
     KernSdfSphere<<<gridDim,blockDim>>>(vol, vol_min, vol_max, center, r);
+    GpuCheckErrors();
 }
 
 

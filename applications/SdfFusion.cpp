@@ -92,6 +92,7 @@ int main( int argc, char* argv[] )
     Var<bool> fuseonce("ui.fuse once", false, false);
     Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
+    Var<float> mincostheta("ui.min cos theta", 0.5, 0, 1);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
@@ -127,7 +128,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w );
+            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         /////////////////////////////////////////////////////////////

@@ -1,11 +1,51 @@
 #pragma once
 
 #include <boost/math/common_factor.hpp>
+#include <cstdio>
 
 #include "Image.h"
 
+#define GPU_CHECK_ERRORS
+//#define GPU_CHECK_ERRORS_SYNC
+
+// Based on cutil methods for error checking.
+#define GpuCheckSuccess( err ) Gpu::__SuccessOrDie( err, __FILE__, __LINE__ )
+#define GpuCheckErrors() Gpu::__CheckForErrorsDie( __FILE__, __LINE__ )
+
 namespace Gpu
 {
+
+// Based on cutil methods for error checking.
+inline void __SuccessOrDie( cudaError err, const char *file, const int line )
+{
+#ifdef GPU_CHECK_ERRORS
+    if ( cudaSuccess != err ) {
+        fprintf( stderr, "cudaSafeCall() failed at %s:%i : %s\n", file, line, cudaGetErrorString( err ) );
+        exit(-1);
+    }
+#endif // GPU_CHECK_ERRORS
+}
+
+// Based on cutil methods for error checking.
+inline void __CheckForErrorsDie(const char* file, const int line)
+{
+#ifdef GPU_CHECK_ERRORS
+    cudaError err = cudaGetLastError();
+    if ( cudaSuccess != err ) {
+        fprintf( stderr, "cudaCheckError() failed at %s:%i : %s\n", file, line, cudaGetErrorString( err ) );
+        exit(-1);
+    }
+
+  #ifdef GPU_CHECK_ERRORS_SYNC
+    err = cudaDeviceSynchronize();
+    if( cudaSuccess != err ) {
+        fprintf( stderr, "cudaCheckError() with sync failed at %s:%i : %s\n", file, line, cudaGetErrorString( err ) );
+        exit(-1);
+    }
+  #endif // GPU_CHECK_ERRORS_SYNS
+
+#endif // GPU_CHECK_ERRORS
+}
 
 //! Utility for attempting to estimate safe block/grid dimensions from working image dimensions
 //! These are not necesserily optimal. Far from it.
