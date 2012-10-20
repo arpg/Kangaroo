@@ -112,7 +112,6 @@ int main( int argc, char* argv[] )
     const float3 boxmin = make_float3(-2,-2,-0.2);
     const float3 boxsize = boxmax - boxmin;
     const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
-    Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,1), 0.9 );
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLGrid glGrid(10,1,true);
@@ -162,7 +161,7 @@ int main( int argc, char* argv[] )
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
-        if(Pushed(sdfreset)) {
+        if(Pushed(sdfreset) || frame==0) {
             Gpu::SdfReset(vol, trunc_dist);
         }
 
@@ -224,6 +223,8 @@ int main( int argc, char* argv[] )
                     // add to posegraph
                     graph.AddChild(newsensor->glT_wv);
                     graph.AddChild(newsensor->glxytheta);
+
+                    CVarUtils::Load("cvars.xml");
                 }
 
                 Sensor& sensor = *it->second;
