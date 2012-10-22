@@ -222,6 +222,13 @@ if(Kangaroo_FOUND)
       target_link_libraries( KinectTrack )
       target_link_libraries( KinectTrack ${CeresSolver_LIBRARIES} )
     endif()
+
+    set( BuildKinectFusion true CACHE "" force )
+    if( BuildKinectFusion)
+      add_executable( KinectFusion KinectFusion.cpp ${COMMON_HEADERS})
+      target_link_libraries( KinectFusion )
+      target_link_libraries( KinectFusion ${CeresSolver_LIBRARIES} )
+    endif()
   endif()
 
 endif()

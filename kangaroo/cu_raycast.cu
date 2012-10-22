@@ -82,7 +82,8 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 //          img(u,v) = (depth - near) / (far - near);
             imgdepth(u,v) = depth;
             img(u,v) = ambient + diffuse * dot(n_c, lightdir )  + specular * spec;
-            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
+//            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
+            norm(u,v) = make_float4(-1.0f*n_c, 1);
         }else{
             imgdepth(u,v) = 0.0f/0.0f;
             img(u,v) = 0;
@@ -94,7 +95,8 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
 {    
     dim3 blockDim, gridDim;
-    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
+//    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
+    InitDimFromOutputImageOver(blockDim, gridDim, img);
     KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
     GpuCheckErrors();
 }

@@ -84,9 +84,9 @@ __global__ void KernBoxHalfIgnoreInvalid( Image<To> out, const Image<Ti> in )
     const Ti* tl = &in(2*x,2*y);
     const Ti* bl = &in(2*x,2*y+1);
     const Ti v1 = *tl;
-    const Ti v2 = *tl+1;
+    const Ti v2 = *(tl+1);
     const Ti v3 = *bl;
-    const Ti v4 = *bl+1;
+    const Ti v4 = *(bl+1);
 
     int n = 0;
     UpType sum = 0;
