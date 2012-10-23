@@ -69,6 +69,11 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.SetProperty("lcmod", cl.follow( "lcmod.xml", "-lcmod" ) );
     camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
     camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
+    unsigned int    nFPS                = cl.follow( 30, 1, "-fps"  );
+    std::string     sResolution         = cl.follow( "VGA", 1, "-res"  ); // follow format of XGA, SVGA, VGA, QVGA, QQVGA, etc.
+    camera.SetProperty("FPS", nFPS);
+    camera.SetProperty("Resolution", sResolution);
+
 
     int numNodes = 0;
 
