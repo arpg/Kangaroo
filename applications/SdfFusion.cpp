@@ -92,9 +92,15 @@ int main( int argc, char* argv[] )
     Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.5, 0, 1);
+    Var<bool>  test("ui.test", false, true);
+    Var<float> scale("ui.scale", 1, 0,100);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
+        if(test) {
+            stacks_capture.SetModelViewMatrix(stacks_view.GetModelViewMatrix());
+        }
+
         Sophus::SE3 T_vw(stacks_view.GetModelViewMatrix());
         Sophus::SE3 T_cw(stacks_capture.GetModelViewMatrix());
 
@@ -128,6 +134,13 @@ int main( int argc, char* argv[] )
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
             Gpu::SdfFuse(vol, boxmin, boxmax, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+        }
+
+        if(test) {
+            // override img with difference between depth and gtd
+            Gpu::ElementwiseAdd<float,float,float,float>(img, depth, gtd, 1.0f, -1.0f, 0.0f);
+//            Gpu::ElementwiseSquare<float,float,float>(img,img);
+            Gpu::ElementwiseScaleBias<float,float,float>(img,img,scale);
         }
 
         /////////////////////////////////////////////////////////////

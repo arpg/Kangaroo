@@ -38,7 +38,8 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
             float last_sdf = 0;
-            float delta_lambda = (boxmax.x - boxmin.x) / (vol.w-1);
+            float min_delta_lambda = (boxmax.x - boxmin.x) / (vol.w-1);
+            float delta_lambda = 0;
 
             // March through space
             while(lambda < min_tmax) {
@@ -49,12 +50,13 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
                 if( sdf <= 0 ) {
                     // surface!
                     if(subpix) {
-                        lambda = lambda - delta_lambda * last_sdf / (sdf - last_sdf);
+                        lambda = lambda + delta_lambda * sdf / (last_sdf - sdf);
                     }
                     depth = lambda;
                     break;
                 }
-                lambda += fminf(trunc_dist, fmaxf(delta_lambda, sdf));
+                delta_lambda = clamp(sdf, min_delta_lambda, trunc_dist);
+                lambda += delta_lambda;
                 last_sdf = sdf;
             }
         }
@@ -69,25 +71,26 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
         const float3 p_c = depth * ray_c;
 
         if(depth > 0 ) {
-            const float ambient = 0.2;
-            const float diffuse = 0.8;
-            const float specular = 0.1;
+            const float ambient = 0.4;
+            const float diffuse = 0.4;
+            const float specular = 0.2;
             const float3 eyedir = -1.0f * p_c / length(p_c);
             const float3 _lightdir = make_float3(0.4,0.4,-1);
             const float3 lightdir = _lightdir / length(_lightdir);
-            const float3 lightreflect = 2*dot(lightdir,n_c)*n_c + (-1.0) * lightdir;
+            const float ldotn = dot(lightdir,n_c);
+            const float3 lightreflect = 2*ldotn*n_c + (-1.0) * lightdir;
             const float edotr = fmaxf(0,dot(eyedir,lightreflect));
             const float spec = edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr;
 
 //          img(u,v) = (depth - near) / (far - near);
             imgdepth(u,v) = depth;
-            img(u,v) = ambient + diffuse * dot(n_c, lightdir )  + specular * spec;
+            img(u,v) = ambient + diffuse * ldotn  + specular * spec;
 //            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
             norm(u,v) = make_float4(-1.0f*n_c, 1);
         }else{
             imgdepth(u,v) = 0.0f/0.0f;
             img(u,v) = 0;
-            norm(u,v) = make_float4(0,0,0,1);
+            norm(u,v) = make_float4(0,0,0,0);
         }
     }
 }

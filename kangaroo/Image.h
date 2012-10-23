@@ -134,13 +134,6 @@ struct DontManage
     }
 };
 
-//! Return v clamped to interval [vmin,vmax]
-template<typename T> __host__ __device__
-inline T clamp(T vmin, T vmax, T v) {
-    return v < vmin ? vmin : (vmax < v ? vmax : v);
-}
-
-
 //! Simple templated pitched image type for use with Cuda
 //! Type encapsulates ptr, pitch, width and height
 //! Instantiate Image<T,Target,ManagementAllocDealloc> to handle memory allocation
@@ -397,8 +390,8 @@ struct Image {
     inline  __device__ __host__
     const T& GetWithClampedRange(int x, int y) const
     {
-        x = Gpu::clamp<int>(0,w-1,x);
-        y = Gpu::clamp<int>(0,h-1,y);
+        x = clamp(x, 0, w-1);
+        y = clamp(y, 0, h-1);
         return RowPtr(y)[x];
     }
 

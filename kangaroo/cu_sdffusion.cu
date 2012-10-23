@@ -27,13 +27,13 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
 
     const float3 P_c = T_cw * P_w;
     const float2 p_c = make_float2(u0 + fu*P_c.x/P_c.z, v0 + fv*P_c.y/P_c.z);
-    const int2 xy = make_int2(p_c.x+0.5, p_c.y + 0.5);
 
-    if( 0 < xy.x && xy.x < depth.w-1 && 0 < xy.y && xy.y < depth.h-1)
+    if( depth.InBounds(p_c, 2) )
     {
         const float vd = P_c.z;
-//        const float md = depth(xy.x, xy.y);
-//        const float3 mdn = make_float3(normals.Get(xy.x, xy.y));
+//        const float md = depth.GetNearestNeighbour(p_c);
+//        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
+
         const float md = depth.GetBilinear<float>(p_c);
         const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
 
@@ -49,7 +49,7 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
 //                SDF_t sdf = SDF_t( fminf(1, sd / trunc_dist), w) + vol(x,y,z);
 //                sdf.val = clamp(-1.0f, 1.0f, sdf.val);
                 SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
-                sdf.val = clamp(-trunc_dist, trunc_dist, sdf.val);
+                sdf.val = clamp(sdf.val, -trunc_dist, trunc_dist);
                 sdf.w   = fminf(sdf.w, max_w);
                 vol(x,y,z) = sdf;
             }
