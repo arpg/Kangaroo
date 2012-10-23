@@ -2,7 +2,12 @@ find_package(CUDA REQUIRED)
 find_package(Boost REQUIRED)
 
 set(CUDA_PROPAGATE_HOST_FLAGS off)
-set(CUDA_NVCC_FLAGS "--pre-include /usr/local/cuda/include/undef_cuda.h -arch=sm_20 -use_fast_math" )
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  # Kepler OSX laptop
+  set(CUDA_NVCC_FLAGS "-arch=sm_30 -use_fast_math" )
+else()
+  set(CUDA_NVCC_FLAGS "--pre-include /usr/local/cuda/include/undef_cuda.h -arch=sm_20 -use_fast_math" )
+endif()
 
 if(NOT CUDA_npp_LIBRARY)
     # Hack for old FindCUDA to locate libnpp.so
