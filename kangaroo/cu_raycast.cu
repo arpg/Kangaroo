@@ -12,7 +12,7 @@ namespace Gpu
 // Raycast SDF
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
+__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -55,7 +55,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
                     depth = lambda;
                     break;
                 }
-                delta_lambda = clamp(sdf, min_delta_lambda, trunc_dist);
+                delta_lambda = fmaxf(sdf, min_delta_lambda);
                 lambda += delta_lambda;
                 last_sdf = sdf;
             }
@@ -95,12 +95,12 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
     }
 }
 
-void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {    
     dim3 blockDim, gridDim;
 //    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
+    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, subpix);
     GpuCheckErrors();
 }
 

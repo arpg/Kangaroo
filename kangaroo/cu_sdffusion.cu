@@ -31,11 +31,11 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
     if( depth.InBounds(p_c, 2) )
     {
         const float vd = P_c.z;
-//        const float md = depth.GetNearestNeighbour(p_c);
-//        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
+        const float md = depth.GetNearestNeighbour(p_c);
+        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
 
-        const float md = depth.GetBilinear<float>(p_c);
-        const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
+//        const float md = depth.GetBilinear<float>(p_c);
+//        const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
 
         const float costheta = dot(mdn, P_c / length(P_c));
         const float sd = costheta * (md - vd);
@@ -46,11 +46,9 @@ __global__ void KernSdfFuse(Volume<SDF_t> vol, float3 vol_min, float3 vol_max, I
             // We do nothing.
         }else{
             if(isfinite(w) && w > mincostheta ) {
-//                SDF_t sdf = SDF_t( fminf(1, sd / trunc_dist), w) + vol(x,y,z);
-//                sdf.val = clamp(-1.0f, 1.0f, sdf.val);
                 SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
-                sdf.val = clamp(sdf.val, -trunc_dist, trunc_dist);
-                sdf.w   = fminf(sdf.w, max_w);
+                sdf.Clamp(-trunc_dist, trunc_dist);
+                sdf.LimitWeight(max_w);
                 vol(x,y,z) = sdf;
             }
         }

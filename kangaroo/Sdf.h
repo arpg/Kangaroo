@@ -12,6 +12,13 @@ struct SDF_t {
     inline __host__ __device__ operator float() const {
         return val;
     }    
+    inline __host__ __device__ void Clamp(float minval, float maxval) {
+        val = clamp(val, minval, maxval);
+    }
+    inline __host__ __device__ void LimitWeight(float max_weight) {
+        w = fminf(w, max_weight);
+    }
+
     float w;
     float val;
 };

@@ -273,7 +273,7 @@ int main( int argc, char* argv[] )
         // Raycast current view
         {
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::RaycastSdf(rayd, rayn, rayi, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, trunc_dist, true );
+            Gpu::RaycastSdf(rayd, rayn, rayi, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, true );
         }
 
         int sn = 0;

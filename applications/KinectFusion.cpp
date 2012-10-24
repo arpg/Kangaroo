@@ -44,7 +44,7 @@ int main( int argc, char* argv[] )
     const double fv = fu;
     const double u0 = w/2.0 - 0.5;
     const double v0 = h/2.0 - 0.5;
-    const int volres = 128;
+    const int volres = 256;
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
@@ -123,13 +123,13 @@ int main( int argc, char* argv[] )
     ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
-    SetupContainer(container, 5, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(addebug));
-    container[1].SetDrawFunction(boost::ref(adnormals));
-    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
+    SetupContainer(container, 2, (float)w/h);
+    container[0].SetDrawFunction(boost::ref(adrayimg));
+    container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
-    container[3].SetDrawFunction(boost::ref(adrayimg));
-    container[4].SetDrawFunction(boost::ref(adraynorm));
+//    container[1].SetDrawFunction(boost::ref(adnormals));
+//    container[0].SetDrawFunction(boost::ref(addebug));
+//    container[4].SetDrawFunction(boost::ref(adraynorm));
 
     Sophus::SE3 T_wl;
 
@@ -163,19 +163,16 @@ int main( int argc, char* argv[] )
             Gpu::SdfFuse(vol, boxmin, boxmax, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
-        // Raycast current view
-        for(int l=MaxLevels-1; l >=0; --l)
-        {
-            Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, boxmin, boxmax, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, trunc_dist, true );
-            Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
-        }
-
         if(pose_refinement && frame > 0) {
             Sophus::SE3 T_lp;
 
 //            for(int l=MaxLevels-1; l >=0; --l)
             {
                 const int l = show_level;
+
+                Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, boxmin, boxmax, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
+                Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+
                 const int lits = pose_its;
                 Eigen::Matrix3d Kdepth;
                 Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
