@@ -77,11 +77,9 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
-    const float3 boxmax = make_float3(1,1,1);
-    const float3 boxmin = make_float3(-1,-1,-1);
-    const float3 boxsize = boxmax - boxmin;
-    const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
-    Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+    Gpu::BoundingBox bbox(make_float3(-1,-1,-1), make_float3(1,1,1) );
+    const float3 voxsize = bbox.Size() / make_float3(vol.w, vol.h, vol.d);
+    Gpu::SdfSphere(vol, bbox, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> sdfreset("ui.reset", false, false);
@@ -109,18 +107,18 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(sdfsphere)) {
-            Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+            Gpu::SdfSphere(vol, bbox, make_float3(0,0,0), 0.9 );
         }
 
         // Raycast current view
         {
-            Gpu::RaycastSdf(depth, norm, img, vol, boxmin, boxmax, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::RaycastSdf(depth, norm, img, vol, bbox, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
         {
             if(shape == 0) {
-                Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9) );
+                Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, Gpu::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
             }else if(shape ==1) {
                 Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(0,0,0), 0.9);
             }
@@ -133,7 +131,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, boxmin, boxmax, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, bbox, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(test) {

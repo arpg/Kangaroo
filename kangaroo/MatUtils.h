@@ -443,4 +443,13 @@ float L1(float4 val)
     return abs(val.x) + abs(val.y) + abs(val.z) + abs(val.w);
 }
 
+#ifdef USE_EIGEN
+inline __host__
+Eigen::Vector3d ToEigen(const float3 v)
+{
+    return Eigen::Vector3d(v.x, v.y, v.z);
+}
+
+#endif // USE_EIGEN
+
 }

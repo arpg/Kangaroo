@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector_types.h>
-#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 #include <iostream>
 #include <assert.h>
 

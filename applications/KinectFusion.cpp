@@ -44,7 +44,8 @@ int main( int argc, char* argv[] )
     const double fv = fu;
     const double u0 = w/2.0 - 0.5;
     const double v0 = h/2.0 - 0.5;
-    const int volres = 384; //256;
+//    const int volres = 384; //256;
+    const int volres = 256;
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
@@ -59,13 +60,10 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
     Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres);
 
-    const float3 boxmax = make_float3(1,1,2.5);
-    const float3 boxmin = make_float3(-1,-1,0.5);
-//    const float3 boxmax = make_float3(4,4,6);
-//    const float3 boxmin = make_float3(-4,-4,-2);
-//    const float3 boxmax = make_float3(0.2,0.2,0.8);
-//    const float3 boxmin = make_float3(-0.2,-0.2,0.4);
-    const float3 boxsize = boxmax - boxmin;
+    Gpu::BoundingBox bbox(make_float3(-1,-1,0.5), make_float3(1,1,2.5) );
+//    Gpu::BoundingBox bbox(make_float3(-4,-4,-2), make_float3(4,4,6) );
+//    Gpu::BoundingBox bbox(make_float3(-0.2,-0.2,0.4),make_float3(0.2,0.2,0.8) );
+    const float3 boxsize = bbox.Size();
     const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
 
 //    GlBufferCudaPtr vbo(GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -81,7 +79,7 @@ int main( int argc, char* argv[] )
     SceneGraph::GLAxis glcamera(0.1);
 //    SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
     SceneGraph::GLAxisAlignedBox glbox;
-    glbox.SetBounds(boxmin.x, boxmin.y, boxmin.z, boxmax.x, boxmax.y, boxmax.z);
+    glbox.SetBounds(Gpu::ToEigen(bbox.Min()), Gpu::ToEigen(bbox.Max()) );
     glgraph.AddChild(&glcamera);
 //    glcamera.AddChild(&glvbo);
     glgraph.AddChild(&glbox);
@@ -102,12 +100,12 @@ int main( int argc, char* argv[] )
     Var<float> bigs("ui.gs",5, 1E-3, 5);
     Var<float> bigr("ui.gr",700, 1E-3, 200);
 
-    Var<bool> pose_refinement("ui.Pose Refinement", false, true);
+    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<bool> reset("ui.reset", false, false);
     Var<float> icp_c("ui.icp c",0.5, 1E-3, 1);
     Var<int> pose_its("ui.pose_its", 5, 0, 10);
 
-    Var<bool> fuse("ui.fuse", false, true);
+    Var<bool> fuse("ui.fuse", true, true);
     Var<bool> fuseonce("ui.fuse once", false, false);
 
     Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
@@ -160,7 +158,7 @@ int main( int argc, char* argv[] )
             Gpu::SdfReset(vol, trunc_dist);
 
             // Fuse first kinect frame in.
-            Gpu::SdfFuse(vol, boxmin, boxmax, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(pose_refinement && frame > 0) {
@@ -170,7 +168,7 @@ int main( int argc, char* argv[] )
             {
                 const int l = show_level;
 
-                Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, boxmin, boxmax, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
+                Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, bbox, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
                 Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
 
                 const int lits = pose_its;
@@ -194,7 +192,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, boxmin, boxmax, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         glcamera.SetPose(T_wl.matrix());

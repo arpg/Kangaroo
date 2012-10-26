@@ -63,9 +63,8 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( &handler3d  );
 
-    const float3 boxmax = make_float3(1,1,1);
-    const float3 boxmin = make_float3(-1,-1,-1);
-    Gpu::SdfSphere(vol, boxmin, boxmax, make_float3(0,0,0), 0.9 );
+    Gpu::BoundingBox bbox(make_float3(-1,-1,-1), make_float3(1,1,1) );
+    Gpu::SdfSphere(vol, bbox, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
 
@@ -73,9 +72,7 @@ int main( int argc, char* argv[] )
     {
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
-        {
-            Gpu::RaycastSdf(depth, norm, img, vol, boxmin, boxmax, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
-        }
+        Gpu::RaycastSdf(depth, norm, img, vol, bbox, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
 
         /////////////////////////////////////////////////////////////
         // Perform drawing
