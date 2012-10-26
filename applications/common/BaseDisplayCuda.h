@@ -23,7 +23,7 @@ inline pangolin::View& SetupPangoGLWithCuda(int w, int h, int ui_width = 180, st
     std::cout << cu_mem_start/bytes_per_mb << " MB Video Memory Available." << std::endl;
     if( cu_mem_start < (min_gpu_mem_mb * bytes_per_mb) ) {
         std::cerr << "Not enough memory to proceed." << std::endl;
-        exit(-1);
+//        exit(-1);
     }
     return container;
 }

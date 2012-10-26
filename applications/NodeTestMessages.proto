@@ -1,0 +1,5 @@
+
+message Msg{
+  optional string value = 1;
+}
+

@@ -1,4 +1,3 @@
-project( Kangaroo )
 cmake_minimum_required(VERSION 2.8)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
@@ -106,6 +105,26 @@ set( BuildStereoRectifyOpenCV true CACHE "" force )
 if( BuildStereoRectifyOpenCV )
     add_executable( StereoRectifyOpenCV ${COMMON_SRC} StereoRectifyOpenCV.cpp)
 endif()
+
+find_package( NODE QUIET )
+if(NODE_FOUND)
+    include_directories( ${NODE_INCLUDE_DIRS} )
+    link_libraries( ${NODE_LIBRARIES} )
+    include_directories( ${CMAKE_CURRENT_BINARY_DIR} )
+
+    if(CMAKE_COMPILER_IS_GNUCXX)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOS_OBJECT_USE_OBJC=0")
+    endif()
+
+    message(STATUS "bin dir ${CMAKE_CURRENT_BINARY_DIR}" )
+
+    set( BuildNodeTest true CACHE "" force )
+    if( BuildNodeTest )
+        PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS NodeTestMessages.proto )
+        add_executable( NodeTest ${PROTO_SRCS} ${PROTO_HDRS} NodeTest.cpp)
+    endif()
+endif()
+
 
 if(CeresSolver_FOUND)
     include_directories( ${CeresSolver_INCLUDE_DIRS} )

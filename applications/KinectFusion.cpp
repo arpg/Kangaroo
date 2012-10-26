@@ -44,7 +44,7 @@ int main( int argc, char* argv[] )
     const double fv = fu;
     const double u0 = w/2.0 - 0.5;
     const double v0 = h/2.0 - 0.5;
-    const int volres = 256;
+    const int volres = 384; //256;
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
