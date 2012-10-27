@@ -19,6 +19,8 @@
 #include "common/ViconTracker.h"
 #include "common/PoseGraph.h"
 #include "common/GLPoseGraph.h"
+#include "common/Handler3dGpuDepth.h"
+
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
@@ -94,9 +96,8 @@ int main( int argc, char* argv[] )
         ModelViewLookAtRDF(0,0,-2,0,0,0,0,-1,0)
     );
 
-    Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
-    Var<bool> lockToCam("ui.Lock to cam", false, true);
+    Var<bool> viewonly("ui.view only", false, true);
     Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
 
     Var<int> biwin("ui.size",5, 1, 20);
@@ -115,17 +116,16 @@ int main( int argc, char* argv[] )
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
-    pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
-    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
-
     ActivateDrawPyramid<float,MaxLevels> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
     ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
+    Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
     SetupContainer(container, 2, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adrayimg));
+    container[0].SetDrawFunction(boost::ref(adrayimg))
+                .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
 //    container[1].SetDrawFunction(boost::ref(adnormals));
@@ -138,7 +138,7 @@ int main( int argc, char* argv[] )
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
-        const bool go = frame==-1 || run || Pushed(step);
+        const bool go = frame==-1 || run;
 
         if(go) {
             camera.Capture(img);
@@ -164,38 +164,43 @@ int main( int argc, char* argv[] )
             Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
-        if(pose_refinement && frame > 0) {
-            Sophus::SE3 T_lp;
+        if(viewonly) {
+            Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
+            Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], vol, bbox, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, true );
+        }else{
+            if(pose_refinement && frame > 0) {
+                Sophus::SE3 T_lp;
 
-//            for(int l=MaxLevels-1; l >=0; --l)
-            {
-                const int l = show_level;
+    //            for(int l=MaxLevels-1; l >=0; --l)
+                {
+                    const int l = show_level;
 
-                Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, bbox, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
-                Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, bbox, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
+                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
 
-                const int lits = pose_its;
-                Eigen::Matrix3d Kdepth;
-                Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
+                    const int lits = pose_its;
+                    Eigen::Matrix3d Kdepth;
+                    Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
 
-                for(int i=0; i<lits; ++i ) {
-                    const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
-                    const Eigen::Matrix<double, 3,4> mT_pl = T_lp.inverse().matrix3x4();
-                    Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
-                        kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
-                    );
-                    Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                    Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                    T_lp = T_lp * Sophus::SE3::exp(x);
+                    for(int i=0; i<lits; ++i ) {
+                        const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
+                        const Eigen::Matrix<double, 3,4> mT_pl = T_lp.inverse().matrix3x4();
+                        Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
+                            kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
+                        );
+                        Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                        Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
+                        T_lp = T_lp * Sophus::SE3::exp(x);
+                    }
                 }
+
+                T_wl = T_wl * T_lp.inverse();
             }
 
-            T_wl = T_wl * T_lp.inverse();
-        }
-
-        if(Pushed(fuseonce) || fuse) {
-            // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            if(pose_refinement && (Pushed(fuseonce) || fuse) ) {
+                // integrate gtd into TSDF
+                Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            }
         }
 
         glcamera.SetPose(T_wl.matrix());
@@ -222,7 +227,7 @@ int main( int argc, char* argv[] )
 //        addepth.SetImageScale(scale);
 //        addepth.SetLevel(show_level);
 //        adnormals.SetLevel(show_level);
-        adrayimg.SetLevel(show_level);
+        adrayimg.SetLevel(viewonly? 0 : show_level);
 //        adraynorm.SetLevel(show_level);
 
 
