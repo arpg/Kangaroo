@@ -60,7 +60,8 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
     Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres);
 
-    Gpu::BoundingBox bbox(make_float3(-1,-1,0.5), make_float3(1,1,2.5) );
+    Gpu::BoundingBox bbox(make_float3(-2,-2,-2), make_float3(2,2,2) );
+//    Gpu::BoundingBox bbox(make_float3(-1,-1,0.5), make_float3(1,1,2.5) );
 //    Gpu::BoundingBox bbox(make_float3(-4,-4,-2), make_float3(4,4,6) );
 //    Gpu::BoundingBox bbox(make_float3(-0.2,-0.2,0.4),make_float3(0.2,0.2,0.8) );
     const float3 boxsize = bbox.Size();
@@ -78,11 +79,14 @@ int main( int argc, char* argv[] )
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
 //    SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
-    SceneGraph::GLAxisAlignedBox glbox;
-    glbox.SetBounds(Gpu::ToEigen(bbox.Min()), Gpu::ToEigen(bbox.Max()) );
+    SceneGraph::GLAxisAlignedBox glboxfrustum;
+    SceneGraph::GLAxisAlignedBox glboxvol;
+
+    glboxvol.SetBounds(Gpu::ToEigen(bbox.Min()), Gpu::ToEigen(bbox.Max()) );
     glgraph.AddChild(&glcamera);
 //    glcamera.AddChild(&glvbo);
-    glgraph.AddChild(&glbox);
+    glgraph.AddChild(&glboxvol);
+    glgraph.AddChild(&glboxfrustum);
 
 
     pangolin::OpenGlRenderState s_cam(
@@ -94,7 +98,6 @@ int main( int argc, char* argv[] )
     Var<bool> run("ui.run", true, true);
     Var<bool> lockToCam("ui.Lock to cam", false, true);
     Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
-    Var<float> scale("ui.scale",0.0001, 0, 0.001);
 
     Var<int> biwin("ui.size",5, 1, 20);
     Var<float> bigs("ui.gs",5, 1E-3, 5);
@@ -196,6 +199,10 @@ int main( int argc, char* argv[] )
         }
 
         glcamera.SetPose(T_wl.matrix());
+
+        Gpu::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, 0.2, 8);
+        bbox_work.Intersect(bbox);
+        glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
 
 //        {
 //            CudaScopedMappedPtr var(cbo);

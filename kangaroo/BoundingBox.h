@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Mat.h"
+#include <iostream>
 
 namespace Gpu
 {
@@ -14,6 +15,12 @@ struct BoundingBox
     }
 
     inline __device__ __host__
+    BoundingBox(const BoundingBox& bbox)
+        : boxmin(bbox.boxmin), boxmax(bbox.boxmax)
+    {
+    }
+
+    inline __device__ __host__
     BoundingBox(float3 boxmin, float3 boxmax)
         : boxmin(boxmin), boxmax(boxmax)
     {
@@ -22,6 +29,36 @@ struct BoundingBox
     // Construct bounding box from Frustum.
     inline __host__
     BoundingBox(
+        const Mat<float,3,4> T_wc,
+        float w, float h,
+        float fu, float fv, float u0, float v0,
+        float near, float far
+    ) {
+        FitToFrustum(T_wc,w,h,fu,fv,u0,v0,near,far);
+    }
+
+    inline __host__ __device__
+    float3& Min() {
+        return boxmin;
+    }
+
+    inline __host__ __device__
+    float3 Min() const {
+        return boxmin;
+    }
+
+    inline __host__ __device__
+    float3& Max() {
+        return boxmax;
+    }
+
+    inline __host__ __device__
+    float3 Max() const {
+        return boxmax;
+    }
+
+    inline __host__
+    void FitToFrustum(
         const Mat<float,3,4> T_wc,
         float w, float h,
         float fu, float fv, float u0, float v0,
@@ -46,57 +83,36 @@ struct BoundingBox
         Insert(c_w + far*ray_br);
     }
 
-    inline __host__ __device__
-    float3& Min() {
-        return boxmin;
-    }
-
-    inline __host__ __device__
-    float3 Min() const {
-        return boxmin;
-    }
-
-    inline __host__ __device__
-    float3& Max() {
-        return boxmax;
-    }
-
-    inline __host__ __device__
-    float3 Max() const {
-        return boxmax;
-    }
-
-
     inline __host__
     void Clear()
     {
         boxmin = make_float3(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max());
-        boxmax = make_float3(std::numeric_limits<float>::min(),std::numeric_limits<float>::min(),std::numeric_limits<float>::min());
+        boxmax = make_float3(-10,-10,-10);
     }
 
     // Expand bounding box to include p
     inline __host__
-    void Insert(float3 p)
+    void Insert(const float3 p)
     {
-        boxmin = make_float3(fminf(p.x,boxmin.x), fminf(p.x,boxmin.y), fminf(p.x,boxmin.z));
-        boxmax = make_float3(fmaxf(p.x,boxmax.x), fmaxf(p.x,boxmax.y), fmaxf(p.x,boxmax.z));
+        boxmax = fmaxf(p,boxmax);
+        boxmin = fminf(p,boxmin);
     }
 
     // Expand bounding box to include bb
     inline __host__
-    void Insert(BoundingBox bb)
+    void Insert(const BoundingBox& bb)
     {
-        boxmin = make_float3(fminf(bb.boxmin.x,boxmin.x), fminf(bb.boxmin.x,boxmin.y), fminf(bb.boxmin.x,boxmin.z));
-        boxmax = make_float3(fmaxf(bb.boxmax.x,boxmax.x), fmaxf(bb.boxmax.x,boxmax.y), fmaxf(bb.boxmax.x,boxmax.z));
+        boxmin = make_float3(fminf(bb.boxmin.x,boxmin.x), fminf(bb.boxmin.y,boxmin.y), fminf(bb.boxmin.z,boxmin.z));
+        boxmax = make_float3(fmaxf(bb.boxmax.x,boxmax.x), fmaxf(bb.boxmax.y,boxmax.y), fmaxf(bb.boxmax.z,boxmax.z));
     }
 
     // Contract bounding box to represent intersection (common space)
     // between this and bb
     inline __host__
-    void Intersect(BoundingBox bb)
+    void Intersect(const BoundingBox& bb)
     {
-        boxmin = make_float3(fmaxf(bb.boxmin.x,boxmin.x), fmaxf(bb.boxmin.x,boxmin.y), fmaxf(bb.boxmin.x,boxmin.z));
-        boxmax = make_float3(fminf(bb.boxmax.x,boxmax.x), fminf(bb.boxmax.x,boxmax.y), fminf(bb.boxmax.x,boxmax.z));
+        boxmin = make_float3(fmaxf(bb.boxmin.x,boxmin.x), fmaxf(bb.boxmin.y,boxmin.y), fmaxf(bb.boxmin.z,boxmin.z));
+        boxmax = make_float3(fminf(bb.boxmax.x,boxmax.x), fminf(bb.boxmax.y,boxmax.y), fminf(bb.boxmax.z,boxmax.z));
     }
 
     inline __host__ __device__
@@ -108,5 +124,13 @@ struct BoundingBox
     float3 boxmin;
     float3 boxmax;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const BoundingBox& bbox)
+{
+    os << "(" << bbox.boxmin.x << "," << bbox.boxmin.y << "," << bbox.boxmin.z << ")";
+    os << " - ";
+    os << "(" << bbox.boxmax.x << "," << bbox.boxmax.y << "," << bbox.boxmax.z << ")";
+    return os;
+}
 
 }
