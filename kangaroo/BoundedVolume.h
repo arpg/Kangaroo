@@ -16,13 +16,18 @@ public:
     //////////////////////////////////////////////////////
 
     template<typename ManagementCopyFrom> inline __host__ __device__
-    BoundedVolume( const BoundedVolume<T,Target,ManagementCopyFrom>& img )
-        : Volume<T,Target,Management>(img), bbox(img.bbox)
+    BoundedVolume( const BoundedVolume<T,Target,ManagementCopyFrom>& vol )
+        : Volume<T,Target,Management>(vol), bbox(vol.bbox)
     {
-        Management::AssignmentCheck();
     }
 
-    inline __host__
+    template<typename ManagementCopyFrom> inline __host__ __device__
+    BoundedVolume(const Volume<T,Target,ManagementCopyFrom>& vol, const BoundingBox& bbox)
+        : Volume<T,Target,Management>(vol), bbox(bbox)
+    {
+    }
+
+    inline __host__ __device__
     BoundedVolume()
     {
     }
@@ -69,14 +74,14 @@ public:
     inline  __device__ __host__
     float GetUnitsTrilinearClamped(float3 pos_w) const
     {
-        const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Max() - bbox.Min());
+        const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Size());
         return Volume<T,Target,Management>::GetFractionalTrilinearClamped(pos_v);
     }
 
     inline __device__ __host__
     float3 GetUnitsBackwardDiffDxDyDz(float3 pos_w) const
     {
-        const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Max() - bbox.Min());
+        const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Size());
         return Volume<T,Target,Management>::GetFractionalBackwardDiffDxDyDz(pos_v);
     }
 
@@ -91,6 +96,48 @@ public:
             bbox.Min().z + vol_size.z*z/(float)(Volume<T,Target,Management>::d-1)
         );
     }
+
+    inline __device__ __host__
+    float3 VoxelPositionInUnits(int3 p_v)
+    {
+        return VoxelPositionInUnits(p_v.x,p_v.y,p_v.z);
+    }
+
+    //////////////////////////////////////////////////////
+    // Access sub-regions
+    //////////////////////////////////////////////////////
+
+    inline __device__ __host__
+    BoundedVolume<T,Target,DontManage> SubBoundingVolume(const BoundingBox& region)
+    {
+        const float3 min_fv = (region.Min() - bbox.Min()) / (bbox.Size());
+        const float3 max_fv = (region.Max() - bbox.Min()) / (bbox.Size());
+
+        const int3 min_v = make_int3(
+            fmaxf((Volume<T,Target,Management>::w-1)*min_fv.x, 0),
+            fmaxf((Volume<T,Target,Management>::h-1)*min_fv.y, 0),
+            fmaxf((Volume<T,Target,Management>::d-1)*min_fv.z, 0)
+        );
+        const int3 max_v = make_int3(
+            fminf(ceilf((Volume<T,Target,Management>::w-1)*max_fv.x), Volume<T,Target,Management>::w-1),
+            fminf(ceilf((Volume<T,Target,Management>::h-1)*max_fv.y), Volume<T,Target,Management>::h-1),
+            fminf(ceilf((Volume<T,Target,Management>::d-1)*max_fv.z), Volume<T,Target,Management>::d-1)
+        );
+
+        const int3 size_v = max((max_v - min_v) + make_int3(1,1,1), make_int3(8,8,8));
+
+        const BoundingBox nbbox(
+            VoxelPositionInUnits(min_v),
+            VoxelPositionInUnits(max_v)
+        );
+
+        return BoundedVolume<T,Target,DontManage>(
+            Volume<T,Target,Management>::SubVolume(min_v, size_v),
+            nbbox
+        );
+    }
+
+
 
     BoundingBox bbox;
 };

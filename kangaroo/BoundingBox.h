@@ -21,7 +21,7 @@ struct BoundingBox
     }
 
     inline __device__ __host__
-    BoundingBox(float3 boxmin, float3 boxmax)
+    BoundingBox(const float3 boxmin, const float3 boxmax)
         : boxmin(boxmin), boxmax(boxmax)
     {
     }

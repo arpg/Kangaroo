@@ -47,8 +47,11 @@ int main( int argc, char* argv[] )
     const double fv = fu;
     const double u0 = w/2.0 - 0.5;
     const double v0 = h/2.0 - 0.5;
+    const double knear = 0.4;
+    const double kfar = 2;
 //    const int volres = 384; //256;
-    const int volres = 256;
+    const int volres = 384;
+    const float volrad = 2;
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
@@ -61,7 +64,7 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_d(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-2,-2,-2), make_float3(2,2,2));
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
 
     Gpu::BoundingBox bbox(make_float3(-2,-2,-2), make_float3(2,2,2) );
 //    Gpu::BoundingBox bbox(make_float3(-1,-1,0.5), make_float3(1,1,2.5) );
@@ -167,16 +170,19 @@ int main( int argc, char* argv[] )
 
         if(viewonly) {
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, true );
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
+            Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, knear,20, true );
         }else{
             if(pose_refinement && frame > 0) {
                 Sophus::SE3 T_lp;
+                Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
 
     //            for(int l=MaxLevels-1; l >=0; --l)
                 {
                     const int l = show_level;
 
-                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
+
+                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
                     Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
 
                     const int lits = pose_its;
@@ -199,14 +205,14 @@ int main( int argc, char* argv[] )
             }
 
             if(pose_refinement && (Pushed(fuseonce) || fuse) ) {
-                // integrate gtd into TSDF
-                Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+                Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+                Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
             }
         }
 
         glcamera.SetPose(T_wl.matrix());
 
-        Gpu::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, 0.2, 8);
+        Gpu::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar);
         bbox_work.Intersect(bbox);
         glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
 

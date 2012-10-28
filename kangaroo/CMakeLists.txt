@@ -20,10 +20,12 @@ endif()
 
 list(APPEND SRC_H
     kangaroo.h
-    Image.h Volume.h ImageApron.h sampling.h pixel_convert.h patch_score.h
-    Mat.h MatUtils.h reweighting.h Pyramid.h reduce.h InvalidValue.h
+    Image.h Pyramid.h Volume.h BoundedVolume.h BoundingBox.h Sdf.h
+    ImageApron.h sampling.h pixel_convert.h patch_score.h
+    Mat.h MatUtils.h reweighting.h reduce.h InvalidValue.h
     CudaTimer.h LeastSquareSum.h hamming_distance.h
-    variational.h
+    variational.h Divergence.h disparity.h
+    hamming_distance.h
 )
 
 list(APPEND SRC_CU

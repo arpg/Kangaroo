@@ -163,9 +163,27 @@ struct Volume
     }
 
     inline  __device__ __host__
+    T& Get(int x, int y, int z)
+    {
+        return RowPtr(y,z)[x];
+    }
+
+    inline  __device__ __host__
     const T& Get(int x, int y, int z) const
     {
         return RowPtr(y,z)[x];
+    }
+
+    inline  __device__ __host__
+    T& Get(int3 p)
+    {
+        return RowPtr(p.y,p.z)[p.x];
+    }
+
+    inline  __device__ __host__
+    const T& Get(int3 p) const
+    {
+        return RowPtr(p.y,p.z)[p.x];
     }
 
     //////////////////////////////////////////////////////
@@ -289,6 +307,15 @@ struct Volume
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
+    Volume<T,Target,DontManage> SubVolume(int3 start, int3 size)
+    {
+        return Volume<T,Target,DontManage>(
+            &Get(start), size.x, size.y, size.z,
+            pitch, img_pitch
+        );
+    }
+
+    inline __device__ __host__
     Image<T,Target,DontManage> ImageXY(size_t z)
     {
         assert( z < d );
@@ -301,6 +328,10 @@ struct Volume
         assert( y < h );
         return Image<T,Target,DontManage>( RowPtr(y,0), w, d, img_pitch);
     }
+
+    //////////////////////////////////////////////////////
+    // Size Accessors
+    //////////////////////////////////////////////////////
 
     inline __device__ __host__
     uint3 Voxels() const
