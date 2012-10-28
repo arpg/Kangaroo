@@ -16,6 +16,7 @@
 #include "Sdf.h"
 #include "CostVolElem.h"
 #include "BoundingBox.h"
+#include "BoundedVolume.h"
 
 namespace Gpu
 {
@@ -429,7 +430,7 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
 //////////////////////////////////////////////////////
 
-void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const BoundingBox bbox, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix = true);
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix = true);
 
 void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r);
 
@@ -437,10 +438,10 @@ void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float f
 
 //////////////////////////////////////////////////////
 
-void SdfFuse(Volume<SDF_t> vol, BoundingBox bbox, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float maxw, float mincostheta );
+void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float maxw, float mincostheta );
 
-void SdfReset(Volume<SDF_t> vol, float trunc_dist);
+void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist);
 
-void SdfSphere(Volume<SDF_t> vol, BoundingBox bbox, float3 center, float r);
+void SdfSphere(BoundedVolume<SDF_t> vol, float3 center, float r);
 
 }

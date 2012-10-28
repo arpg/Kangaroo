@@ -1,9 +1,7 @@
-#include "Mat.h"
 #include "MatUtils.h"
 #include "Image.h"
-#include "Volume.h"
 #include "Sdf.h"
-#include "BoundingBox.h"
+#include "BoundedVolume.h"
 #include "launch_utils.h"
 
 namespace Gpu
@@ -13,7 +11,7 @@ namespace Gpu
 // Raycast SDF
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const BoundingBox bbox, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
+__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -25,8 +23,8 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 
         // Raycast bounding box to find valid ray segment of sdf
         // http://www.cs.utah.edu/~awilliam/box/box.pdf
-        const float3 tminbound = (bbox.Min() - c_w) / ray_w;
-        const float3 tmaxbound = (bbox.Max() - c_w) / ray_w;
+        const float3 tminbound = (vol.bbox.Min() - c_w) / ray_w;
+        const float3 tmaxbound = (vol.bbox.Max() - c_w) / ray_w;
         const float3 tmin = fminf(tminbound,tmaxbound);
         const float3 tmax = fmaxf(tminbound,tmaxbound);
         const float max_tmin = fmaxf(fmaxf(fmaxf(tmin.x, tmin.y), tmin.z), near);
@@ -39,14 +37,13 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
             float last_sdf = 0;
-            float min_delta_lambda = bbox.Size().x / (vol.w-1);
+            float min_delta_lambda = vol.VoxelSizeUnits().x;
             float delta_lambda = 0;
 
             // March through space
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;
-                const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Max() - bbox.Min());
-                const float sdf = vol.GetFractionalTrilinearClamped(pos_v);
+                const float sdf = vol.GetUnitsTrilinearClamped(pos_w);
 
                 if( sdf <= 0 ) {
                     // surface!
@@ -64,8 +61,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 
         // Compute normal
         const float3 pos_w = c_w + depth * ray_w;
-        const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Size());
-        const float3 _n_w = vol.GetFractionalBackwardDiffDxDyDz(pos_v);
+        const float3 _n_w = vol.GetUnitsBackwardDiffDxDyDz(pos_w);
         const float len_n_w = length(_n_w);
         const float3 n_w = len_n_w > 0 ? _n_w / len_n_w : make_float3(0,0,1);
         const float3 n_c = mulSO3inv(T_wc,n_w);
@@ -96,12 +92,12 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
     }
 }
 
-void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const BoundingBox bbox, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, bool subpix )
 {    
     dim3 blockDim, gridDim;
 //    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, bbox, T_wc, fu, fv, u0, v0, near, far, subpix);
+    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, T_wc, fu, fv, u0, v0, near, far, subpix);
     GpuCheckErrors();
 }
 

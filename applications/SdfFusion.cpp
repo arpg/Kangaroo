@@ -46,7 +46,7 @@ int main( int argc, char* argv[] )
 
     pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
 
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres);
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
 
@@ -77,9 +77,8 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
-    Gpu::BoundingBox bbox(make_float3(-1,-1,-1), make_float3(1,1,1) );
-    const float3 voxsize = bbox.Size() / make_float3(vol.w, vol.h, vol.d);
-    Gpu::SdfSphere(vol, bbox, make_float3(0,0,0), 0.9 );
+    const float voxsize = length(vol.VoxelSizeUnits());
+    Gpu::SdfSphere(vol, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> sdfreset("ui.reset", false, false);
@@ -87,7 +86,7 @@ int main( int argc, char* argv[] )
     Var<bool> sdfsphere("ui.sphere", false, false);
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> fuseonce("ui.fuse once", false, false);
-    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    Var<float> trunc_dist("ui.trunc dist", 2*voxsize, 2*voxsize,0.5);
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.5, 0, 1);
     Var<bool>  test("ui.test", false, true);
@@ -107,12 +106,12 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(sdfsphere)) {
-            Gpu::SdfSphere(vol, bbox, make_float3(0,0,0), 0.9 );
+            Gpu::SdfSphere(vol, make_float3(0,0,0), 0.9 );
         }
 
         // Raycast current view
         {
-            Gpu::RaycastSdf(depth, norm, img, vol, bbox, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
@@ -131,7 +130,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, bbox, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(test) {

@@ -302,6 +302,12 @@ struct Volume
         return Image<T,Target,DontManage>( RowPtr(y,0), w, d, img_pitch);
     }
 
+    inline __device__ __host__
+    uint3 Voxels() const
+    {
+        return make_uint3(w,h,d);
+    }
+
     //////////////////////////////////////////////////////
     // Thrust convenience methods
     //////////////////////////////////////////////////////

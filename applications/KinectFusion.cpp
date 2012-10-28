@@ -24,6 +24,7 @@
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
+#include <kangaroo/BoundedVolume.h>
 
 using namespace std;
 using namespace pangolin;
@@ -60,7 +61,7 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_d(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres);
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-2,-2,-2), make_float3(2,2,2));
 
     Gpu::BoundingBox bbox(make_float3(-2,-2,-2), make_float3(2,2,2) );
 //    Gpu::BoundingBox bbox(make_float3(-1,-1,0.5), make_float3(1,1,2.5) );
@@ -161,12 +162,12 @@ int main( int argc, char* argv[] )
             Gpu::SdfReset(vol, trunc_dist);
 
             // Fuse first kinect frame in.
-            Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(viewonly) {
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], vol, bbox, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, true );
+            Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, true );
         }else{
             if(pose_refinement && frame > 0) {
                 Sophus::SE3 T_lp;
@@ -175,7 +176,7 @@ int main( int argc, char* argv[] )
                 {
                     const int l = show_level;
 
-                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, bbox, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
+                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, 0.2, 8, true );
                     Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
 
                     const int lits = pose_its;
@@ -199,7 +200,7 @@ int main( int argc, char* argv[] )
 
             if(pose_refinement && (Pushed(fuseonce) || fuse) ) {
                 // integrate gtd into TSDF
-                Gpu::SdfFuse(vol, bbox, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+                Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
             }
         }
 

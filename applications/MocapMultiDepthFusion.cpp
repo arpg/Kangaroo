@@ -107,15 +107,14 @@ int main( int argc, char* argv[] )
     Gpu::Image<unsigned char,Gpu::TargetDevice,Gpu::Manage> scratch(MaxWidth*sizeof(Gpu::LeastSquaresSystem<float,6>),MaxHeight);
     Gpu::Image<float,Gpu::TargetDevice,Gpu::Manage>  imgerr(w,h);
 
-    Gpu::Volume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(4*64,4*64,2*64);
-    const Gpu::BoundingBox bbox(make_float3(-2,-2,-0.2), make_float3(2,2,1.8) );
-    const float3 voxsize = bbox.Size() / make_float3(vol.w, vol.h, vol.d);
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(4*64,4*64,2*64, make_float3(-2,-2,-0.2), make_float3(2,2,1.8));
+    const float3 voxsize = vol.VoxelSizeUnits();
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLGrid glGrid(10,1,true);
     SceneGraph::GLAxis glAxis;
     SceneGraph::GLAxisAlignedBox glbbox;
-    glbbox.SetBounds(Gpu::ToEigen(bbox.Min()), Gpu::ToEigen(bbox.Max()) );
+    glbbox.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
     graph.AddChild(&glGrid);
     graph.AddChild(&glAxis);
     graph.AddChild(&glbbox);
@@ -164,7 +163,7 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(sdfsphere)) {
-            Gpu::SdfSphere(vol, bbox, make_float3(0,0,1), 0.9 );
+            Gpu::SdfSphere(vol, make_float3(0,0,1), 0.9 );
         }
 
         if(plane_do) {
@@ -251,7 +250,7 @@ int main( int argc, char* argv[] )
                 if(Pushed(fuseonce) || fuse) {
                     // integrate gtd into TSDF
                     Eigen::Matrix<double,3,4> T_cw = (Sophus::SE3(sensor.glT_wv->GetPose4x4_po() * sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
-                    Gpu::SdfFuse(vol, bbox, imgf, imgn, T_cw, sensor.fu, sensor.fv, sensor.u0, sensor.v0, trunc_dist, max_w, mincostheta );
+                    Gpu::SdfFuse(vol, imgf, imgn, T_cw, sensor.fu, sensor.fv, sensor.u0, sensor.v0, trunc_dist, max_w, mincostheta );
                 }
 
                 {
@@ -271,7 +270,7 @@ int main( int argc, char* argv[] )
         // Raycast current view
         {
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::RaycastSdf(rayd, rayn, rayi, vol, bbox, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, true );
+            Gpu::RaycastSdf(rayd, rayn, rayi, vol, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, true );
         }
 
         int sn = 0;
