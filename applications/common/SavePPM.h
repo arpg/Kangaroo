@@ -21,8 +21,8 @@ void SavePXM(const std::string filename, const Gpu::Image<T,Gpu::TargetHost>& im
 {
     std::ofstream bFile( filename.c_str(), std::ios::out | std::ios::binary );
     bFile << ppm_type << std::endl;
-    bFile << image.w << " " << image.h << std::endl;
-    bFile << num_colors << std::endl;
+    bFile << image.w << " " << image.h << '\n';
+    bFile << num_colors << '\n';
     for(int r=0; r<image.h; ++r) {
         bFile.write( (const char*)image.RowPtr(r), image.w * sizeof(T) );
     }
@@ -38,16 +38,16 @@ void SavePXM(const std::string filename, const Gpu::Image<T,Gpu::TargetDevice>& 
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// Volume types
+// Save Volume types
 /////////////////////////////////////////////////////////////////////////////
 
-template<typename T>
-void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetHost>& vol, std::string ppm_type = "P5", int num_colors = 255)
+template<typename T, typename Manage>
+void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetHost,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
 {
     std::ofstream bFile( filename.c_str(), std::ios::out | std::ios::binary );
     bFile << ppm_type << std::endl;
-    bFile << vol.w << " " << vol.h << " " << vol.d << std::endl;
-    bFile << num_colors << std::endl;
+    bFile << vol.w << " " << vol.h << " " << vol.d << '\n';
+    bFile << num_colors << '\n';
     for(int d=0; d<vol.d; ++d) {
         for(int r=0; r<vol.h; ++r) {
             bFile.write( (const char*)vol.RowPtr(r,d), vol.w * sizeof(T) );
@@ -56,10 +56,72 @@ void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetHost>& v
     bFile.close();
 }
 
-template<typename T>
-void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetDevice>& vol, std::string ppm_type = "P5", int num_colors = 255)
+template<typename T, typename Manage>
+void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetDevice,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
 {
-    Gpu::Volume<T,Gpu::TargetHost> hvol(vol.w, vol.h, vol.d);
+    Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage> hvol(vol.w, vol.h, vol.d);
     hvol.CopyFrom(vol);
     SavePXM(filename, hvol, ppm_type, num_colors);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Load Volume types
+/////////////////////////////////////////////////////////////////////////////
+
+template<typename T>
+bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage>& vol)
+{
+    // Parse header
+    std::ifstream bFile( filename.c_str(), std::ios::in | std::ios::binary );
+    std::string ppm_type = "";
+    int num_colors = 0;
+    int w = 0;
+    int h = 0;
+    int d = 0;
+
+    bFile >> ppm_type;
+    bFile >> w;
+    bFile >> h;
+    bFile >> d;
+    bFile >> num_colors;
+    bFile.ignore(1,'\n');
+
+    bool success = !bFile.fail() && w > 0 && h > 0 && d > 0;
+
+    if(success) {
+        // Make sure vol is empty
+        Gpu::Manage::Cleanup<T,Gpu::TargetHost>(vol.ptr);
+
+        // Allocate memory
+        Gpu::TargetHost::AllocatePitchedMem<T>(&vol.ptr,&vol.pitch,&vol.img_pitch,w,h,d);
+        vol.w = w; vol.h = h; vol.d = d;
+
+        // Read in data
+        for(int d=0; d<vol.d; ++d) {
+            for(int r=0; r<vol.h; ++r) {
+                bFile.read( (char*)vol.RowPtr(r,d), vol.w * sizeof(T) );
+            }
+        }
+        success = !bFile.fail();
+    }
+    bFile.close();
+
+    return success;
+}
+
+template<typename T>
+bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetDevice,Gpu::Manage>& vol)
+{
+    Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage> hvol;
+    bool success = LoadPXM(filename, hvol);
+
+    if(success) {
+        Gpu::Manage::Cleanup<T,Gpu::TargetDevice>(vol.ptr);
+
+        Gpu::TargetDevice::AllocatePitchedMem<T>(&vol.ptr,&vol.pitch,&vol.img_pitch,hvol.w,hvol.h,hvol.d);
+        vol.w = hvol.w; vol.h = hvol.h; vol.d = hvol.d;
+
+        vol.CopyFrom(hvol);
+    }
+    return success;
 }

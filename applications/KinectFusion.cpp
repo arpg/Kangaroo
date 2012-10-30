@@ -54,7 +54,7 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 1;
+    const float volrad = 2;
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -72,8 +72,9 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_c(w,h);
-//    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25)); // dress form.
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
+//    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25)); // dress form.
+
     const float3 voxsize = vol.VoxelSizeUnits();
 
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> kfrgb(w,h);
@@ -97,7 +98,11 @@ int main( int argc, char* argv[] )
     );
 
     Var<bool> run("ui.run", true, true);
+
     Var<bool> viewonly("ui.view only", false, true);
+    Var<bool> fuse("ui.fuse", true, true);
+    Var<bool> reset("ui.reset", true, false);
+
     Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
 
     Var<int> biwin("ui.size",5, 1, 20);
@@ -105,12 +110,8 @@ int main( int argc, char* argv[] )
     Var<float> bigr("ui.gr",700, 1E-3, 200);
 
     Var<bool> pose_refinement("ui.Pose Refinement", true, true);
-    Var<bool> reset("ui.reset", false, false);
-    Var<float> icp_c("ui.icp c",0.5, 1E-3, 1);
+    Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
     Var<int> pose_its("ui.pose_its", 5, 0, 10);
-
-    Var<bool> fuse("ui.fuse", true, true);
-    Var<bool> fuseonce("ui.fuse once", false, false);
 
     Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
@@ -145,7 +146,8 @@ int main( int argc, char* argv[] )
 
     Sophus::SE3 T_wl;
 
-//    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
+    pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
+    pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol);} );
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
@@ -179,7 +181,7 @@ int main( int argc, char* argv[] )
             frame++;
         }
 
-        if(Pushed(reset) || frame==0) {
+        if(Pushed(reset)) {
             T_wl = Sophus::SE3();
             Gpu::SdfReset(vol, trunc_dist);
 
@@ -224,7 +226,7 @@ int main( int argc, char* argv[] )
                 T_wl = T_wl * T_lp.inverse();
             }
 
-            if(pose_refinement && (Pushed(fuseonce) || fuse) ) {
+            if(pose_refinement && fuse ) {
                 Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
                 Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
             }

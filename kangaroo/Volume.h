@@ -50,8 +50,7 @@ struct Volume
         :w(w), h(h), d(d)
     {
         Management::AllocateCheck();
-        Target::template AllocatePitchedMem<T>(&ptr,&pitch,w,h*d);
-        img_pitch = pitch*h;
+        Target::template AllocatePitchedMem<T>(&ptr,&pitch,&img_pitch,w,h,d);
     }
 
     inline __device__ __host__
@@ -90,9 +89,7 @@ struct Volume
         // we need to do a copy for each depth layer.
         assert(w == img.w);
         assert(h == img.h);
-        assert(pitch == img.pitch);
         assert(img_pitch == img.img_pitch);
-
         cudaMemcpy2D(ptr,pitch,img.ptr,img.pitch, std::min(img.w,w)*sizeof(T), h*std::min(img.d,d), TargetCopyKind<Target,TargetFrom>() );
     }
 

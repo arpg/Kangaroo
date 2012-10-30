@@ -55,6 +55,13 @@ struct TargetHost
     }
 
     template<typename T> inline static
+    void AllocatePitchedMem(T** hostPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
+        *pitch = w*sizeof(T);
+        *img_pitch = *pitch*h;
+        *hostPtr = (T*)malloc(*pitch * h * d);
+    }
+
+    template<typename T> inline static
     void DeallocatePitchedMem(T* hostPtr){
         free(hostPtr);
     }
@@ -67,6 +74,14 @@ struct TargetDevice
         if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h) != cudaSuccess ) {
             throw CudaException("Unable to cudaMallocPitch");
         }
+    }
+
+    template<typename T> inline static
+    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
+        if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h*d) != cudaSuccess ) {
+            throw CudaException("Unable to cudaMallocPitch");
+        }
+        *img_pitch = *pitch * h;
     }
 
     template<typename T> inline static
@@ -108,6 +123,7 @@ struct Manage
     {
         if(ptr) {
             Target::template DeallocatePitchedMem<T>(ptr);
+            ptr = 0;
         }
     }
 };
