@@ -141,7 +141,11 @@ void DisparityImageToVbo(
 void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd );
 
 template<typename Tout, typename Tin>
-void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+
+template<typename Tout, typename Tin, size_t N>
+void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+
 
 void NormalsFromVbo(Image<float4> dN, const Image<float4> dV);
 

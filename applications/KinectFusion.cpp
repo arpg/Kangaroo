@@ -31,6 +31,17 @@ using namespace pangolin;
 
 //Gpu::Mat<ImageKeyframe<Timg>,N> keyframes;
 
+struct KinectKeyframe
+{
+    KinectKeyframe(int w, int h, Sophus::SE3 T_iw)
+        : img(w,h), T_iw(T_iw)
+    {
+    }
+
+    Sophus::SE3 T_iw;
+    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
+};
+
 int main( int argc, char* argv[] )
 {
     // Initialise window
@@ -52,9 +63,9 @@ int main( int argc, char* argv[] )
     const double v0 = h/2.0 - 0.5;
     const double knear = 0.4;
     const double kfar = 4;
-    const int volres = 384; //256;
-//    const int volres = 256;
-    const float volrad = 4;
+//    const int volres = 384; //256;
+    const int volres = 256;
+    const float volrad = 2;
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -77,10 +88,8 @@ int main( int argc, char* argv[] )
 
     const float3 voxsize = vol.VoxelSizeUnits();
 
-    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> kfrgb(w,h);
-
-    Gpu::ImageKeyframe<uchar3> kf;
-    kf.img = kfrgb;
+    boost::ptr_vector<KinectKeyframe> keyframes;
+    Gpu::Mat<Gpu::ImageKeyframe<uchar3>,10> kfs;
 
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
@@ -120,11 +129,6 @@ int main( int argc, char* argv[] )
     Var<bool> save_kf("ui.Save KF", false, false);
     Var<float> rgb_fl("ui.RGB focal length", 535.7,400,600);
 
-    Eigen::Matrix3d Krgb;
-    Krgb << rgb_fl, 0, w/2.0f - 0.5,
-            0, rgb_fl, h/2.0f - 0.5,
-            0,0,1;
-
     ActivateDrawPyramid<float,MaxLevels> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawPyramid<float4,MaxLevels> adraycolor(ray_c, GL_RGBA32F, true, true);
 //    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
@@ -154,16 +158,13 @@ int main( int argc, char* argv[] )
         const bool go = frame==-1 || run;
 
         if(rgb_fl.GuiChanged()) {
-            Krgb << rgb_fl, 0, w/2.0f - 0.5,
-                    0, rgb_fl, h/2.0f - 0.5,
-                    0,0,1;
             save_kf = true;
         }
 
         if(Pushed(save_kf)) {
-            Eigen::Matrix<double,3,4> KiTiw = Krgb * (T_cd * T_wl.inverse()).matrix3x4();
-            kf.img.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)img[0].Image.data,w,h));
-            kf.KiT_iw = KiTiw;
+            KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
+            kf->img.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)img[0].Image.data,w,h));
+            keyframes.push_back(kf);
         }
 
         if(go) {
@@ -184,6 +185,7 @@ int main( int argc, char* argv[] )
         if(Pushed(reset)) {
             T_wl = Sophus::SE3();
             Gpu::SdfReset(vol, trunc_dist);
+            keyframes.clear();
 
             // Fuse first kinect frame in.
             Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
@@ -194,7 +196,20 @@ int main( int argc, char* argv[] )
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
             if(work_vol.IsValid()) {
                 Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, knear,20, true );
-                Gpu::TextureDepth<float4,uchar3>(ray_c[0], kf, ray_d[0], T_vw.inverse().matrix3x4(), fu,fv,u0,v0);
+
+                // populate kfs
+                for( int k=0; k< kfs.Rows(); k++)
+                {
+                    if(k < keyframes.size()) {
+                        kfs[k].img = keyframes[k].img;
+                        kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
+                        kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
+                    }else{
+                        kfs[k].img.ptr = 0;
+                    }
+                }
+
+                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], T_vw.inverse().matrix3x4(), fu,fv,u0,v0);
             }
         }else{
             if(pose_refinement && frame > 0) {

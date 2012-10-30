@@ -92,6 +92,7 @@ public:
     inline __device__ __host__
     float3 GetUnitsBackwardDiffDxDyDz(float3 pos_w) const
     {
+        // TODO: Fix scaling on derivative
         const float3 pos_v = (pos_w - bbox.Min()) / (bbox.Size());
         return Volume<T,Target,Management>::GetFractionalBackwardDiffDxDyDz(pos_v);
     }

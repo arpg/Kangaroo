@@ -245,7 +245,6 @@ struct Image {
     inline __host__
     void operator=(Image<T,Target,Management>&& img)
     {
-        assert(ptr==0);
         pitch = img.pitch;
         ptr = img.ptr;
         w = img.w;

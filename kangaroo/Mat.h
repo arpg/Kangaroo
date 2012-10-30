@@ -57,6 +57,14 @@ struct Mat
         return m[r];
     }
 
+    inline __device__ __host__ unsigned Rows() {
+        return R;
+    }
+
+    inline __device__ __host__ unsigned Cols() {
+        return C;
+    }
+
     inline __device__ __host__ void operator+=(const Mat<P,R,C>& rhs) {
         #pragma unroll
         for( int i=0; i<R*C; ++i )

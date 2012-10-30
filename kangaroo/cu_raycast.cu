@@ -83,7 +83,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
             imgdepth(u,v) = depth;
             img(u,v) = ambient + diffuse * ldotn  + specular * spec;
 //            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
-            norm(u,v) = make_float4(-1.0f*n_c, 1);
+            norm(u,v) = make_float4(n_c, 1);
         }else{
             imgdepth(u,v) = 0.0f/0.0f;
             img(u,v) = 0;

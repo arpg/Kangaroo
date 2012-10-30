@@ -38,7 +38,7 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
             // Further than truncation distance from surface
             // We do nothing.
         }else{
-            if(isfinite(w) && w > mincostheta ) {
+            if(isfinite(md) && isfinite(w) && w > mincostheta ) {
                 SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
                 sdf.Clamp(-trunc_dist, trunc_dist);
                 sdf.LimitWeight(max_w);
