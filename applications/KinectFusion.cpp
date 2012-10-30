@@ -52,9 +52,9 @@ int main( int argc, char* argv[] )
     const double v0 = h/2.0 - 0.5;
     const double knear = 0.4;
     const double kfar = 4;
-//    const int volres = 384; //256;
-    const int volres = 256;
-    const float volrad = 2;
+    const int volres = 384; //256;
+//    const int volres = 256;
+    const float volrad = 4;
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -192,43 +192,48 @@ int main( int argc, char* argv[] )
         if(viewonly) {
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
-            Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, knear,20, true );
-            Gpu::TextureDepth<float4,uchar3>(ray_c[0], kf, ray_d[0], T_vw.inverse().matrix3x4(), fu,fv,u0,v0);
+            if(work_vol.IsValid()) {
+                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, knear,20, true );
+                Gpu::TextureDepth<float4,uchar3>(ray_c[0], kf, ray_d[0], T_vw.inverse().matrix3x4(), fu,fv,u0,v0);
+            }
         }else{
             if(pose_refinement && frame > 0) {
                 Sophus::SE3 T_lp;
                 Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+                if(work_vol.IsValid()) {
+        //            for(int l=MaxLevels-1; l >=0; --l)
+                    {
+                        const int l = show_level;
 
-    //            for(int l=MaxLevels-1; l >=0; --l)
-                {
-                    const int l = show_level;
 
+                        Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
+                        Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
 
-                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
-                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+                        const int lits = pose_its;
+                        Eigen::Matrix3d Kdepth;
+                        Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
 
-                    const int lits = pose_its;
-                    Eigen::Matrix3d Kdepth;
-                    Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
-
-                    for(int i=0; i<lits; ++i ) {
-                        const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
-                        const Eigen::Matrix<double, 3,4> mT_pl = T_lp.inverse().matrix3x4();
-                        Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
-                            kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
-                        );
-                        Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                        Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                        T_lp = T_lp * Sophus::SE3::exp(x);
+                        for(int i=0; i<lits; ++i ) {
+                            const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
+                            const Eigen::Matrix<double, 3,4> mT_pl = T_lp.inverse().matrix3x4();
+                            Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
+                                kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
+                            );
+                            Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                            Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
+                            T_lp = T_lp * Sophus::SE3::exp(x);
+                        }
                     }
-                }
 
-                T_wl = T_wl * T_lp.inverse();
+                    T_wl = T_wl * T_lp.inverse();
+                }
             }
 
             if(pose_refinement && fuse ) {
                 Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
-                Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+                if(work_vol.IsValid()) {
+                    Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+                }
             }
         }
 

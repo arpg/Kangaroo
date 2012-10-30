@@ -68,6 +68,17 @@ public:
     }
 
     //////////////////////////////////////////////////////
+    // Return true if this BoundedVolume represents a positive
+    // amount of space.
+    //////////////////////////////////////////////////////
+
+    inline __device__ __host__
+    bool IsValid() {
+        const uint3 size = Volume<T,Target,Management>::Voxels();
+        return size.x >= 8 && size.y >= 8 && size.z >= 8;
+    }
+
+    //////////////////////////////////////////////////////
     // Access volume in units of Bounding Box
     //////////////////////////////////////////////////////
 
@@ -124,7 +135,7 @@ public:
             fminf(ceilf((Volume<T,Target,Management>::d-1)*max_fv.z), Volume<T,Target,Management>::d-1)
         );
 
-        const int3 size_v = max((max_v - min_v) + make_int3(1,1,1), make_int3(8,8,8));
+        const int3 size_v = max((max_v - min_v) + make_int3(1,1,1), make_int3(0,0,0) );
 
         const BoundingBox nbbox(
             VoxelPositionInUnits(min_v),
