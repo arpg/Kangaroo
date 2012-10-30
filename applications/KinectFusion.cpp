@@ -20,7 +20,7 @@
 #include "common/PoseGraph.h"
 #include "common/GLPoseGraph.h"
 #include "common/Handler3dGpuDepth.h"
-
+#include "common/SavePPM.h"
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
@@ -72,7 +72,8 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_c(w,h);
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
+//    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25)); // dress form.
     const float3 voxsize = vol.VoxelSizeUnits();
 
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> kfrgb(w,h);
