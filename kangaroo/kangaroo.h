@@ -17,6 +17,7 @@
 #include "CostVolElem.h"
 #include "BoundingBox.h"
 #include "BoundedVolume.h"
+#include "ImageKeyframe.h"
 
 namespace Gpu
 {
@@ -138,6 +139,9 @@ void DisparityImageToVbo(
 );
 
 void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd );
+
+template<typename Tout, typename Tin>
+void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
 
 void NormalsFromVbo(Image<float4> dN, const Image<float4> dV);
 

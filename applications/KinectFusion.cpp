@@ -29,6 +29,8 @@
 using namespace std;
 using namespace pangolin;
 
+//Gpu::Mat<ImageKeyframe<Timg>,N> keyframes;
+
 int main( int argc, char* argv[] )
 {
     // Initialise window
@@ -43,15 +45,20 @@ int main( int argc, char* argv[] )
     const int h = img[0].height();
     const int MaxLevels = 4;
 
+    const double baseline_m = camera.GetProperty<double>("Depth0Baseline", 0) / 100;
     const double fu = camera.GetProperty<double>("Depth0FocalLength", 570.342);
     const double fv = fu;
     const double u0 = w/2.0 - 0.5;
     const double v0 = h/2.0 - 0.5;
     const double knear = 0.4;
-    const double kfar = 2;
+    const double kfar = 4;
 //    const int volres = 384; //256;
-    const int volres = 384;
-    const float volrad = 2;
+    const int volres = 256;
+    const float volrad = 1;
+
+    // Camera (rgb) to depth
+    Eigen::Vector3d c_d(baseline_m,0,0);
+    Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),c_d).inverse();
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
@@ -64,36 +71,24 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_d(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
+    Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_c(w,h);
     Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
+    const float3 voxsize = vol.VoxelSizeUnits();
 
-    Gpu::BoundingBox bbox(make_float3(-2,-2,-2), make_float3(2,2,2) );
-//    Gpu::BoundingBox bbox(make_float3(-1,-1,0.5), make_float3(1,1,2.5) );
-//    Gpu::BoundingBox bbox(make_float3(-4,-4,-2), make_float3(4,4,6) );
-//    Gpu::BoundingBox bbox(make_float3(-0.2,-0.2,0.4),make_float3(0.2,0.2,0.8) );
-    const float3 boxsize = bbox.Size();
-    const float3 voxsize = boxsize / make_float3(vol.w, vol.h, vol.d);
+    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> kfrgb(w,h);
 
-//    GlBufferCudaPtr vbo(GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-//    GlBufferCudaPtr cbo(GlArrayBuffer, w,h,GL_UNSIGNED_BYTE,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-//    GlBufferCudaPtr ibo(GlElementArrayBuffer, w,h,GL_UNSIGNED_INT,2 );
-//    {
-//        CudaScopedMappedPtr var(ibo);
-//        Gpu::Image<uint2> dIbo((uint2*)*var,w,h);
-//        Gpu::GenerateTriangleStripIndexBuffer(dIbo);
-//    }
+    Gpu::ImageKeyframe<uchar3> kf;
+    kf.img = kfrgb;
 
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
-//    SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
     SceneGraph::GLAxisAlignedBox glboxfrustum;
     SceneGraph::GLAxisAlignedBox glboxvol;
 
-    glboxvol.SetBounds(Gpu::ToEigen(bbox.Min()), Gpu::ToEigen(bbox.Max()) );
+    glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
     glgraph.AddChild(&glcamera);
-//    glcamera.AddChild(&glvbo);
     glgraph.AddChild(&glboxvol);
     glgraph.AddChild(&glboxfrustum);
-
 
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrixRDF_TopLeft(w,h,fu,fv,u0,v0,0.1,1000),
@@ -120,18 +115,29 @@ int main( int argc, char* argv[] )
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
+    Var<bool> save_kf("ui.Save KF", false, false);
+    Var<float> rgb_fl("ui.RGB focal length", 535.7,400,600);
+
+    Eigen::Matrix3d Krgb;
+    Krgb << rgb_fl, 0, w/2.0f - 0.5,
+            0, rgb_fl, h/2.0f - 0.5,
+            0,0,1;
+
     ActivateDrawPyramid<float,MaxLevels> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
-    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
-    ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
+    ActivateDrawPyramid<float4,MaxLevels> adraycolor(ray_c, GL_RGBA32F, true, true);
+//    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
+//    ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
+//    ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
-    SetupContainer(container, 2, (float)w/h);
+    SetupContainer(container, 3, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adrayimg))
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
+    container[2].SetDrawFunction(boost::ref(adraycolor))
+                .SetHandler(&rayhandler);
 //    container[1].SetDrawFunction(boost::ref(adnormals));
 //    container[0].SetDrawFunction(boost::ref(addebug));
 //    container[4].SetDrawFunction(boost::ref(adraynorm));
@@ -144,10 +150,22 @@ int main( int argc, char* argv[] )
     {
         const bool go = frame==-1 || run;
 
+        if(rgb_fl.GuiChanged()) {
+            Krgb << rgb_fl, 0, w/2.0f - 0.5,
+                    0, rgb_fl, h/2.0f - 0.5,
+                    0,0,1;
+            save_kf = true;
+        }
+
+        if(Pushed(save_kf)) {
+            Eigen::Matrix<double,3,4> KiTiw = Krgb * (T_cd * T_wl.inverse()).matrix3x4();
+            kf.img.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)img[0].Image.data,w,h));
+            kf.KiT_iw = KiTiw;
+        }
+
         if(go) {
             camera.Capture(img);
-            const int nid = 0;
-            dKinect.CopyFrom(Gpu::Image<unsigned short, Gpu::TargetHost>((unsigned short*)img[nid].Image.data,w,h));
+            dKinect.CopyFrom(Gpu::Image<unsigned short, Gpu::TargetHost>((unsigned short*)img[1].Image.data,w,h));
             Gpu::BilateralFilter<float,unsigned short>(kin_d[0],dKinect,bigs,bigr,biwin,200);
             Gpu::ElementwiseScaleBias<float,float,float>(kin_d[0], kin_d[0], 1.0f/1000.0f);
 
@@ -172,6 +190,7 @@ int main( int argc, char* argv[] )
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
             Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, knear,20, true );
+            Gpu::TextureDepth<float4,uchar3>(ray_c[0], kf, ray_d[0], T_vw.inverse().matrix3x4(), fu,fv,u0,v0);
         }else{
             if(pose_refinement && frame > 0) {
                 Sophus::SE3 T_lp;
@@ -213,7 +232,7 @@ int main( int argc, char* argv[] )
         glcamera.SetPose(T_wl.matrix());
 
         Gpu::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar);
-        bbox_work.Intersect(bbox);
+        bbox_work.Intersect(vol.bbox);
         glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
 
 //        {
