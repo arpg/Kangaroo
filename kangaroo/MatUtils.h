@@ -275,6 +275,18 @@ float dot(const float4& lhs, const float3& rhs)
     return lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z;
 }
 
+__host__ __device__ inline
+float dot3(const float4& lhs, const float4& rhs)
+{
+    return lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z;
+}
+
+__host__ __device__ inline
+float length3(float4 r)
+{
+    return sqrtf(dot3(r, r));
+}
+
 //////////////////////////////////////////////////////
 // SE3 Generator sparse multiplied by Mat
 // gen_i * p

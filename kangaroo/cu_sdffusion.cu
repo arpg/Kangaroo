@@ -32,7 +32,7 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
 
         const float costheta = dot(mdn, P_c / length(P_c));
         const float sd = costheta * (md - vd);
-        const float w = costheta;
+        const float w = costheta * 1.0f/vd;
 
         if(sd <= -trunc_dist) {
             // Further than truncation distance from surface

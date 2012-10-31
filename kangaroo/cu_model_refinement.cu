@@ -351,9 +351,9 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
     const float3 KPl = KT_lr * Pr;
     const float2 pl = dn(KPl);
 
-    if( isfinite(Pr.z) && Nr.w == 1.0f && dPl.InBounds(pl, 3) ) {
-//        const float4 _Pl = dPl.GetNearestNeighbour(pl);
-        const float4 _Pl = dPl.GetBilinear<float4>(pl);
+    if( isfinite(Pr.z) && Nr.w == 1.0f /*&& dot3(Nr,Pr) / -length3(Pr) > 0.2*/ && dPl.InBounds(pl, 3) ) {
+        const float4 _Pl = dPl.GetNearestNeighbour(pl);
+//        const float4 _Pl = dPl.GetBilinear<float4>(pl);
         if(isfinite(_Pl.z)) {
             const float3 _Pr = T_rl * _Pl;
             const float3 Dr = _Pr - Pr;
@@ -369,7 +369,7 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
                 -dot(SE3gen5mul(_Pr), Nr)
             };
 
-            const float w = LSReweightTukey(y,c);
+            const float w = (1.0f/Pr.z) * LSReweightTukey(y,c);
             sum.JTJ = OuterProduct(Jr,w);
             sum.JTy = mul_aTb(Jr,y*w);
             sum.obs = 1;

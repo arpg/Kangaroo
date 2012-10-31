@@ -144,7 +144,7 @@ template<typename Tout, typename Tin>
 void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
 
 template<typename Tout, typename Tin, size_t N>
-void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
 
 
 void NormalsFromVbo(Image<float4> dN, const Image<float4> dV);
