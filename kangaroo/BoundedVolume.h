@@ -98,7 +98,7 @@ public:
     }
 
     inline __device__ __host__
-    float3 VoxelPositionInUnits(int x, int y, int z)
+    float3 VoxelPositionInUnits(int x, int y, int z) const
     {
         const float3 vol_size = bbox.Size();
 
@@ -110,7 +110,7 @@ public:
     }
 
     inline __device__ __host__
-    float3 VoxelPositionInUnits(int3 p_v)
+    float3 VoxelPositionInUnits(int3 p_v) const
     {
         return VoxelPositionInUnits(p_v.x,p_v.y,p_v.z);
     }

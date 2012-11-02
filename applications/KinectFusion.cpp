@@ -15,12 +15,13 @@
 #include "common/ImageSelect.h"
 #include "common/BaseDisplayCuda.h"
 #include "common/DisplayUtils.h"
-#include "common/HeightmapFusion.h"
 #include "common/ViconTracker.h"
 #include "common/PoseGraph.h"
 #include "common/GLPoseGraph.h"
 #include "common/Handler3dGpuDepth.h"
 #include "common/SavePPM.h"
+
+#include "MarchingCubes.h"
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
@@ -63,9 +64,11 @@ int main( int argc, char* argv[] )
     const double v0 = h/2.0 - 0.5;
     const double knear = 0.4;
     const double kfar = 4;
-    const int volres = 384; //256;
-//    const int volres = 256;
-    const float volrad = 3;
+//    const int volres = 384; //256;
+    const int volres = 256;
+    const float volrad = 1;
+
+    const Eigen::Vector4d its(1,2,3,4);
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -136,25 +139,25 @@ int main( int argc, char* argv[] )
     ActivateDrawPyramid<float4,MaxLevels> adraycolor(ray_c, GL_RGBA32F, true, true);
 //    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
 //    ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
+    ActivateDrawPyramid<float4,MaxLevels> adnormals( ray_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
-    SetupContainer(container, 5, (float)w/h);
+    SetupContainer(container, 3, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adrayimg))
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
     container[2].SetDrawFunction(boost::ref(adraycolor))
                 .SetHandler(&rayhandler);
-    container[3].SetDrawFunction(boost::ref(addebug));
-    container[4].SetDrawFunction(boost::ref(adnormals));
+//    container[3].SetDrawFunction(boost::ref(addebug));
+//    container[4].SetDrawFunction(boost::ref(adnormals));
 //    container[4].SetDrawFunction(boost::ref(adraynorm));
 
     Sophus::SE3 T_wl;
 
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
-    pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol);} );
+    pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); Gpu::SaveMesh("mesh", vol); } );
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
@@ -217,21 +220,30 @@ int main( int argc, char* argv[] )
         }else{
             bool tracking_good = true;
 
-            if(pose_refinement && frame > 0) {
-                Sophus::SE3 T_lp;
-                Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
-                if(work_vol.IsValid()) {
-        //            for(int l=MaxLevels-1; l >=0; --l)
-                    {
-                        const int l = show_level;
-                        Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
-                        Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+            if(work_vol.IsValid()) {
+//                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
+//                Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);
+                for(int l=0; l<MaxLevels; ++l) {
+                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
+                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+//                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
+                }
 
-                        const int lits = pose_its;
+                if(pose_refinement && frame > 0) {
+                    Sophus::SE3 T_lp;
+
+//                    const int l = show_level;
+//                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
+//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+
+                    for(int l=MaxLevels-1; l >=0; --l)
+                    {
                         Eigen::Matrix3d Kdepth;
                         Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
 
-                        for(int i=0; i<lits; ++i ) {
+                        for(int i=0; i<its[l]; ++i ) {
                             const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
                             const Eigen::Matrix<double, 3,4> mT_pl = T_lp.inverse().matrix3x4();
                             Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
@@ -240,6 +252,10 @@ int main( int argc, char* argv[] )
                             Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                             Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
                             T_lp = T_lp * Sophus::SE3::exp(x);
+
+                            if(lu_JTJ.rank() < 6) {
+                                cout << "Rank" << lu_JTJ.rank() << endl;
+                            }
 
                             rmse = sqrt(lss.sqErr / lss.obs);
                             tracking_good = rmse < max_rmse;
@@ -285,7 +301,7 @@ int main( int argc, char* argv[] )
         addebug.SetImage(dDebug.SubImage(0,0,w>>show_level,h>>show_level));
 //        addepth.SetImageScale(scale);
 //        addepth.SetLevel(show_level);
-//        adnormals.SetLevel(show_level);
+        adnormals.SetLevel(show_level);
         adrayimg.SetLevel(viewonly? 0 : show_level);
 //        adraynorm.SetLevel(show_level);
 

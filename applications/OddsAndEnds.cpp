@@ -1,45 +1,14 @@
 #include <iostream>
 
-#include "common/BitonicSortingNetwork.h"
+#include "MarchingCubes.h"
+#include <kangaroo/BoundedVolume.h>
+#include <kangaroo/Sdf.h>
 
 using namespace std;
 
-int OutputBitonicNetwork()
-{
-    const int size = 9*9;
-
-    // Which sorted indices do we need?
-    set<int> desired;
-
-    // 5x5 median - just central value
-//    desired.insert(size/2);
-
-    // 5x5 median - upper half (so we can offset start)
-    for(int i=size/2; i<size; ++i ) {
-        desired.insert(i);
-    }
-
-    BitonicNetwork network(size);
-    network.Compute();
-    cout << "Complete sort network (" << network.Size() << " swaps)" << endl;
-    network.Print();
-
-    network.Prune(desired);
-    cout << endl << "Pruned sort network (" << network.Size() << " swaps)" << endl;
-    network.Print();
-}
-
-#include <fiducials/tracker.h>
-
-void TestEPS()
-{
-    Tracker tracker(640,480);
-    tracker.target.LoadEPS("/Users/slovegrove/Desktop/stereo.eps");
-
-}
 
 int main( int /*argc*/, char* argv[] )
 {
-//    OutputBitonicNetwork();
-    TestEPS();
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetHost, Gpu::Manage> vol(16,16,16, make_float3(0,0,0), make_float3(1,1,1) );
+    Gpu::SaveMesh<Gpu::SDF_t>("test",vol);
 }

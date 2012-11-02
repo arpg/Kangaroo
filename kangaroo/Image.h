@@ -18,7 +18,7 @@
 #endif // __CUDACC__
 
 #ifdef USE_OPENCV
-#include <opencv.hpp>
+#include <opencv2/opencv.hpp>
 #endif // HAVE_OPENCV
 
 #define HAVE_THRUST

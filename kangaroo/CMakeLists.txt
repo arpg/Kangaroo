@@ -42,6 +42,7 @@ list(APPEND SRC_CU
     cu_raycast.cu cu_sdffusion.cu
 )
 
+
 include_directories( ${Boost_INCLUDE_DIRS} )
 cuda_add_library( ${LIBRARY_NAME} ${SRC_H} ${SRC_CU} )
 

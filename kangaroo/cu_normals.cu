@@ -28,7 +28,7 @@ __global__ void KernNormalsFromVbo(Image<float4> dN, const Image<float4> dV)
             );
 
             const float magaxb = length(axb);
-            float4 N = make_float4(axb.x/magaxb, axb.y/magaxb, axb.z/magaxb,1);
+            const float4 N = make_float4(-axb.x/magaxb, -axb.y/magaxb, -axb.z/magaxb,1);
             dN(u,v) = N;
         }else{
             dN(u,v) = make_float4(0,0,0,0);
