@@ -12,8 +12,21 @@ using namespace std;
 using namespace pangolin;
 using namespace Eigen;
 
-int main( int /*argc*/, char* argv[] )
+void Usage() {
+    cout << "Usage: ViconTest ConnectionString ObjectName [ObjectName2]" << endl;
+}
+
+int main( int argc, char* argv[] )
 {
+    if(argc < 3 || 4 < argc ) {
+        Usage();
+        exit(-1);
+    }
+
+    const std::string vicon_ip(argv[1]);
+    const std::string vicon_name1(argv[2]);
+    const std::string vicon_name2(argc > 3 ? argv[3] : "" );
+
     const int w = 640;
     const int h = 480;
 
@@ -32,13 +45,13 @@ int main( int /*argc*/, char* argv[] )
       .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f/480.0f)
       .SetHandler(new Handler3D(s_cam,AxisZ));
 
-    ViconConnection viconConnection("192.168.10.1");
-    ViconTracking tracker("ASUS", viconConnection);
-//    ViconTracking tracker2("QUAD1", viconConnection);
+    ViconConnection viconConnection(vicon_ip);
+    ViconTracking tracker1(vicon_name1, viconConnection);
+    ViconTracking tracker2(vicon_name2, viconConnection);
     int subsample = 1;
 
-    pangolin::RegisterKeyPressCallback(' ', [&tracker](){tracker.ToggleRecordHistory();} );
-    pangolin::RegisterKeyPressCallback('r', [&tracker](){tracker.ClearHistory();} );
+    pangolin::RegisterKeyPressCallback(' ', [&tracker1](){tracker1.ToggleRecordHistory();} );
+    pangolin::RegisterKeyPressCallback('r', [&tracker1](){tracker1.ClearHistory();} );
     pangolin::RegisterKeyPressCallback('=', [&subsample](){subsample++;} );
     pangolin::RegisterKeyPressCallback('-', [&subsample](){subsample--; subsample=max(subsample,1);} );
 
@@ -53,7 +66,7 @@ int main( int /*argc*/, char* argv[] )
         glEnable(GL_DEPTH_TEST);
 
         // Draw History
-        const std::vector<Sophus::SE3>& history = tracker.History();
+        const std::vector<Sophus::SE3>& history = tracker1.History();
         const int N = history.size();
         for(int i=0; i<N; i+= subsample) {
             glPushMatrix();
@@ -64,15 +77,15 @@ int main( int /*argc*/, char* argv[] )
 
         // Draw Vicon
         glPushMatrix();
-        glMultMatrix( tracker.T_wf().matrix() );
+        glMultMatrix( tracker1.T_wf().matrix() );
         glDrawAxis(1);
         glPopMatrix();
 
-//        // Draw Second Vicon Target
-//        glPushMatrix();
-//        glMultMatrix( tracker2.T_wf().matrix() );
-//        glDrawAxis(1);
-//        glPopMatrix();
+        // Draw Second Vicon Target
+        glPushMatrix();
+        glMultMatrix( tracker2.T_wf().matrix() );
+        glDrawAxis(1);
+        glPopMatrix();
 
         pangolin::FinishGlutFrame();
     }
