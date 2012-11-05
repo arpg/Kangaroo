@@ -69,6 +69,7 @@ void vMarchCube(
     float afCubeValue[8];
     for(int iVertex = 0; iVertex < 8; iVertex++) {
         afCubeValue[iVertex] = vol.Get(x+a2fVertexOffset[iVertex][0],y+a2fVertexOffset[iVertex][1],z+a2fVertexOffset[iVertex][2]);
+        if(!std::isfinite(afCubeValue[iVertex])) return;
     }
 
     //Find which vertices are inside of the surface and which are outside

@@ -71,7 +71,7 @@ int main( int argc, char* argv[] )
     {
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
-        Gpu::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+        Gpu::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, 0, subpix );
 
         /////////////////////////////////////////////////////////////
         // Perform drawing

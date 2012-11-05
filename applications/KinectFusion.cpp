@@ -66,7 +66,7 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 2;
+    const float volrad = 1;
 
     const Eigen::Vector4d its(1,2,3,4);
 
@@ -201,7 +201,7 @@ int main( int argc, char* argv[] )
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
             if(work_vol.IsValid()) {
-                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, true );
+                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, trunc_dist, true );
 
                 // populate kfs
                 for( int k=0; k< kfs.Rows(); k++)

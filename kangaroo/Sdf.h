@@ -11,7 +11,8 @@ struct SDF_t {
     inline __host__ __device__ SDF_t(float v) : val(v), w(1) {}
     inline __host__ __device__ SDF_t(float v, float w) : val(v), w(w) {}
     inline __host__ __device__ operator float() const {
-        return val;
+        return w * (val / w);
+//        return val;
     }    
     inline __host__ __device__ void Clamp(float minval, float maxval) {
         val = clamp(val, minval, maxval);

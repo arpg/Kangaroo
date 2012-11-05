@@ -111,7 +111,7 @@ int main( int argc, char* argv[] )
 
         // Raycast current view
         {
-            Gpu::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, subpix );
+            Gpu::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, trunc_dist, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
