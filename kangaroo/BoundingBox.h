@@ -87,7 +87,7 @@ struct BoundingBox
     void Clear()
     {
         boxmin = make_float3(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max());
-        boxmax = make_float3(-10,-10,-10);
+        boxmax = make_float3(-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max());
     }
 
     // Expand bounding box to include p
