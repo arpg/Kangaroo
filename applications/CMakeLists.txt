@@ -118,6 +118,9 @@ if(Kangaroo_FOUND)
 
     add_executable( KinectFusion KinectFusion.cpp MarchingCubes.cpp)
     target_link_libraries( KinectFusion ${CeresSolver_LIBRARIES} )
+
+    add_executable( MocapFusion MocapFusion.cpp MarchingCubes.cpp)
+    target_link_libraries( MocapFusion ${CeresSolver_LIBRARIES} )
   endif()
 
 endif()

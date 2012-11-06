@@ -29,7 +29,7 @@ public:
                 const Keyframe& cf = posegraph.coord_frames[j];
                 glPushMatrix();
                 Eigen::glMultMatrix(cf.GetT_wk().matrix());
-                SceneGraph::GLAxis::DrawAxis(0.05);
+                SceneGraph::GLAxis::DrawAxis(0.01);
                 glPopMatrix();
             }
             glPopMatrix();

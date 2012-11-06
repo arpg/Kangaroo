@@ -88,7 +88,7 @@ struct UnaryEdgeIndirect6DofCostFunction
         T measR_wk[4];
         T meast_wk[3];
 
-        XYZUnitQuatXYZWComposeInverse(measR_wz, meast_wz, R_kz, t_kz, measR_wk, meast_wk);
+        XYZUnitQuatXYZWComposeInverse( measR_wz, meast_wz, R_kz, t_kz, measR_wk, meast_wk);
         XYZUnitQuatXYZWPoseResidual(R_wk, t_wk, measR_wk, meast_wk, residuals);
         return true;
     }
@@ -173,19 +173,37 @@ struct BinaryEdgeXYZQuatIndirectCostFunction
 class PoseGraph {
 public:
     PoseGraph()
-        : running(false)
+        : problem(0), running(false)
     {
+        Clear();
+    }
+
+    ~PoseGraph()
+    {
+        delete problem;
+    }
+
+    void Clear()
+    {
+        if(problem) {
+            delete problem;
+        }
+        problem = new ceres::Problem();
         quat_param = new QuatXYZWParameterization;
         huber_loss = new ceres::HuberLoss(0.01);
         cauchy_loss = new ceres::CauchyLoss(0.001);
+
+        keyframes.clear();
+        coord_frames.clear();
     }
+
 
     int AddKeyframe(Keyframe* kf)
     {
         const int id = keyframes.size();
         keyframes.push_back( kf );
-        problem.AddParameterBlock(pq(kf->m_T_wk), 4, quat_param);
-        problem.AddParameterBlock(pt(kf->m_T_wk), 3, NULL);
+        problem->AddParameterBlock(pq(kf->m_T_wk), 4, quat_param);
+        problem->AddParameterBlock(pt(kf->m_T_wk), 3, NULL);
         return id;
     }
 
@@ -205,10 +223,8 @@ public:
         Keyframe* kf = new Keyframe(T_kz);
         const int id = coord_frames.size();
         coord_frames.push_back( kf );
-        problem.AddParameterBlock(pq(kf->m_T_wk), 4, quat_param);
-        problem.AddParameterBlock(pt(kf->m_T_wk), 3, NULL);
-
-        problem.SetParameterBlockConstant( pt(kf->m_T_wk) );
+        problem->AddParameterBlock(pq(kf->m_T_wk), 4, quat_param);
+        problem->AddParameterBlock(pt(kf->m_T_wk), 3, NULL);
         return id;
     }
 
@@ -223,7 +239,7 @@ public:
         Keyframe& kfa = GetKeyframe(a);
         Keyframe& kfb = GetKeyframe(b);
 
-        problem.AddResidualBlock(
+        problem->AddResidualBlock(
             new ceres::AutoDiffCostFunction<BinaryEdgeXYZQuatCostFunction, 6, 4, 3, 4, 3>(
                 new BinaryEdgeXYZQuatCostFunction(T_ba)
             ), cauchy_loss,
@@ -236,7 +252,7 @@ public:
     {
         Keyframe& kfa = GetKeyframe(a);
 
-        problem.AddResidualBlock(
+        problem->AddResidualBlock(
             new ceres::AutoDiffCostFunction<UnaryEdgeXYCostFunction, 3, 3>(
                 new UnaryEdgeXYCostFunction(xyz)
             ), NULL,
@@ -248,7 +264,7 @@ public:
     {
         Keyframe& kfa = GetKeyframe(a);
 
-        problem.AddResidualBlock(
+        problem->AddResidualBlock(
             new ceres::AutoDiffCostFunction<UnaryEdge6DofCostFunction, 6, 4, 3>(
                 new UnaryEdge6DofCostFunction(T_wa)
             ), NULL,
@@ -269,33 +285,33 @@ public:
         return k;
     }
 
-    void AddIndirectUnaryEdge(int kf_a, int coord_z, Sophus::SE3 T_wz)
+    void AddIndirectUnaryEdge(int kf_a, int coord_z, Sophus::SE3 T_w_az)
     {
         Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
         Keyframe& kfa = GetKeyframe(kf_a);
 
-        problem.AddResidualBlock(
+        problem->AddResidualBlock(
             new ceres::AutoDiffCostFunction<UnaryEdgeIndirect6DofCostFunction, 6, 4, 3, 4, 3>(
-                new UnaryEdgeIndirect6DofCostFunction(T_wz)
-            ), NULL,
+                new UnaryEdgeIndirect6DofCostFunction(T_w_az)
+            ), cauchy_loss,
             pq(coz.m_T_wk), pt(coz.m_T_wk),
             pq(kfa.m_T_wk), pt(kfa.m_T_wk)
         );
 
 //        // Only optimise rotation
-//        problem.SetParameterBlockConstant( pt(coz.m_T_wk) );
-//        problem.SetParameterBlockConstant( pq(coz.m_T_wk) );
+//        problem->SetParameterBlockConstant( pt(coz.m_T_wk) );
+//        problem->SetParameterBlockConstant( pq(coz.m_T_wk) );
     }
 
-    void AddIndirectBinaryEdge(int b, int a, int coord_z, Sophus::SE3 T_zb_za)
+    void AddIndirectBinaryEdge(int b, int a, int coord_z, Sophus::SE3 T_bz_az)
     {
         Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
         Keyframe& kfa = GetKeyframe(a);
         Keyframe& kfb = GetKeyframe(b);
 
-        problem.AddResidualBlock(
+        problem->AddResidualBlock(
             new ceres::AutoDiffCostFunction<BinaryEdgeXYZQuatIndirectCostFunction, 6, 4, 3, 4, 3, 4, 3>(
-                new BinaryEdgeXYZQuatIndirectCostFunction(T_zb_za)
+                new BinaryEdgeXYZQuatIndirectCostFunction(T_bz_az)
             ), NULL,
             pq(coz.m_T_wk), pt(coz.m_T_wk),
             pq(kfb.m_T_wk), pt(kfb.m_T_wk),
@@ -304,10 +320,34 @@ public:
     }
 
 
-    void SetSecondaryCoordinateFrameFree(int coord_z) {
+    void SetSecondaryCoordinateFrameFreedom(int coord_z, bool rot_free, bool trans_free) {
         Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
-        problem.SetParameterBlockVariable( pt(coz.m_T_wk) );
-        problem.SetParameterBlockVariable( pq(coz.m_T_wk) );
+
+        if(rot_free) {
+            problem->SetParameterBlockVariable( pq(coz.m_T_wk) );
+        }else{
+            problem->SetParameterBlockConstant( pq(coz.m_T_wk) );
+        }
+        if(trans_free) {
+            problem->SetParameterBlockVariable( pt(coz.m_T_wk) );
+        }else{
+            problem->SetParameterBlockConstant( pt(coz.m_T_wk) );
+        }
+    }
+
+    void SetKeyframeFreedom(int kf_id, bool rot_free, bool trans_free) {
+        Keyframe& kf = GetKeyframe(kf_id);
+
+        if(rot_free) {
+            problem->SetParameterBlockVariable( pq(kf.m_T_wk) );
+        }else{
+            problem->SetParameterBlockConstant( pq(kf.m_T_wk) );
+        }
+        if(trans_free) {
+            problem->SetParameterBlockVariable( pt(kf.m_T_wk) );
+        }else{
+            problem->SetParameterBlockConstant( pt(kf.m_T_wk) );
+        }
     }
 
     void Solve()
@@ -324,7 +364,7 @@ public:
         options.parameter_tolerance = 1E-50;
 
         ceres::Solver::Summary summary;
-        ceres::Solve(options, &problem, &summary);
+        ceres::Solve(options, problem, &summary);
         std::cout << summary.FullReport() << std::endl;
         running = false;
     }
@@ -346,7 +386,7 @@ public:
     ceres::LocalParameterization* quat_param;
     boost::ptr_vector<Keyframe> keyframes;
     boost::ptr_vector<Keyframe> coord_frames;
-    ceres::Problem problem;
+    ceres::Problem* problem;
     boost::thread optThread;
     bool running;
 };
