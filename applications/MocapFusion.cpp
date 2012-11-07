@@ -197,6 +197,29 @@ int main( int argc, char* argv[] )
             keyframes.push_back(kf);
         }
 
+        if(Pushed(reset_sdf)) {
+            const Sophus::SE3 T_kin_vicon = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
+
+            // Reset posegraph
+            keyframes.clear();
+            posegraph.Clear();
+            coord_vicon = posegraph.AddSecondaryCoordinateFrame();
+            posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_vicon);
+            kf_sdf = posegraph.AddKeyframe();
+
+            // TODO: Use memory more appropriately.
+            vol.bbox.Min() = make_float3(-5,-5,-5);
+            vol.bbox.Max() = make_float3(+5,+5,+5);
+            trunc_dist = 2*length(voxsize);
+            Gpu::SdfReset(vol, trunc_dist);
+
+            glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
+
+            const Sophus::SE3 T_room_vicon = vicon.T_wf();
+            const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_room_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+        }
+
         const bool newViconData = vicon.IsNewData();
         const Sophus::SE3 T_room_vicon = vicon.T_wf();
         const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
@@ -234,10 +257,6 @@ int main( int argc, char* argv[] )
             Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
-        if(Pushed(reset_sdf)) {
-            Gpu::SdfReset(vol, trunc_dist);
-        }
-
         if(viewonly) {
             Sophus::SE3 T_wv(s_cam.GetModelViewMatrix().Inverse());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
@@ -272,7 +291,7 @@ int main( int argc, char* argv[] )
 //                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
                 }
 
-                if(!use_vicon_for_sdf && pose_refinement && frame > 0) {
+                if( pose_refinement && frame > 0) {
                     Sophus::SE3 T_lp;
 
 //                    const int l = show_level;
@@ -290,22 +309,31 @@ int main( int argc, char* argv[] )
                             Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
                                 kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
                             );
-                            Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                            Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                            T_lp = T_lp * Sophus::SE3::exp(x);
 
-                            if(lu_JTJ.rank() < 6) {
-                                cout << "Rank" << lu_JTJ.rank() << endl;
+                            if(!use_vicon_for_sdf) {
+                                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
+                                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
+                                T_lp = T_lp * Sophus::SE3::exp(x);
+                            }else{
+                                // Add vicon rotation as prior, so we don't stray too far form it.
+                                Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( ((Eigen::Matrix<double,6,6>)lss.JTJ).block<3,3>(3,3) );
+                                Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,6,1>)lss.JTy).segment<3>(3) );
+                                T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
                             }
 
                             rmse = sqrt(lss.sqErr / lss.obs);
                             tracking_good = rmse < max_rmse;
+
+                            if(lu_JTJ.rank() < (use_vicon_for_sdf ? 3 : 6) ) {
+                                cout << "Rank deficient: " << lu_JTJ.rank() << endl;
+                                tracking_good = false;
+                            }
                         }
                     }
 
                     T_sdf_kin = T_sdf_kin * T_lp.inverse();
 
-                    if(add_constraints && newViconData && tracking_good) {
+                    if(!use_vicon_for_sdf && add_constraints && newViconData && tracking_good) {
                         // Add to pose graph
                         const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
                         const int kf_kin = posegraph.AddKeyframe(new Keyframe(T_room_sdf * T_sdf_kin));
