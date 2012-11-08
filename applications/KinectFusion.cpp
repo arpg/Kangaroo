@@ -124,9 +124,8 @@ int main( int argc, char* argv[] )
 
     Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
-    Var<int> pose_its("ui.pose_its", 5, 0, 10);
 
-    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 1E-6, 2*length(voxsize));
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 

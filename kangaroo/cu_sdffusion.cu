@@ -40,7 +40,8 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
         }else{
 //        }else if(sd < 5*trunc_dist) {
             if(isfinite(md) && isfinite(w) && costheta > mincostheta ) {
-                SDF_t sdf = SDF_t(sd, w) + vol(x,y,z);
+                SDF_t sdf(sd, w);
+                sdf += vol(x,y,z);
                 sdf.Clamp(-trunc_dist, trunc_dist);
                 sdf.LimitWeight(max_w);
                 vol(x,y,z) = sdf;
@@ -68,7 +69,7 @@ __global__ void KernSdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
     const int z = blockIdx.z*blockDim.z + threadIdx.z;
 
-    vol(x,y,z) = SDF_t(trunc_dist, 0);
+    vol(x,y,z) = SDF_t(0.0/0.0, 0);
 }
 
 void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
