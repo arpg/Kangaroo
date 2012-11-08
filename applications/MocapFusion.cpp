@@ -314,19 +314,29 @@ int main( int argc, char* argv[] )
                                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
                                 T_lp = T_lp * Sophus::SE3::exp(x);
+
+                                rmse = sqrt(lss.sqErr / lss.obs);
+                                tracking_good = rmse < max_rmse;
+
+                                if(lu_JTJ.rank() < (use_vicon_for_sdf ? 3 : 6) ) {
+                                    cout << "Rank deficient: " << lu_JTJ.rank() << endl;
+                                    cout << lu_JTJ.kernel() << endl;
+                                    tracking_good = false;
+                                }
                             }else{
                                 // Add vicon rotation as prior, so we don't stray too far form it.
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( ((Eigen::Matrix<double,6,6>)lss.JTJ).block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,6,1>)lss.JTy).segment<3>(3) );
                                 T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
-                            }
 
-                            rmse = sqrt(lss.sqErr / lss.obs);
-                            tracking_good = rmse < max_rmse;
+                                rmse = sqrt(lss.sqErr / lss.obs);
+                                tracking_good = rmse < max_rmse;
 
-                            if(lu_JTJ.rank() < (use_vicon_for_sdf ? 3 : 6) ) {
-                                cout << "Rank deficient: " << lu_JTJ.rank() << endl;
-                                tracking_good = false;
+                                if(lu_JTJ.rank() < (use_vicon_for_sdf ? 3 : 6) ) {
+                                    cout << "Rank deficient: " << lu_JTJ.rank() << endl;
+                                    cout << lu_JTJ.kernel() << endl;
+                                    tracking_good = false;
+                                }
                             }
                         }
                     }

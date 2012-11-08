@@ -68,7 +68,7 @@ int main( int argc, char* argv[] )
     const int volres = 256;
     const float volrad = 1;
 
-    const Eigen::Vector4d its(1,2,3,4);
+    const Eigen::Vector4d its(1,0,2,3);
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -116,7 +116,7 @@ int main( int argc, char* argv[] )
     Var<bool> fuse("ui.fuse", true, true);
     Var<bool> reset("ui.reset", true, false);
 
-    Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
+    Var<int> show_level("ui.Show Level", 0, 0, MaxLevels-1);
 
     Var<int> biwin("ui.size",5, 1, 20);
     Var<float> bigs("ui.gs",5, 1E-3, 5);
@@ -225,10 +225,12 @@ int main( int argc, char* argv[] )
 //                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
 //                Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);
                 for(int l=0; l<MaxLevels; ++l) {
-                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
-                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
-//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
-//                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
+                    if(its[l] > 0) {
+                        Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
+                        Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+    //                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+    //                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
+                    }
                 }
 
                 if(pose_refinement && frame > 0) {
@@ -249,16 +251,29 @@ int main( int argc, char* argv[] )
                             Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
                                 kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
                             );
-                            Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                            Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                            T_lp = T_lp * Sophus::SE3::exp(x);
 
-                            if(lu_JTJ.rank() < 6) {
-                                cout << "Rank" << lu_JTJ.rank() << endl;
-                            }
+                            Eigen::Matrix<double,6,6> sysJTJ = lss.JTJ;
+                            Eigen::Matrix<double,6,1> sysJTy = lss.JTy;
+
+                            // Add a week prior on our pose
+                            const double motionSigma = 0.2;
+                            const double depthSigma = 0.1;
+                            sysJTJ += (depthSigma / motionSigma) * Eigen::Matrix<double,6,6>::Identity();
 
                             rmse = sqrt(lss.sqErr / lss.obs);
                             tracking_good = rmse < max_rmse;
+
+                            if(l == MaxLevels-1) {
+                                // Solve for rotation only
+                                Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
+                                Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
+                                T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
+                            }else{
+                                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
+                                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
+                                T_lp = T_lp * Sophus::SE3::exp(x);
+                            }
+
                         }
                     }
 

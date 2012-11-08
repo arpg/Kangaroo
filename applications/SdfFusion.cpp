@@ -49,6 +49,7 @@ int main( int argc, char* argv[] )
     Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
+    ActivateDrawImage<float4> adin(gtn, GL_RGBA32F, true, true);
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLAxis glaxis;
@@ -71,11 +72,12 @@ int main( int argc, char* argv[] )
     Handler3DGpuDepth handler(depth,stacks_view, AxisNone);
     SceneGraph::HandlerSceneGraph handlerView(graph, stacks_view, AxisNone);
     SceneGraph::HandlerSceneGraph handlerCapture(graph, stacks_capture, AxisNone);
-    SetupContainer(container, 4, (float)w/h);
+    SetupContainer(container, 5, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler);
     container[1].SetDrawFunction(boost::ref(adn)).SetHandler(&handler);
-    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
-    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
+    container[2].SetDrawFunction(boost::ref(adin)).SetHandler(&handler);
+    container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
+    container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
     const float voxsize = length(vol.VoxelSizeUnits());
     Gpu::SdfSphere(vol, make_float3(0,0,0), 0.9 );
