@@ -88,7 +88,7 @@ int main( int argc, char* argv[] )
     Var<bool> sdfsphere("ui.sphere", false, false);
     Var<bool> fuse("ui.fuse", false, true);
     Var<bool> fuseonce("ui.fuse once", false, false);
-    Var<float> trunc_dist("ui.trunc dist", 2*voxsize, 2*voxsize,0.5);
+    Var<float> trunc_dist("ui.trunc dist", 2*voxsize, 0, 2*voxsize);
     Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.5, 0, 1);
     Var<bool>  test("ui.test", false, true);
