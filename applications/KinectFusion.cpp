@@ -126,7 +126,7 @@ int main( int argc, char* argv[] )
     Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
 
     Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 1E-6, 2*length(voxsize));
-    Var<float> max_w("ui.max w", 10, 1E-4, 10);
+    Var<float> max_w("ui.max w", 100, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
     Var<bool> save_kf("ui.Save KF", false, false);
@@ -136,9 +136,9 @@ int main( int argc, char* argv[] )
 
     ActivateDrawPyramid<float,MaxLevels> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawPyramid<float4,MaxLevels> adraycolor(ray_c, GL_RGBA32F, true, true);
-//    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
+    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
 //    ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawPyramid<float4,MaxLevels> adnormals( ray_n, GL_RGBA32F_ARB, false, true);
+    ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
@@ -151,7 +151,7 @@ int main( int argc, char* argv[] )
                 .SetHandler(&rayhandler);
 //    container[3].SetDrawFunction(boost::ref(addebug));
 //    container[4].SetDrawFunction(boost::ref(adnormals));
-//    container[4].SetDrawFunction(boost::ref(adraynorm));
+//    container[5].SetDrawFunction(boost::ref(adraynorm));
 
     Sophus::SE3 T_wl;
 

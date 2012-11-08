@@ -24,11 +24,11 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
     if( depth.InBounds(p_c, 2) )
     {
         const float vd = P_c.z;
-//        const float md = depth.GetNearestNeighbour(p_c);
-//        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
+        const float md = depth.GetNearestNeighbour(p_c);
+        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
 
-        const float md = depth.GetBilinear<float>(p_c);
-        const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
+//        const float md = depth.GetBilinear<float>(p_c);
+//        const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
 
         const float costheta = dot(mdn, P_c) / -length(P_c);
         const float sd = costheta * (md - vd);
@@ -40,9 +40,9 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
         }else{
 //        }else if(sd < 5*trunc_dist) {
             if(isfinite(md) && isfinite(w) && costheta > mincostheta ) {
-                SDF_t sdf(sd, w);
+                SDF_t sdf( clamp(sd,-trunc_dist,trunc_dist) , w);
                 sdf += vol(x,y,z);
-                sdf.Clamp(-trunc_dist, trunc_dist);
+//                sdf.Clamp(-trunc_dist, trunc_dist);
                 sdf.LimitWeight(max_w);
                 vol(x,y,z) = sdf;
             }
