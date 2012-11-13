@@ -472,6 +472,12 @@ Eigen::Vector3d ToEigen(const float3 v)
     return Eigen::Vector3d(v.x, v.y, v.z);
 }
 
+inline __host__
+float3 ToCuda(const Eigen::Vector3d& v)
+{
+    return make_float3(v(0), v(1), v(2));
+}
+
 #endif // USE_EIGEN
 
 }

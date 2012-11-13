@@ -106,7 +106,9 @@ void vMarchCube(
                 p.z + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][2]  +  fOffset * a2fEdgeDirection[iEdge][2]) * fScale
             );
 
-            asEdgeNorm[iEdge] = vol.GetUnitsBackwardDiffDxDyDz( asEdgeVertex[iEdge] );
+            // TODO: Why do we have to negate this?
+            const float3 deriv = vol.GetUnitsBackwardDiffDxDyDz( asEdgeVertex[iEdge] );
+            asEdgeNorm[iEdge] = deriv / length(deriv);
         }
     }
 

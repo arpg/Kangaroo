@@ -208,11 +208,11 @@ int main( int argc, char* argv[] )
             kf_sdf = posegraph.AddKeyframe();
 
             // TODO: Use memory more appropriately.
-            vol.bbox.Min() = make_float3(-5,-5,-5);
-            vol.bbox.Max() = make_float3(+5,+5,+5);
+
+            vol.bbox.Min() = Gpu::ToCuda(vicon.WorkspaceMin());
+            vol.bbox.Max() = Gpu::ToCuda(vicon.WorkspaceMax());
             trunc_dist = 2*length(voxsize);
             Gpu::SdfReset(vol, trunc_dist);
-
             glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
 
             const Sophus::SE3 T_room_vicon = vicon.T_wf();
@@ -310,33 +310,26 @@ int main( int argc, char* argv[] )
                                 kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
                             );
 
-                            if(!use_vicon_for_sdf) {
-                                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
-                                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                                T_lp = T_lp * Sophus::SE3::exp(x);
+                            Eigen::Matrix<double,6,6> sysJTJ = lss.JTJ;
+                            Eigen::Matrix<double,6,1> sysJTy = lss.JTy;
 
-                                rmse = sqrt(lss.sqErr / lss.obs);
-                                tracking_good = rmse < max_rmse;
+                            // Add a week prior on our pose
+                            const double motionSigma = use_vicon_for_sdf ? 0.01 : 0.2;
+                            const double depthSigma = 0.1;
+                            sysJTJ += (depthSigma / motionSigma) * Eigen::Matrix<double,6,6>::Identity();
 
-                                if(lu_JTJ.rank() < (use_vicon_for_sdf ? 3 : 6) ) {
-                                    cout << "Rank deficient: " << lu_JTJ.rank() << endl;
-                                    cout << lu_JTJ.kernel() << endl;
-                                    tracking_good = false;
-                                }
-                            }else{
-                                // Add vicon rotation as prior, so we don't stray too far form it.
-                                Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( ((Eigen::Matrix<double,6,6>)lss.JTJ).block<3,3>(3,3) );
-                                Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( ((Eigen::Matrix<double,6,1>)lss.JTy).segment<3>(3) );
+                            rmse = sqrt(lss.sqErr / lss.obs);
+                            tracking_good = rmse < max_rmse;
+
+                            if(l == MaxLevels-1 /*|| use_vicon_for_sdf*/) {
+                                // Solve for rotation only
+                                Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
+                                Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
                                 T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
-
-                                rmse = sqrt(lss.sqErr / lss.obs);
-                                tracking_good = rmse < max_rmse;
-
-                                if(lu_JTJ.rank() < (use_vicon_for_sdf ? 3 : 6) ) {
-                                    cout << "Rank deficient: " << lu_JTJ.rank() << endl;
-                                    cout << lu_JTJ.kernel() << endl;
-                                    tracking_good = false;
-                                }
+                            }else{
+                                Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
+                                Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
+                                T_lp = T_lp * Sophus::SE3::exp(x);
                             }
                         }
                     }
@@ -352,6 +345,8 @@ int main( int argc, char* argv[] )
                     }
                 }
             }
+
+            if(use_vicon_for_sdf && !newViconData) tracking_good = false;
 
             if( (pose_refinement || use_vicon_for_sdf) && fuse) {
                 if(tracking_good) {

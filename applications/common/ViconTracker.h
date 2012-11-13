@@ -48,11 +48,12 @@ class ViconTracking
 {
 public:
     ViconTracking( std::string objectName, std::string host)
-        : m_workspace_min(0,0,0), m_workspace_max(0,0,0), m_workspace_size(0,0,0),
-          m_connected(false), m_newdata(false), m_run(false), m_recordHistory(false)
+        : m_connected(false), m_newdata(false), m_run(false),
+          m_recordHistory(false)
     {
         const std::string uri = objectName + "@" + host;
         m_object = new vrpn_Tracker_Remote( uri.c_str() );
+        WorkspaceReset();
         RegisterHandlers();
         StartThread();
     }
@@ -88,6 +89,11 @@ public:
         delete m_object;
     }
 
+    inline void WorkspaceReset() {
+        m_workspace_min = Eigen::Vector3d(+1E6,+1E6,+1E6);
+        m_workspace_max = Eigen::Vector3d(-1E6,-1E6,-1E6);
+    }
+
     inline const Eigen::Vector3d& WorkspaceMin() {
         return m_workspace_min;
     }
@@ -96,8 +102,8 @@ public:
         return m_workspace_max;
     }
 
-    inline const Eigen::Vector3d& WorkspaceSize() {
-        return m_workspace_size;
+    inline const Eigen::Vector3d WorkspaceSize() {
+        return m_workspace_max - m_workspace_min;
     }
 
     inline const Sophus::SE3& T_wf()
@@ -143,6 +149,10 @@ public:
         );
         m_connected = true;
         m_newdata = true;
+
+        m_workspace_min = ElementwiseMin(m_workspace_min, m_T_wf.translation());
+        m_workspace_max = ElementwiseMax(m_workspace_max, m_T_wf.translation());
+
         if(m_recordHistory) {
             m_vecT_wf.push_back(m_T_wf);
         }
@@ -157,7 +167,6 @@ public:
     {
         m_workspace_min = Eigen::Map<const Eigen::Vector3d>(tData.workspace_min);
         m_workspace_max = Eigen::Map<const Eigen::Vector3d>(tData.workspace_max);
-        m_workspace_size = m_workspace_max - m_workspace_min;
     }
 
     static void VRPN_CALLBACK pose_callback(void* userData, const vrpn_TRACKERCB tData )
@@ -179,6 +188,17 @@ public:
     }
 
 protected:
+
+    inline Eigen::Vector3d ElementwiseMin(const Eigen::Vector3d& a, const Eigen::Vector3d& b)
+    {
+        return Eigen::Vector3d(std::min(a(0), b(0)), std::min(a(1), b(1)), std::min(a(2), b(2)) );
+    }
+
+    inline Eigen::Vector3d ElementwiseMax(const Eigen::Vector3d& a, const Eigen::Vector3d& b)
+    {
+        return Eigen::Vector3d(std::max(a(0), b(0)), std::max(a(1), b(1)), std::max(a(2), b(2)) );
+    }
+
     void EventLoop() {
         while(m_run) {
             m_object->mainloop();
@@ -200,7 +220,6 @@ protected:
 
     Eigen::Vector3d m_workspace_min;
     Eigen::Vector3d m_workspace_max;
-    Eigen::Vector3d m_workspace_size;
 
     Sophus::SE3 m_T_wf;
     std::vector<Sophus::SE3> m_vecT_wf;

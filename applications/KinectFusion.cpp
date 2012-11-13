@@ -20,6 +20,8 @@
 #include "common/GLPoseGraph.h"
 #include "common/Handler3dGpuDepth.h"
 #include "common/SavePPM.h"
+#include "common/SaveGIL.h"
+#include "common/SaveMeshlab.h"
 
 #include "MarchingCubes.h"
 
@@ -29,19 +31,6 @@
 
 using namespace std;
 using namespace pangolin;
-
-//Gpu::Mat<ImageKeyframe<Timg>,N> keyframes;
-
-struct KinectKeyframe
-{
-    KinectKeyframe(int w, int h, Sophus::SE3 T_iw)
-        : img(w,h), T_iw(T_iw)
-    {
-    }
-
-    Sophus::SE3 T_iw;
-    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
-};
 
 int main( int argc, char* argv[] )
 {
@@ -66,7 +55,7 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 0.15;
+    const float volrad = 0.5;
 
     const Eigen::Vector4d its(1,0,2,3);
 
@@ -156,15 +145,11 @@ int main( int argc, char* argv[] )
     Sophus::SE3 T_wl;
 
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
-    pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); Gpu::SaveMesh("mesh", vol); } );
+    pangolin::RegisterKeyPressCallback('s', [&vol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
         const bool go = frame==-1 || run;
-
-        if(rgb_fl.GuiChanged()) {
-            save_kf = true;
-        }
 
         if(Pushed(save_kf)) {
             KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
