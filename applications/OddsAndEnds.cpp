@@ -1,45 +1,35 @@
 #include <iostream>
 
-#include "common/BitonicSortingNetwork.h"
+#include "common/PoseGraph.h"
+
 
 using namespace std;
 
-int OutputBitonicNetwork()
-{
-    const int size = 9*9;
-
-    // Which sorted indices do we need?
-    set<int> desired;
-
-    // 5x5 median - just central value
-//    desired.insert(size/2);
-
-    // 5x5 median - upper half (so we can offset start)
-    for(int i=size/2; i<size; ++i ) {
-        desired.insert(i);
-    }
-
-    BitonicNetwork network(size);
-    network.Compute();
-    cout << "Complete sort network (" << network.Size() << " swaps)" << endl;
-    network.Print();
-
-    network.Prune(desired);
-    cout << endl << "Pruned sort network (" << network.Size() << " swaps)" << endl;
-    network.Print();
-}
-
-#include <fiducials/tracker.h>
-
-void TestEPS()
-{
-    Tracker tracker(640,480);
-    tracker.target.LoadEPS("/Users/slovegrove/Desktop/stereo.eps");
-
-}
 
 int main( int /*argc*/, char* argv[] )
 {
-//    OutputBitonicNetwork();
-    TestEPS();
+    PoseGraph posegraph;
+    const int coord_vicon = posegraph.AddSecondaryCoordinateFrame();
+    const int kf_sdf = posegraph.AddKeyframe();
+
+    const Sophus::SE3 T_vk(Sophus::SO3(1,2,3),Eigen::Vector3d(4,5,6));
+    const Sophus::SE3 T_sr(Sophus::SO3(3,2,1),Eigen::Vector3d(6,5,4));
+
+    for( int i=0; i<1000; ++i) {
+        Sophus::SE3 T_rv(Sophus::SO3(i*0.01,i*-0.02, i*0.03), Eigen::Vector3d(i*0.01,2*i*0.02,0) );
+        Sophus::SE3 T_sk = T_sr * T_rv * T_vk;
+
+        const int kfid = posegraph.AddKeyframe(new Keyframe(T_sk));
+//        posegraph.SetKeyframeFreedom(kfid,false,false);
+        posegraph.AddIndirectUnaryEdge(kfid,coord_vicon,T_rv);
+        posegraph.AddBinaryEdge(kf_sdf,kfid,T_sk);
+    }
+
+    posegraph.Solve();
+
+    cout << T_sr.inverse().matrix3x4() << endl << endl;
+    cout << T_vk.inverse().matrix3x4() << endl << endl;
+
+    cout << posegraph.GetKeyframe(kf_sdf).GetT_wk().matrix3x4() << endl << endl;
+    cout << posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().matrix3x4() << endl << endl;
 }

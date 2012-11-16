@@ -141,6 +141,16 @@ float3 mulSO3(const Mat<float,3,4>& T_ab, const float3& r_a)
 }
 
 __host__ __device__ inline
+float3 mulSO3(const Mat<float,3,4>& T_ab, const float4& r_a)
+{
+    return make_float3(
+            T_ab(0,0) * r_a.x + T_ab(0,1) * r_a.y + T_ab(0,2) * r_a.z,
+            T_ab(1,0) * r_a.x + T_ab(1,1) * r_a.y + T_ab(1,2) * r_a.z,
+            T_ab(2,0) * r_a.x + T_ab(2,1) * r_a.y + T_ab(2,2) * r_a.z
+    );
+}
+
+__host__ __device__ inline
 float3 mulSO3inv(const Mat<float,3,3>& R_ab, const float3& r_a)
 {
     return make_float3(
@@ -263,6 +273,18 @@ __host__ __device__ inline
 float dot(const float4& lhs, const float3& rhs)
 {
     return lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z;
+}
+
+__host__ __device__ inline
+float dot3(const float4& lhs, const float4& rhs)
+{
+    return lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z;
+}
+
+__host__ __device__ inline
+float length3(float4 r)
+{
+    return sqrtf(dot3(r, r));
 }
 
 //////////////////////////////////////////////////////
@@ -442,5 +464,20 @@ float L1(float4 val)
 {
     return abs(val.x) + abs(val.y) + abs(val.z) + abs(val.w);
 }
+
+#ifdef USE_EIGEN
+inline __host__
+Eigen::Vector3d ToEigen(const float3 v)
+{
+    return Eigen::Vector3d(v.x, v.y, v.z);
+}
+
+inline __host__
+float3 ToCuda(const Eigen::Vector3d& v)
+{
+    return make_float3(v(0), v(1), v(2));
+}
+
+#endif // USE_EIGEN
 
 }

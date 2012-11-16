@@ -18,7 +18,7 @@
 #endif // __CUDACC__
 
 #ifdef USE_OPENCV
-#include <opencv.hpp>
+#include <opencv2/opencv.hpp>
 #endif // HAVE_OPENCV
 
 #define HAVE_THRUST
@@ -55,6 +55,13 @@ struct TargetHost
     }
 
     template<typename T> inline static
+    void AllocatePitchedMem(T** hostPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
+        *pitch = w*sizeof(T);
+        *img_pitch = *pitch*h;
+        *hostPtr = (T*)malloc(*pitch * h * d);
+    }
+
+    template<typename T> inline static
     void DeallocatePitchedMem(T* hostPtr){
         free(hostPtr);
     }
@@ -67,6 +74,14 @@ struct TargetDevice
         if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h) != cudaSuccess ) {
             throw CudaException("Unable to cudaMallocPitch");
         }
+    }
+
+    template<typename T> inline static
+    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
+        if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h*d) != cudaSuccess ) {
+            throw CudaException("Unable to cudaMallocPitch");
+        }
+        *img_pitch = *pitch * h;
     }
 
     template<typename T> inline static
@@ -108,6 +123,7 @@ struct Manage
     {
         if(ptr) {
             Target::template DeallocatePitchedMem<T>(ptr);
+            ptr = 0;
         }
     }
 };
@@ -133,13 +149,6 @@ struct DontManage
     {
     }
 };
-
-//! Return v clamped to interval [vmin,vmax]
-template<typename T> __host__ __device__
-inline T clamp(T vmin, T vmax, T v) {
-    return v < vmin ? vmin : (vmax < v ? vmax : v);
-}
-
 
 //! Simple templated pitched image type for use with Cuda
 //! Type encapsulates ptr, pitch, width and height
@@ -236,7 +245,6 @@ struct Image {
     inline __host__
     void operator=(Image<T,Target,Management>&& img)
     {
-        assert(ptr==0);
         pitch = img.pitch;
         ptr = img.ptr;
         w = img.w;
@@ -397,8 +405,8 @@ struct Image {
     inline  __device__ __host__
     const T& GetWithClampedRange(int x, int y) const
     {
-        x = Gpu::clamp<int>(0,w-1,x);
-        y = Gpu::clamp<int>(0,h-1,y);
+        x = clamp(x, 0, w-1);
+        y = clamp(y, 0, h-1);
         return RowPtr(y)[x];
     }
 

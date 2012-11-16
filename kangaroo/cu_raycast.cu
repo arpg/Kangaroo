@@ -1,8 +1,7 @@
-#include "Mat.h"
 #include "MatUtils.h"
 #include "Image.h"
-#include "Volume.h"
 #include "Sdf.h"
+#include "BoundedVolume.h"
 #include "launch_utils.h"
 
 namespace Gpu
@@ -12,7 +11,7 @@ namespace Gpu
 // Raycast SDF
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
+__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -24,8 +23,8 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 
         // Raycast bounding box to find valid ray segment of sdf
         // http://www.cs.utah.edu/~awilliam/box/box.pdf
-        const float3 tminbound = (boxmin - c_w) / ray_w;
-        const float3 tmaxbound = (boxmax - c_w) / ray_w;
+        const float3 tminbound = (vol.bbox.Min() - c_w) / ray_w;
+        const float3 tmaxbound = (vol.bbox.Max() - c_w) / ray_w;
         const float3 tmin = fminf(tminbound,tmaxbound);
         const float3 tmax = fmaxf(tminbound,tmaxbound);
         const float max_tmin = fmaxf(fmaxf(fmaxf(tmin.x, tmin.y), tmin.z), near);
@@ -37,67 +36,70 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
         if(max_tmin < min_tmax ) {
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
-            float last_sdf = 0;
-            float delta_lambda = (boxmax.x - boxmin.x) / (vol.w-1);
+            float last_sdf = 0.0f/0.0f;
+            float min_delta_lambda = vol.VoxelSizeUnits().x;
+            float delta_lambda = 0;
 
             // March through space
             while(lambda < min_tmax) {
                 const float3 pos_w = c_w + lambda * ray_w;
-                const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
-                const float sdf = vol.GetFractionalTrilinearClamped(pos_v);
+                const float sdf = vol.GetUnitsTrilinearClamped(pos_w);
 
                 if( sdf <= 0 ) {
-                    // surface!
-                    if(subpix) {
-                        lambda = lambda - delta_lambda * last_sdf / (sdf - last_sdf);
+                    if( last_sdf > 0) {
+                        // surface!
+                        if(subpix) {
+                            lambda = lambda + delta_lambda * sdf / (last_sdf - sdf);
+                        }
+                        depth = lambda;
                     }
-                    depth = lambda;
                     break;
                 }
-                lambda += fminf(trunc_dist, fmaxf(delta_lambda, sdf));
+                delta_lambda = sdf > 0 ? fmaxf(sdf, min_delta_lambda) : trunc_dist;
+                lambda += delta_lambda;
                 last_sdf = sdf;
             }
         }
 
         // Compute normal
         const float3 pos_w = c_w + depth * ray_w;
-        const float3 pos_v = (pos_w - boxmin) / (boxmax - boxmin);
-        const float3 _n_w = vol.GetFractionalBackwardDiffDxDyDz(pos_v);
+        const float3 _n_w = vol.GetUnitsBackwardDiffDxDyDz(pos_w);
         const float len_n_w = length(_n_w);
         const float3 n_w = len_n_w > 0 ? _n_w / len_n_w : make_float3(0,0,1);
         const float3 n_c = mulSO3inv(T_wc,n_w);
         const float3 p_c = depth * ray_c;
 
         if(depth > 0 ) {
-            const float ambient = 0.2;
-            const float diffuse = 0.8;
-            const float specular = 0.1;
+            const float ambient = 0.4;
+            const float diffuse = 0.4;
+            const float specular = 0.2;
             const float3 eyedir = -1.0f * p_c / length(p_c);
             const float3 _lightdir = make_float3(0.4,0.4,-1);
             const float3 lightdir = _lightdir / length(_lightdir);
-            const float3 lightreflect = 2*dot(lightdir,n_c)*n_c + (-1.0) * lightdir;
+            const float ldotn = dot(lightdir,n_c);
+            const float3 lightreflect = 2*ldotn*n_c + (-1.0) * lightdir;
             const float edotr = fmaxf(0,dot(eyedir,lightreflect));
             const float spec = edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr;
 
 //          img(u,v) = (depth - near) / (far - near);
             imgdepth(u,v) = depth;
-            img(u,v) = ambient + diffuse * dot(n_c, lightdir )  + specular * spec;
+            img(u,v) = ambient + diffuse * ldotn  + specular * spec;
 //            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
-            norm(u,v) = make_float4(-1.0f*n_c, 1);
+            norm(u,v) = make_float4(n_c, 1);
         }else{
             imgdepth(u,v) = 0.0f/0.0f;
             img(u,v) = 0;
-            norm(u,v) = make_float4(0,0,0,1);
+            norm(u,v) = make_float4(0,0,0,0);
         }
     }
 }
 
-void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const Volume<SDF_t> vol, const float3 boxmin, const float3 boxmax, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
 {    
     dim3 blockDim, gridDim;
 //    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, boxmin, boxmax, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
+    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
     GpuCheckErrors();
 }
 
@@ -134,7 +136,7 @@ void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, floa
 // Raycast box
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const float3 boxmin, const float3 boxmax )
+__global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const BoundingBox bbox )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -146,8 +148,8 @@ __global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, fl
 
         // Raycast bounding box to find valid ray segment of sdf
         // http://www.cs.utah.edu/~awilliam/box/box.pdf
-        const float3 tminbound = (boxmin - c_w) / ray_w;
-        const float3 tmaxbound = (boxmax - c_w) / ray_w;
+        const float3 tminbound = (bbox.Min() - c_w) / ray_w;
+        const float3 tmaxbound = (bbox.Max() - c_w) / ray_w;
         const float3 tmin = fminf(tminbound,tmaxbound);
         const float3 tmax = fmaxf(tminbound,tmaxbound);
         const float max_tmin = fmaxf(fmaxf(tmin.x, tmin.y), tmin.z);
@@ -166,11 +168,11 @@ __global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, fl
     }
 }
 
-void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const float3 boxmin, const float3 boxmax )
+void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const BoundingBox bbox )
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, depth);
-    KernRaycastBox<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, boxmin, boxmax);
+    KernRaycastBox<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, bbox);
     GpuCheckErrors();
 }
 

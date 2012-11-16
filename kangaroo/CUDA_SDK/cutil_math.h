@@ -54,22 +54,22 @@ typedef unsigned short ushort;
 
 inline float fminf(float a, float b)
 {
-  return a < b ? a : b;
+  return (a < b) ? a : b;
 }
 
 inline float fmaxf(float a, float b)
 {
-  return a < b ? a : b;
-}
-
-inline int max(int a, int b)
-{
-  return a > b ? a : b;
+  return (a > b) ? a : b;
 }
 
 inline int min(int a, int b)
 {
-  return a < b ? a : b;
+  return (a < b) ? a : b;
+}
+
+inline int max(int a, int b)
+{
+  return (a > b) ? a : b;
 }
 #endif
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector_types.h>
-#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 #include <iostream>
 #include <assert.h>
 
@@ -55,6 +55,14 @@ struct Mat
 
     inline __device__ __host__ P& operator[](int r) {
         return m[r];
+    }
+
+    inline __device__ __host__ unsigned Rows() {
+        return R;
+    }
+
+    inline __device__ __host__ unsigned Cols() {
+        return C;
     }
 
     inline __device__ __host__ void operator+=(const Mat<P,R,C>& rhs) {

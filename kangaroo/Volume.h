@@ -50,8 +50,7 @@ struct Volume
         :w(w), h(h), d(d)
     {
         Management::AllocateCheck();
-        Target::template AllocatePitchedMem<T>(&ptr,&pitch,w,h*d);
-        img_pitch = pitch*h;
+        Target::template AllocatePitchedMem<T>(&ptr,&pitch,&img_pitch,w,h,d);
     }
 
     inline __device__ __host__
@@ -90,9 +89,7 @@ struct Volume
         // we need to do a copy for each depth layer.
         assert(w == img.w);
         assert(h == img.h);
-        assert(pitch == img.pitch);
         assert(img_pitch == img.img_pitch);
-
         cudaMemcpy2D(ptr,pitch,img.ptr,img.pitch, std::min(img.w,w)*sizeof(T), h*std::min(img.d,d), TargetCopyKind<Target,TargetFrom>() );
     }
 
@@ -163,9 +160,27 @@ struct Volume
     }
 
     inline  __device__ __host__
+    T& Get(int x, int y, int z)
+    {
+        return RowPtr(y,z)[x];
+    }
+
+    inline  __device__ __host__
     const T& Get(int x, int y, int z) const
     {
         return RowPtr(y,z)[x];
+    }
+
+    inline  __device__ __host__
+    T& Get(int3 p)
+    {
+        return RowPtr(p.y,p.z)[p.x];
+    }
+
+    inline  __device__ __host__
+    const T& Get(int3 p) const
+    {
+        return RowPtr(p.y,p.z)[p.x];
     }
 
     //////////////////////////////////////////////////////
@@ -289,6 +304,15 @@ struct Volume
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
+    Volume<T,Target,DontManage> SubVolume(int3 start, int3 size)
+    {
+        return Volume<T,Target,DontManage>(
+            &Get(start), size.x, size.y, size.z,
+            pitch, img_pitch
+        );
+    }
+
+    inline __device__ __host__
     Image<T,Target,DontManage> ImageXY(size_t z)
     {
         assert( z < d );
@@ -300,6 +324,16 @@ struct Volume
     {
         assert( y < h );
         return Image<T,Target,DontManage>( RowPtr(y,0), w, d, img_pitch);
+    }
+
+    //////////////////////////////////////////////////////
+    // Size Accessors
+    //////////////////////////////////////////////////////
+
+    inline __device__ __host__
+    uint3 Voxels() const
+    {
+        return make_uint3(w,h,d);
     }
 
     //////////////////////////////////////////////////////

@@ -20,8 +20,8 @@
 #include "common/GLPoseGraph.h"
 #include "common/Handler3dGpuDepth.h"
 #include "common/SavePPM.h"
-#include "common/SaveGIL.h"
-#include "common/SaveMeshlab.h"
+#include "common/PoseGraph.h"
+#include "common/GLPoseGraph.h"
 
 #include "MarchingCubes.h"
 
@@ -31,6 +31,19 @@
 
 using namespace std;
 using namespace pangolin;
+
+//Gpu::Mat<ImageKeyframe<Timg>,N> keyframes;
+
+struct KinectKeyframe
+{
+    KinectKeyframe(int w, int h, Sophus::SE3 T_iw)
+        : img(w,h), T_iw(T_iw)
+    {
+    }
+
+    Sophus::SE3 T_iw;
+    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
+};
 
 int main( int argc, char* argv[] )
 {
@@ -55,9 +68,9 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 0.5;
+    const float volrad = 2;
 
-    const Eigen::Vector4d its(1,0,2,3);
+    const Eigen::Vector4d its(1,2,3,4);
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -85,18 +98,26 @@ int main( int argc, char* argv[] )
     Gpu::Mat<Gpu::ImageKeyframe<uchar3>,10> kfs;
 
     SceneGraph::GLSceneGraph glgraph;
-    SceneGraph::GLAxis glcamera(0.1);
+    SceneGraph::GLAxis glsdf(2.0);
     SceneGraph::GLAxisAlignedBox glboxfrustum;
     SceneGraph::GLAxisAlignedBox glboxvol;
-
     glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
-    glgraph.AddChild(&glcamera);
-    glgraph.AddChild(&glboxvol);
-    glgraph.AddChild(&glboxfrustum);
+    SceneGraph::GLGrid glGrid(5,1,true);
+    SceneGraph::GLAxis glcamera(1.0);
+    SceneGraph::GLAxis glcamera_vic(0.5);
+
+    glgraph.AddChild(&glGrid);
+    glgraph.AddChild(&glsdf);
+
+    glsdf.AddChild(&glcamera_vic);
+    glsdf.AddChild(&glcamera);
+    glsdf.AddChild(&glboxvol);
+    glsdf.AddChild(&glboxfrustum);
 
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrixRDF_TopLeft(w,h,fu,fv,u0,v0,0.1,1000),
-        ModelViewLookAtRDF(0,0,-2,0,0,0,0,-1,0)
+//        pangolin::ModelViewLookAtRDF(0,0,-2,0,0,0,0,-1,0)
+        pangolin::ModelViewLookAtRDF(0,5,5,0,0,0,0,0,1)
     );
 
     Var<bool> run("ui.run", true, true);
@@ -105,7 +126,7 @@ int main( int argc, char* argv[] )
     Var<bool> fuse("ui.fuse", true, true);
     Var<bool> reset("ui.reset", true, false);
 
-    Var<int> show_level("ui.Show Level", 0, 0, MaxLevels-1);
+    Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
 
     Var<int> biwin("ui.size",5, 1, 20);
     Var<float> bigs("ui.gs",5, 1E-3, 5);
@@ -114,20 +135,24 @@ int main( int argc, char* argv[] )
     Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
 
-    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 1E-6, 2*length(voxsize));
-    Var<float> max_w("ui.max w", 100, 1E-4, 10);
+    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    Var<float> max_w("ui.max w", 10, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
     Var<bool> save_kf("ui.Save KF", false, false);
     Var<float> rgb_fl("ui.RGB focal length", 535.7,400,600);
     Var<float> max_rmse("ui.Max RMSE",0.10,0,0.5);
     Var<float> rmse("ui.RMSE",0);
+    Var<bool> add_constraints("ui.Add Constraints", false, true);
+    Var<bool> use_vicon_for_sdf("ui.Use Vicon For SDF", false, true);
+    Var<bool> reset_sdf("ui.reset_sdf", false, false);
+
 
     ActivateDrawPyramid<float,MaxLevels> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawPyramid<float4,MaxLevels> adraycolor(ray_c, GL_RGBA32F, true, true);
-    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
+//    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
 //    ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
+    ActivateDrawPyramid<float4,MaxLevels> adnormals( ray_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
@@ -140,25 +165,73 @@ int main( int argc, char* argv[] )
                 .SetHandler(&rayhandler);
 //    container[3].SetDrawFunction(boost::ref(addebug));
 //    container[4].SetDrawFunction(boost::ref(adnormals));
-//    container[5].SetDrawFunction(boost::ref(adraynorm));
+//    container[4].SetDrawFunction(boost::ref(adraynorm));
 
-    Sophus::SE3 T_wl;
+    Sophus::SE3 T_sdf_kin;
+    bool tracking_good = true;
 
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
-    pangolin::RegisterKeyPressCallback('s', [&vol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
+    pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); Gpu::SaveMesh("mesh", vol); } );
+
+    PoseGraph posegraph;
+    int coord_vicon = posegraph.AddSecondaryCoordinateFrame();
+    int kf_sdf = posegraph.AddKeyframe();
+    ViconTracking vicon("Local2", "192.168.10.1");
+
+    GLPoseGraph glposegraph(posegraph);
+    glgraph.AddChild(&glposegraph);
+
+    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
         const bool go = frame==-1 || run;
 
+        if(rgb_fl.GuiChanged()) {
+            save_kf = true;
+        }
+
         if(Pushed(save_kf)) {
-            KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
+            KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_sdf_kin.inverse());
             kf->img.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)img[0].Image.data,w,h));
             keyframes.push_back(kf);
         }
 
+        if(Pushed(reset_sdf)) {
+            const Sophus::SE3 T_kin_vicon = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
+
+            // Reset posegraph
+            keyframes.clear();
+            posegraph.Clear();
+            coord_vicon = posegraph.AddSecondaryCoordinateFrame();
+            posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_vicon);
+            kf_sdf = posegraph.AddKeyframe();
+
+            // TODO: Use memory more appropriately.
+
+            vol.bbox.Min() = Gpu::ToCuda(vicon.WorkspaceMin());
+            vol.bbox.Max() = Gpu::ToCuda(vicon.WorkspaceMax());
+            trunc_dist = 2*length(voxsize);
+            Gpu::SdfReset(vol, trunc_dist);
+            glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
+
+            const Sophus::SE3 T_room_vicon = vicon.T_wf();
+            const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_room_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+        }
+
+        const bool newViconData = vicon.IsNewData();
+        const Sophus::SE3 T_room_vicon = vicon.T_wf();
+        const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
+        const Sophus::SE3 Tv_sdf_kin = T_room_sdf.inverse() * T_room_vicon * posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().inverse();
+        if(use_vicon_for_sdf) {
+            tracking_good = newViconData;
+            T_sdf_kin = Tv_sdf_kin;
+        }
+
         if(go) {
             camera.Capture(img);
+
             dKinect.CopyFrom(Gpu::Image<unsigned short, Gpu::TargetHost>((unsigned short*)img[1].Image.data,w,h));
             Gpu::BilateralFilter<float,unsigned short>(kin_d[0],dKinect,bigs,bigr,biwin,200);
             Gpu::ElementwiseScaleBias<float,float,float>(kin_d[0], kin_d[0], 1.0f/1000.0f);
@@ -173,19 +246,22 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(reset)) {
-            T_wl = Sophus::SE3();
+            T_sdf_kin = Sophus::SE3();
             Gpu::SdfReset(vol, trunc_dist);
             keyframes.clear();
+            posegraph.Clear();
+            coord_vicon = posegraph.AddSecondaryCoordinateFrame();
+            kf_sdf = posegraph.AddKeyframe();
 
             // Fuse first kinect frame in.
-            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(viewonly) {
-            Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, 0, 20) );
+            Sophus::SE3 T_wv(s_cam.GetModelViewMatrix().Inverse());
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
             if(work_vol.IsValid()) {
-                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, trunc_dist, true );
+                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), fu, fv, u0, v0, 0.1, 20, trunc_dist, true );
 
                 // populate kfs
                 for( int k=0; k< kfs.Rows(); k++)
@@ -199,25 +275,23 @@ int main( int argc, char* argv[] )
                     }
                 }
 
-                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_vw.inverse().matrix3x4(), fu,fv,u0,v0);
+                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), fu,fv,u0,v0);
             }
         }else{
-            bool tracking_good = true;
+            tracking_good = true;
 
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_sdf_kin.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
             if(work_vol.IsValid()) {
 //                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
 //                Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);
                 for(int l=0; l<MaxLevels; ++l) {
-                    if(its[l] > 0) {
-                        Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
-                        Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
-    //                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
-    //                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
-                    }
+                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_sdf_kin.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
+                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+//                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
                 }
 
-                if(pose_refinement && frame > 0) {
+                if( pose_refinement && frame > 0) {
                     Sophus::SE3 T_lp;
 
 //                    const int l = show_level;
@@ -240,14 +314,14 @@ int main( int argc, char* argv[] )
                             Eigen::Matrix<double,6,1> sysJTy = lss.JTy;
 
                             // Add a week prior on our pose
-                            const double motionSigma = 0.2;
+                            const double motionSigma = use_vicon_for_sdf ? 0.01 : 0.2;
                             const double depthSigma = 0.1;
                             sysJTJ += (depthSigma / motionSigma) * Eigen::Matrix<double,6,6>::Identity();
 
                             rmse = sqrt(lss.sqErr / lss.obs);
                             tracking_good = rmse < max_rmse;
 
-                            if(l == MaxLevels-1) {
+                            if(l == MaxLevels-1 /*|| use_vicon_for_sdf*/) {
                                 // Solve for rotation only
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
@@ -257,19 +331,28 @@ int main( int argc, char* argv[] )
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
                                 T_lp = T_lp * Sophus::SE3::exp(x);
                             }
-
                         }
                     }
 
-                    T_wl = T_wl * T_lp.inverse();
+                    T_sdf_kin = T_sdf_kin * T_lp.inverse();
+
+                    if(!use_vicon_for_sdf && add_constraints && newViconData && tracking_good) {
+                        // Add to pose graph
+                        const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
+                        const int kf_kin = posegraph.AddKeyframe(new Keyframe(T_room_sdf * T_sdf_kin));
+                        posegraph.AddIndirectUnaryEdge(kf_kin,coord_vicon,T_room_vicon);
+                        posegraph.AddBinaryEdge(kf_sdf,kf_kin,T_sdf_kin);
+                    }
                 }
             }
 
-            if(pose_refinement && fuse) {
+            if(use_vicon_for_sdf && !newViconData) tracking_good = false;
+
+            if( (pose_refinement || use_vicon_for_sdf) && fuse) {
                 if(tracking_good) {
-                    Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+                    Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_sdf_kin.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
                     if(work_vol.IsValid()) {
-                        Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+                        Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
                     }
                 }else{
                     cerr << "Tracking bad" << endl;
@@ -277,23 +360,14 @@ int main( int argc, char* argv[] )
             }
         }
 
-        glcamera.SetPose(T_wl.matrix());
+//        glAxisVicon.SetPose(T_room_vicon.matrix());
+        glcamera_vic.SetPose(Tv_sdf_kin.matrix());
+        glsdf.SetPose(T_room_sdf.matrix());
+        glcamera.SetPose(T_sdf_kin.matrix());
 
-        Gpu::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar);
+        Gpu::BoundingBox bbox_work(T_sdf_kin.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar);
         bbox_work.Intersect(vol.bbox);
         glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
-
-//        {
-//            CudaScopedMappedPtr var(cbo);
-//            Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-//            Gpu::ConvertImage<uchar4,float4>(dCbo,kin_n[0]);
-//        }
-
-//        {
-//            CudaScopedMappedPtr var(vbo);
-//            Gpu::Image<float4> dVbo((float4*)*var,w,h);
-//            dVbo.CopyFrom(kin_v[0]);
-//        }
 
         /////////////////////////////////////////////////////////////
         // Draw
