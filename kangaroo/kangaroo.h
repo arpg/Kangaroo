@@ -175,7 +175,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const Mat<float,3,4> KT_lr, float c,
     float fu, float fv, float u0, float v0,
     Image<unsigned char> dWorkspace, Image<float4> dDebug,
-    const bool bDiscardMaxMin = false
+    const bool bDiscardMaxMin = false, const float fMinDepth = 0, const float fMaxDepth = 100
     );
 
 LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
