@@ -55,7 +55,7 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 0.5;
+    const float volrad = 1.0;
 
     const Eigen::Vector4d its(1,0,2,3);
 

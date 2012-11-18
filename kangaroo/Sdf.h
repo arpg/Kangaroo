@@ -6,7 +6,7 @@
 namespace Gpu
 {
 
-struct SDF_t {
+struct __align__(8) SDF_t {
     inline __host__ __device__ SDF_t() {}
     inline __host__ __device__ SDF_t(float v) : val(v), w(1) {}
     inline __host__ __device__ SDF_t(float v, float w) : val(v), w(w) {}

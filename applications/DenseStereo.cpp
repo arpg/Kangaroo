@@ -26,8 +26,6 @@
 
 #include <kangaroo/kangaroo.h>
 
-#include <Node.h>
-
 //#define HM_FUSION
 //#define PLANE_FIT
 //#define COSTVOL_TIME
