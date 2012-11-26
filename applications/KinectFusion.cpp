@@ -5,6 +5,8 @@
 #include <pangolin/glcuda.h>
 #include <pangolin/glvbo.h>
 
+#include <CVars/CVar.h>
+
 #include <SceneGraph/SceneGraph.h>
 
 #include "common/ViconTracker.h"
@@ -22,6 +24,7 @@
 #include "common/SavePPM.h"
 #include "common/SaveGIL.h"
 #include "common/SaveMeshlab.h"
+#include "common/CVarHelpers.h"
 
 #include "MarchingCubes.h"
 
@@ -55,7 +58,13 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 1.0;
+    const float volrad = 0.4;
+
+    Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
+//    Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
+//    Gpu::BoundingBox reset_bb(make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25));
+
+    CVarUtils::AttachCVar<Gpu::BoundingBox>("BoundingBox", &reset_bb);
 
     const Eigen::Vector4d its(1,0,2,3);
 
@@ -75,11 +84,7 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_c(w,h);
-//    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad)); // in middle
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad)); // in front
-//    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25)); // dress form.
-
-    const float3 voxsize = vol.VoxelSizeUnits();
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,reset_bb); // in front
 
     boost::ptr_vector<KinectKeyframe> keyframes;
     Gpu::Mat<Gpu::ImageKeyframe<uchar3>,10> kfs;
@@ -114,7 +119,6 @@ int main( int argc, char* argv[] )
     Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
 
-    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 1E-6, 2*length(voxsize));
     Var<float> max_w("ui.max w", 100, 1E-4, 10);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
@@ -174,14 +178,19 @@ int main( int argc, char* argv[] )
 
         if(Pushed(reset)) {
             T_wl = Sophus::SE3();
-            Gpu::SdfReset(vol, trunc_dist);
+
+            vol.bbox = reset_bb;
+            Gpu::SdfReset(vol);
             keyframes.clear();
 
             // Fuse first kinect frame in.
+            const float trunc_dist = 2*length(vol.VoxelSizeUnits());
             Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(viewonly) {
+            const float trunc_dist = 2*length(vol.VoxelSizeUnits());
+
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, 0, 20) );
             if(work_vol.IsValid()) {
@@ -269,6 +278,7 @@ int main( int argc, char* argv[] )
                 if(tracking_good) {
                     Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
                     if(work_vol.IsValid()) {
+                        const float trunc_dist = 2*length(vol.VoxelSizeUnits());
                         Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
                     }
                 }else{

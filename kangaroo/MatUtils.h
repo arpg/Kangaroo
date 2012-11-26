@@ -481,3 +481,21 @@ float3 ToCuda(const Eigen::Vector3d& v)
 #endif // USE_EIGEN
 
 }
+
+//////////////////////////////////////////////////////
+// Cuda vector type Stream Overloads
+//////////////////////////////////////////////////////
+
+inline std::ostream& operator<<( std::ostream& os, const float3& v)
+{
+    os << v.x << " " << v.y << " " << v.z;
+    return os;
+}
+
+inline std::istream& operator>>( std::istream& is, float3& v)
+{
+    is >> v.x;
+    is >> v.y;
+    is >> v.z;
+    return is;
+}

@@ -125,12 +125,18 @@ struct BoundingBox
     float3 boxmax;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const BoundingBox& bbox)
+inline std::ostream& operator<<( std::ostream& os, const Gpu::BoundingBox& bbox)
 {
-    os << "(" << bbox.boxmin.x << "," << bbox.boxmin.y << "," << bbox.boxmin.z << ")";
-    os << " - ";
-    os << "(" << bbox.boxmax.x << "," << bbox.boxmax.y << "," << bbox.boxmax.z << ")";
+    os << bbox.Min() << " - " << bbox.Max();
     return os;
+}
+
+inline std::istream& operator>>( std::istream& is, Gpu::BoundingBox& bbox)
+{
+    is >> bbox.Min();
+    is.ignore(3, '-');
+    is >> bbox.Max();
+    return is;
 }
 
 }
