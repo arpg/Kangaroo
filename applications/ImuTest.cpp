@@ -1,90 +1,76 @@
-#include <boost/signals2/mutex.hpp>
-#include <Eigen/Eigen>
-
-#include <SimpleGui/Gui.h>
-#include <SimpleGui/GetPot>
-#include <SimpleGui/GLMesh.h>
-
+#include <iostream>
+#include <boost/thread.hpp>
+#include <pangolin/pangolin.h>
 #include <RPG/Devices/IMU/IMUDevice.h>
-#include <Mvlpp/Mvl.h>
 
+using namespace pangolin;
 using namespace std;
-using namespace Eigen;
 
-const char* MESH_NAME = "./Models/beatle-no-wheels-no-interior-embedded-texture.blend";
+#include <pangolin/display_internal.h>
 
-class Application
+struct Application
 {
-public:
     Application()
-        : window(0, 0, 1024, 768, __FILE__ ),
-          meshtest()
+        : log(1024*1024), plotter(&log)
     {
-        Init();
-    }
+        // Setup IMU
+        imu.SetProperty("GetAHRS", true);
+        imu.SetProperty("GetGyro", true);
+        imu.SetProperty("GetAccelerometer", true);
+        imu.SetProperty("HzAHRS", 1000);
 
-    void Init()
-    {
-    //    Cam.SetProperty("property", val);
-
-        // Initialise driver
         if( imu.InitDriver( "MicroStrain" ) ) {
             IMUDriverDataCallback f = boost::bind(&Application::NewIMUData, this, _1);
             imu.RegisterDataCallback( f );
         }else{
             std::cout << "Invalid input device." << std::endl;
+            exit(-1);
         }
 
-        meshtest.Init(MESH_NAME);
+        // Create OpenGL window in single line thanks to GLUT
+        pangolin::CreateGlutWindowAndBind("Main",640,480);
+        glEnable (GL_BLEND);
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-//        window.AddChildToRoot(&meshtest);
-//        window.AddPreRenderCallback(Application::PreRender, this);
-        window.AddPostRenderCallback(Application::PostRender, this);
+        plotter.SetBounds(0.0, 1.0, 0.0, 1.0);
+        DisplayBase().AddDisplay(plotter);
     }
 
-    void NewIMUData(const IMUData& data)
+    ~Application()
     {
-//        updateMutex.lock();
-        rotation = data.rotation;
-//        updateMutex.unlock();
+        imu.DeinitDriver();
     }
 
-    static void PreRender(GLWindow*, void* data)
+
+    void NewIMUData(IMUData data)
     {
-        // Set Cars pose from IMU Data
-        Application* self = static_cast<Application*>(data);
-        Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-        T.block<3,3>(0,0) = self->rotation.toRotationMatrix();
-        Eigen::Vector6d t = mvl::T2Cart(T);
-        self->meshtest.SetPose(t);
+        log.Log(
+            data.gyro(0), data.gyro(1), data.gyro(2),
+            data.accel(0), data.accel(1), data.accel(2)
+        );
     }
 
-    static void PostRender(GLWindow*, void* data)
+    void Run()
     {
-        Application* self = static_cast<Application*>(data);
-        Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-        T.block<3,3>(0,0) = self->rotation.toRotationMatrix();
+      // Default hooks for exiting (Esc) and fullscreen (tab).
+      while( !pangolin::ShouldQuit() )
+      {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        pangolin::FinishGlutFrame();
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1E3/60.0));
+      }
 
-        glPushMatrix();
-        glMultMatrixd(T.data());
-        self->meshtest.draw();
-        glPopMatrix();
-    }
-
-    int Run()
-    {
-        return window.Run();
     }
 
 protected:
-    boost::signals2::mutex updateMutex;
-    Quaterniond rotation;
     IMUDevice imu;
-    GLWindow window;
-    GLMesh meshtest;
+    DataLog log;
+    Plotter plotter;
 };
 
-int main (int argc, char** argv){
+int main( int /*argc*/, char* argv[] )
+{
     Application app;
-    return app.Run();
+    app.Run();
+    return 0;
 }

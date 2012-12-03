@@ -42,6 +42,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "-std=c++11 -g")
 endif()
 
+add_executable( ImuTest ImuTest.cpp)
 add_executable( CameraViewer CameraViewer.cpp)
 add_executable( StereoCalibration StereoCalibration.cpp)
 add_executable( ViconTest ViconTest.cpp)
