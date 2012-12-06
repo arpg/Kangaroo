@@ -5,22 +5,6 @@
 #include <RPG/Utils/GetPot>
 #include <boost/lexical_cast.hpp>
 
-CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels);
-
-//! Convenience method to load camera based on string URI containing PropertyMap and device.
-CameraDevice OpenRpgCamera( const std::string& str_uri);
-
-//! Convenience method to initialise camera based on string URI containing PropertyMap and device.
-void InitRpgCamera( CameraDevice& camera, const std::string& str_uri);
-
-//! Convenience method to retrieve pangolin video wrapped as RPG Video object.
-CameraDevice OpenPangoCamera( const std::string& str_uri, const std::string& str_uri2 = "");
-
-//! Convenience method to retrieve pangolin video wrapped as RPG Video object.
-void InitPangoCamera( CameraDevice& camera, const std::string& str_uri, const std::string& str_uri2 = "");
-
-//////////////////////////////////////////////////////////////////////
-
 class PangolinRpgVideoAdapterDriver : public CameraDriver
 {
 public:
@@ -52,7 +36,7 @@ const char USAGE[] =
 "Example:\n"
 "program  -idev FileReader  -lcmod lcmod.xml  -rcmod rcmod.xml  -lfile \"left.*pgm\"  -rfile \"right.*pgm\"\n\n";
 
-inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2)
+inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = true)
 {
     if( argc < 2 ) {
         std::cout << USAGE;
@@ -66,6 +50,7 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.SetProperty("Channel-0", cl.follow( ".*left.*pgm", "-lfile" ) );
     camera.SetProperty("Channel-1", cl.follow( ".*right.*pgm", "-rfile" ) );
     camera.SetProperty("StartFrame", cl.follow(0,"-sf") );
+    camera.SetProperty("ForceGrayscale", forceGrayscale);
     camera.SetProperty("lcmod", cl.follow( "lcmod.xml", "-lcmod" ) );
     camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
     camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
@@ -92,20 +77,6 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     camera.InitDriver( cl.follow( "FileReader", "-idev" ) );
 }
 
-inline CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels = 2)
-{
-    CameraDevice camera;
-    OpenRpgCamera(camera,argc,argv,numChannels);
-    return camera;
-}
-
-inline CameraDevice OpenRpgCamera( const std::string& str_uri)
-{
-    CameraDevice camera;
-    InitRpgCamera(camera, str_uri);
-    return camera;
-}
-
 inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
 {
     pangolin::Uri uri = pangolin::ParseUri(str_uri);
@@ -117,6 +88,20 @@ inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
     if( !camera.InitDriver(uri.scheme) ) {
         throw pangolin::VideoException("Couldn't start driver");
     }
+}
+
+inline CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels = 2, bool forceGrayscale = true)
+{
+    CameraDevice camera;
+    OpenRpgCamera(camera,argc,argv,numChannels,forceGrayscale);
+    return camera;
+}
+
+inline CameraDevice OpenRpgCamera( const std::string& str_uri)
+{
+    CameraDevice camera;
+    InitRpgCamera(camera, str_uri);
+    return camera;
 }
 
 
