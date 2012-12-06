@@ -62,7 +62,6 @@ int main( int argc, char* argv[] )
 
     Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
 //    Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
-//    Gpu::BoundingBox reset_bb(make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25));
 
     CVarUtils::AttachCVar<Gpu::BoundingBox>("BoundingBox", &reset_bb);
 
@@ -153,7 +152,7 @@ int main( int argc, char* argv[] )
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
-        const bool go = frame==-1 || run;
+        const bool go = !viewonly && (frame==-1 || run);
 
         if(Pushed(save_kf)) {
             KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
@@ -192,9 +191,9 @@ int main( int argc, char* argv[] )
             const float trunc_dist = 2*length(vol.VoxelSizeUnits());
 
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, 0, 20) );
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, 0, 50) );
             if(work_vol.IsValid()) {
-                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 20, trunc_dist, true );
+                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, 0.1, 50, trunc_dist, true );
 
                 // populate kfs
                 for( int k=0; k< kfs.Rows(); k++)

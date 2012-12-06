@@ -21,7 +21,7 @@ struct Application
 
         if( imu.InitDriver( "MicroStrain" ) ) {
             IMUDriverDataCallback f = boost::bind(&Application::NewIMUData, this, _1);
-            imu.RegisterDataCallback( f );
+            imu.RegisterIMUDataCallback( f );
         }else{
             std::cout << "Invalid input device." << std::endl;
             exit(-1);
