@@ -163,6 +163,7 @@ void OptimiseTargetVicon(
     }
 }
 
+namespace Sophus {
 template<typename T, int R, int C>
 std::istream& operator>> (std::istream& is, Eigen::Matrix<T,R,C>& o){
     for(int r=0; r < R; ++r )  {
@@ -172,7 +173,6 @@ std::istream& operator>> (std::istream& is, Eigen::Matrix<T,R,C>& o){
     }
     return is;
 }
-
 
 template<typename T>
 std::ostream& operator<< (std::ostream& os, const Eigen::Quaternion<T>& o){
@@ -203,6 +203,9 @@ std::istream& operator>> (std::istream& is, Sophus::SE3& o){
     o.setQuaternion(q);
     return is;
 }
+
+}
+
 
 int main( int argc, char* argv[] )
 {

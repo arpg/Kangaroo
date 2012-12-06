@@ -156,7 +156,6 @@ int main( int argc, char* argv[] )
     ViconTracking vicon(cam_name, "192.168.10.1");
 
     pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
-    pangolin::RegisterKeyPressCallback('t', [&posegraph,coord_z]() {posegraph.SetSecondaryCoordinateFrameFree(coord_z);});
     pangolin::RegisterKeyPressCallback('s', [cam_name,&posegraph,coord_z,dfl]() {Save(cam_name, posegraph.GetSecondaryCoordinateFrame(coord_z).GetT_wk(), dfl);});
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
