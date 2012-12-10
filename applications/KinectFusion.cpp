@@ -58,7 +58,7 @@ int main( int argc, char* argv[] )
     const double kfar = 4;
 //    const int volres = 384; //256;
     const int volres = 256;
-    const float volrad = 0.4;
+    const float volrad = 0.6;
 
     Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
 //    Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));

@@ -36,7 +36,7 @@ const char USAGE[] =
 "Example:\n"
 "program  -idev FileReader  -lcmod lcmod.xml  -rcmod rcmod.xml  -lfile \"left.*pgm\"  -rfile \"right.*pgm\"\n\n";
 
-inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = true)
+inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = false)
 {
     if( argc < 2 ) {
         std::cout << USAGE;
@@ -90,7 +90,7 @@ inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
     }
 }
 
-inline CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels = 2, bool forceGrayscale = true)
+inline CameraDevice OpenRpgCamera(int argc, char* argv[], int numChannels = 2, bool forceGrayscale = false)
 {
     CameraDevice camera;
     OpenRpgCamera(camera,argc,argv,numChannels,forceGrayscale);
