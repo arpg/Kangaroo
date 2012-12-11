@@ -72,6 +72,7 @@ int main( int argc, char* argv[] )
     Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),c_d).inverse();
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> dKinectMeters(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_v(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_n(w,h);
@@ -111,14 +112,16 @@ int main( int argc, char* argv[] )
 
     Var<int> show_level("ui.Show Level", 0, 0, MaxLevels-1);
 
-    Var<int> biwin("ui.size",5, 1, 20);
-    Var<float> bigs("ui.gs",5, 1E-3, 5);
-    Var<float> bigr("ui.gr",100, 1E-3, 200);
+    // TODO: This needs to be a function of the inverse depth
+    Var<int> biwin("ui.size",3, 1, 20);
+    Var<float> bigs("ui.gs",1.5, 1E-3, 5);
+    Var<float> bigr("ui.gr",0.1, 1E-6, 0.2);
 
     Var<bool> pose_refinement("ui.Pose Refinement", true, true);
     Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
+    Var<float> trunc_dist_factor("ui.trunc vol factor",2, 1, 4);
 
-    Var<float> max_w("ui.max w", 100, 1E-4, 10);
+    Var<float> max_w("ui.max w", 100, 1E-3, 1E4);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
     Var<bool> save_kf("ui.Save KF", false, false);
@@ -134,7 +137,7 @@ int main( int argc, char* argv[] )
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
-    SetupContainer(container, 3, (float)w/h);
+    SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(boost::ref(adrayimg))
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
@@ -142,11 +145,12 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(boost::ref(adraycolor))
                 .SetHandler(&rayhandler);
 //    container[3].SetDrawFunction(boost::ref(addebug));
-//    container[4].SetDrawFunction(boost::ref(adnormals));
+    container[3].SetDrawFunction(boost::ref(adnormals));
 //    container[5].SetDrawFunction(boost::ref(adraynorm));
 
     Sophus::SE3 T_wl;
 
+    pangolin::RegisterKeyPressCallback(' ', [&reset]() { reset = true; } );
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
     pangolin::RegisterKeyPressCallback('s', [&vol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
 
@@ -163,8 +167,8 @@ int main( int argc, char* argv[] )
         if(go) {
             camera.Capture(img);
             dKinect.CopyFrom(Gpu::Image<unsigned short, Gpu::TargetHost>((unsigned short*)img[1].Image.data,w,h));
-            Gpu::BilateralFilter<float,unsigned short>(kin_d[0],dKinect,bigs,bigr,biwin,200);
-            Gpu::ElementwiseScaleBias<float,float,float>(kin_d[0], kin_d[0], 1.0f/1000.0f);
+            Gpu::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
+            Gpu::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
 
             Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);
             for(int l=0; l<MaxLevels; ++l) {
@@ -183,12 +187,12 @@ int main( int argc, char* argv[] )
             keyframes.clear();
 
             // Fuse first kinect frame in.
-            const float trunc_dist = 2*length(vol.VoxelSizeUnits());
+            const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
             Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
         }
 
         if(viewonly) {
-            const float trunc_dist = 2*length(vol.VoxelSizeUnits());
+            const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_vw.inverse().matrix3x4(), w, h, fu, fv, u0, v0, 0, 50) );
@@ -277,8 +281,9 @@ int main( int argc, char* argv[] )
                 if(tracking_good) {
                     Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wl.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
                     if(work_vol.IsValid()) {
-                        const float trunc_dist = 2*length(vol.VoxelSizeUnits());
+                        const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
                         Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+//                        Gpu::SdfFuse(work_vol, dKinectMeters, kin_n[0], T_wl.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
                     }
                 }else{
                     cerr << "Tracking bad" << endl;

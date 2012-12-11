@@ -253,6 +253,7 @@ Tout ImageL1(Image<T> img, Image<unsigned char> scratch)
 template void Fill(Image<float> img, float val);
 template void Fill(Image<unsigned char> img, unsigned char val);
 template void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
+template void ElementwiseScaleBias(Image<float> b, const Image<unsigned short> a, float s, float offset);
 template void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
 template void ElementwiseScaleBias(Image<float2> b, const Image<float2> a, float s, float2 offset);
 template void ElementwiseAdd(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, int, int, int);
