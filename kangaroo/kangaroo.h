@@ -131,8 +131,18 @@ void DisparityImageCrossSection(
 
 void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth);
 void FilterBadKinectData(Image<float> dFiltered, Image<float> dKinectDepth);
-void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f);
-void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f);
+void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, ImageIntrinsics K, float scale = 1.0f);
+void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, ImageIntrinsics K, float scale = 1.0f);
+
+inline void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f)
+{
+    DepthToVbo(dVbo, dKinectDepth, ImageIntrinsics(fu,fv,u0,v0), scale);
+}
+
+inline void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f)
+{
+    DepthToVbo(dVbo, dKinectDepth, ImageIntrinsics(fu,fv,u0,v0), scale);
+}
 
 void DisparityImageToVbo(
     Image<float4> dVbo, const Image<float> dDisp, float baseline, float fu, float fv, float u0, float v0
@@ -141,10 +151,10 @@ void DisparityImageToVbo(
 void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> dIc, const Mat<float,3,4> KT_cd );
 
 template<typename Tout, typename Tin>
-void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth);
 
 template<typename Tout, typename Tin, size_t N>
-void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth);
 
 
 void NormalsFromVbo(Image<float4> dN, const Image<float4> dV);
@@ -438,15 +448,15 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
 //////////////////////////////////////////////////////
 
-void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix = true);
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float near, float far, float trunc_dist, bool subpix = true);
 
-void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r);
+void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r);
 
-void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const BoundingBox bbox );
+void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox );
 
 //////////////////////////////////////////////////////
 
-void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float maxw, float mincostheta );
+void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float maxw, float mincostheta );
 
 void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist = 0);
 

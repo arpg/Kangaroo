@@ -60,10 +60,11 @@ int main( int argc, char* argv[] )
     const int MaxLevels = 4;
 
     const double baseline_m = camera.GetProperty<double>("Depth0Baseline", 0) / 100;
-    const double fu = camera.GetProperty<double>("Depth0FocalLength", 570.342);
-    const double fv = fu;
-    const double u0 = w/2.0 - 0.5;
-    const double v0 = h/2.0 - 0.5;
+    const Gpu::ImageIntrinsics K(
+        camera.GetProperty<double>("Depth0FocalLength", 570.342),
+        camera.GetProperty<double>("Depth0FocalLength", 570.342),
+        w/2.0 - 0.5, h/2.0 - 0.5
+    );
     const double knear = 0.4;
     const double kfar = 4;
 //    const int volres = 384; //256;
@@ -115,7 +116,7 @@ int main( int argc, char* argv[] )
     glsdf.AddChild(&glboxfrustum);
 
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrixRDF_TopLeft(w,h,fu,fv,u0,v0,0.1,1000),
+        ProjectionMatrixRDF_TopLeft(w,h,K.fu,K.fv,K.u0,K.v0,0.1,1000),
 //        pangolin::ModelViewLookAtRDF(0,0,-2,0,0,0,0,-1,0)
         pangolin::ModelViewLookAtRDF(0,5,5,0,0,0,0,0,1)
     );
@@ -217,7 +218,7 @@ int main( int argc, char* argv[] )
 
             const Sophus::SE3 T_room_vicon = vicon.T_wf();
             const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
-            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_room_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_room_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         const bool newViconData = vicon.IsNewData();
@@ -238,7 +239,7 @@ int main( int argc, char* argv[] )
 
             Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);
             for(int l=0; l<MaxLevels; ++l) {
-                Gpu::DepthToVbo(kin_v[l], kin_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+                Gpu::DepthToVbo(kin_v[l], kin_d[l], K[l] );
                 Gpu::NormalsFromVbo(kin_n[l], kin_v[l]);
             }
 
@@ -254,14 +255,14 @@ int main( int argc, char* argv[] )
             kf_sdf = posegraph.AddKeyframe();
 
             // Fuse first kinect frame in.
-            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         if(viewonly) {
             Sophus::SE3 T_wv(s_cam.GetModelViewMatrix().Inverse());
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, fu, fv, u0, v0, knear,20) );
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, K, knear,20) );
             if(work_vol.IsValid()) {
-                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), fu, fv, u0, v0, 0.1, 20, trunc_dist, true );
+                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), K, 0.1, 20, trunc_dist, true );
 
                 // populate kfs
                 for( int k=0; k< kfs.Rows(); k++)
@@ -275,19 +276,20 @@ int main( int argc, char* argv[] )
                     }
                 }
 
-                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), fu,fv,u0,v0);
+                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), K);
             }
         }else{
             tracking_good = true;
 
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_sdf_kin.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_sdf_kin.matrix3x4(), w, h, K, knear,kfar) );
             if(work_vol.IsValid()) {
 //                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
 //                Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);
                 for(int l=0; l<MaxLevels; ++l) {
-                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_sdf_kin.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
-                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
-//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+                    const Gpu::ImageIntrinsics Kl = K[l];
+                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_sdf_kin.matrix3x4(), Kl, knear,kfar, true );
+                    Gpu::DepthToVbo(ray_v[l], ray_d[l], Kl );
+//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], Kl );
 //                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
                 }
 
@@ -300,8 +302,7 @@ int main( int argc, char* argv[] )
 
                     for(int l=MaxLevels-1; l >=0; --l)
                     {
-                        Eigen::Matrix3d Kdepth;
-                        Kdepth << fu/(1<<l), 0, w/(2.0f * (1<<l)) - 0.5,   0, fv/(1<<l), h/(2.0f * (1<<l)) - 0.5,  0,0,1;
+                        const Eigen::Matrix3d Kdepth = K[l].Matrix();
 
                         for(int i=0; i<its[l]; ++i ) {
                             const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
@@ -350,9 +351,9 @@ int main( int argc, char* argv[] )
 
             if( (pose_refinement || use_vicon_for_sdf) && fuse) {
                 if(tracking_good) {
-                    Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_sdf_kin.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar) );
+                    Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_sdf_kin.matrix3x4(), w, h, K, knear,kfar) );
                     if(work_vol.IsValid()) {
-                        Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+                        Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
                     }
                 }else{
                     cerr << "Tracking bad" << endl;
@@ -365,7 +366,7 @@ int main( int argc, char* argv[] )
         glsdf.SetPose(T_room_sdf.matrix());
         glcamera.SetPose(T_sdf_kin.matrix());
 
-        Gpu::BoundingBox bbox_work(T_sdf_kin.matrix3x4(), w, h, fu, fv, u0, v0, knear,kfar);
+        Gpu::BoundingBox bbox_work(T_sdf_kin.matrix3x4(), w, h, K, knear,kfar);
         bbox_work.Intersect(vol.bbox);
         glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
 

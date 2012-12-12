@@ -3,6 +3,7 @@
 #include "Sdf.h"
 #include "BoundedVolume.h"
 #include "launch_utils.h"
+#include "ImageIntrinsics.h"
 
 namespace Gpu
 {
@@ -11,14 +12,14 @@ namespace Gpu
 // Raycast SDF
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
+__global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float near, float far, float trunc_dist, bool subpix )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( u < img.w && v < img.h ) {
         const float3 c_w = SE3Translation(T_wc);
-        const float3 ray_c = make_float3((u-u0)/fu,(v-v0)/fv, 1);
+        const float3 ray_c = K.Unproject(u,v);
         const float3 ray_w = mulSO3(T_wc, ray_c);
 
         // Raycast bounding box to find valid ray segment of sdf
@@ -94,12 +95,12 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
     }
 }
 
-void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float near, float far, float trunc_dist, bool subpix )
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float near, float far, float trunc_dist, bool subpix )
 {    
     dim3 blockDim, gridDim;
 //    InitDimFromOutputImageOver(blockDim, gridDim, img, 16, 16);
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, T_wc, fu, fv, u0, v0, near, far, trunc_dist, subpix);
+    KernRaycastSdf<<<gridDim,blockDim>>>(depth, norm, img, vol, T_wc, K, near, far, trunc_dist, subpix);
     GpuCheckErrors();
 }
 
@@ -107,14 +108,14 @@ void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const 
 // Raycast sphere
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r)
+__global__ void KernRaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r)
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( u < depth.w && v < depth.h ) {
         const float3 center_c = mulSE3inv(T_wc, center);
-        const float3 ray_c = make_float3((u-u0)/fu,(v-v0)/fv, 1);
+        const float3 ray_c = K.Unproject(u,v);
 
         const float ldotc = dot(ray_c,center_c);
         const float lsq = dot(ray_c,ray_c);
@@ -124,11 +125,11 @@ __global__ void KernRaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc,
     }
 }
 
-void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, float3 center, float r)
+void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, depth);
-    KernRaycastSphere<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, center, r);
+    KernRaycastSphere<<<gridDim,blockDim>>>(depth, T_wc, K, center, r);
     GpuCheckErrors();
 }
 
@@ -136,14 +137,14 @@ void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, float fu, floa
 // Raycast box
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const BoundingBox bbox )
+__global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     if( u < depth.w && v < depth.h ) {
         const float3 c_w = SE3Translation(T_wc);
-        const float3 ray_c = make_float3((u-u0)/fu,(v-v0)/fv, 1);
+        const float3 ray_c = K.Unproject(u,v);
         const float3 ray_w = mulSO3(T_wc, ray_c);
 
         // Raycast bounding box to find valid ray segment of sdf
@@ -168,11 +169,11 @@ __global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, fl
     }
 }
 
-void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, float fu, float fv, float u0, float v0, const BoundingBox bbox )
+void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox )
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, depth);
-    KernRaycastBox<<<gridDim,blockDim>>>(depth, T_wc, fu, fv, u0, v0, bbox);
+    KernRaycastBox<<<gridDim,blockDim>>>(depth, T_wc, K, bbox);
     GpuCheckErrors();
 }
 

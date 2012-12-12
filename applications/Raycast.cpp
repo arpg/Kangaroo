@@ -23,10 +23,7 @@ int main( int argc, char* argv[] )
 {
     const unsigned int w = 512;
     const unsigned int h = 512;
-    const float u0 = w /2;
-    const float v0 = h /2;
-    const float fu = 500;
-    const float fv = 500;
+    const Gpu::ImageIntrinsics K(500,500,w /2, h /2);
     const int volres = 128;
 
     // Initialise window
@@ -51,7 +48,7 @@ int main( int argc, char* argv[] )
     graph.AddChild(&glbox);
 
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1,1E3),
+        ProjectionMatrixRDF_TopLeft(w,h, K.fu,K.fv,K.u0,K.v0, 1,1E3),
         ModelViewLookAtRDF(0,0,-4,0,0,0,0,-1,0)
     );
 
@@ -71,7 +68,7 @@ int main( int argc, char* argv[] )
     {
         Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
 
-        Gpu::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, 0, subpix );
+        Gpu::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), K, near, far, 0, subpix );
 
         /////////////////////////////////////////////////////////////
         // Perform drawing

@@ -24,10 +24,7 @@ int main( int argc, char* argv[] )
 {
     const unsigned int w = 512;
     const unsigned int h = 512;
-    const float u0 = w /2;
-    const float v0 = h /2;
-    const float fu = 500;
-    const float fv = 500;
+    const Gpu::ImageIntrinsics K(500,500,w /2, h /2);
     const int volres = 128;
 
     // Initialise window
@@ -60,12 +57,12 @@ int main( int argc, char* argv[] )
     graph.AddChild(&glvbo);
 
     pangolin::OpenGlRenderState stacks_view(
-        ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1E-2,1E3),
+        ProjectionMatrixRDF_TopLeft(w,h, K.fu,K.fv,K.u0,K.v0, 1E-2,1E3),
         ModelViewLookAtRDF(0,0,-4,0,0,1,0,-1,0)
     );
 
     pangolin::OpenGlRenderState stacks_capture(
-        ProjectionMatrixRDF_TopLeft(w,h, fu,fv, u0,v0, 1E-2,1E3),
+        ProjectionMatrixRDF_TopLeft(w,h, K.fu,K.fv,K.u0,K.v0, 1E-2,1E3),
         ModelViewLookAtRDF(0,0,-4,0,0,1,0,-1,0)
     );
 
@@ -113,26 +110,26 @@ int main( int argc, char* argv[] )
 
         // Raycast current view
         {
-            Gpu::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), fu, fv, u0, v0, near, far, trunc_dist, subpix );
+            Gpu::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), K, near, far, trunc_dist, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
         {
             if(shape == 0) {
-                Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, Gpu::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
+                Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), K, Gpu::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
             }else if(shape ==1) {
-                Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), fu, fv, u0, v0, make_float3(0,0,0), 0.9);
+                Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), K, make_float3(0,0,0), 0.9);
             }
             CudaScopedMappedPtr dvbo(vbo);
             Gpu::Image<float4> vboimg((float4*)*dvbo,w,h);
-            Gpu::DepthToVbo(vboimg, gtd, fu,fv,u0,v0, 1.0f);
+            Gpu::DepthToVbo(vboimg, gtd, K, 1.0f);
             Gpu::NormalsFromVbo(gtn,vboimg);
             glvbo.SetPose(T_cw.inverse().matrix());
         }
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, gtd, gtn, T_cw.matrix3x4(), fu, fv, u0, v0, trunc_dist, max_w, mincostheta );
+            Gpu::SdfFuse(vol, gtd, gtn, T_cw.matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         if(test) {

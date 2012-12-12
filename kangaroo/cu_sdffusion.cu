@@ -3,6 +3,7 @@
 #include "Sdf.h"
 #include "BoundedVolume.h"
 #include "launch_utils.h"
+#include "ImageKeyframe.h"
 
 namespace Gpu
 {
@@ -11,7 +12,7 @@ namespace Gpu
 // Truncated SDF Fusion
 //////////////////////////////////////////////////////
 
-__global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> normals, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w, float mincostheta )
+__global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> normals, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float max_w, float mincostheta )
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -19,7 +20,7 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
 
     const float3 P_w = vol.VoxelPositionInUnits(x,y,z);
     const float3 P_c = T_cw * P_w;
-    const float2 p_c = make_float2(u0 + fu*P_c.x/P_c.z, v0 + fv*P_c.y/P_c.z);
+    const float2 p_c = K.Project(P_c);
 
     if( depth.InBounds(p_c, 2) )
     {
@@ -51,11 +52,11 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
  }
 
 using namespace std;
-void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, float fu, float fv, float u0, float v0, float trunc_dist, float max_w, float mincostheta )
+void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float max_w, float mincostheta )
 {
     dim3 blockDim(8,8,8);
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-    KernSdfFuse<<<gridDim,blockDim>>>(vol, depth, norm, T_cw, fu, fv, u0, v0, trunc_dist, max_w, mincostheta);
+    KernSdfFuse<<<gridDim,blockDim>>>(vol, depth, norm, T_cw, K, trunc_dist, max_w, mincostheta);
     GpuCheckErrors();
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MatUtils.h"
+#include "ImageIntrinsics.h"
 #include <iostream>
 
 namespace Gpu
@@ -35,6 +36,17 @@ struct BoundingBox
         float near, float far
     ) {
         FitToFrustum(T_wc,w,h,fu,fv,u0,v0,near,far);
+    }
+
+    // Construct bounding box from Frustum.
+    inline __host__
+    BoundingBox(
+        const Mat<float,3,4> T_wc,
+        float w, float h,
+        ImageIntrinsics K,
+        float near, float far
+    ) {
+        FitToFrustum(T_wc,w,h,K.fu,K.fv,K.u0,K.v0,near,far);
     }
 
     inline __host__ __device__
@@ -81,6 +93,16 @@ struct BoundingBox
         Insert(c_w + far*ray_tr);
         Insert(c_w + far*ray_bl);
         Insert(c_w + far*ray_br);
+    }
+
+    inline __host__
+    void FitToFrustum(
+        const Mat<float,3,4> T_wc,
+        float w, float h,
+        ImageIntrinsics K,
+        float near, float far
+    ) {
+        FitToFrustum(T_wc,w,h,K.fu,K.fv,K.u0,K.v0,near,far);
     }
 
     inline __host__
