@@ -121,7 +121,7 @@ int main( int argc, char* argv[] )
     Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
     Var<float> trunc_dist_factor("ui.trunc vol factor",2, 1, 4);
 
-    Var<float> max_w("ui.max w", 100, 1E-3, 1E4);
+    Var<float> max_w("ui.max w", 1000, 1E-3, 1E4);
     Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
 
     Var<bool> save_kf("ui.Save KF", false, false);
@@ -273,7 +273,9 @@ int main( int argc, char* argv[] )
                         }
                     }
 
-                    T_wl = T_wl * T_lp.inverse();
+                    if(rmse < max_rmse) {
+                        T_wl = T_wl * T_lp.inverse();
+                    }
                 }
             }
 
