@@ -51,7 +51,6 @@ __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<
     }
  }
 
-using namespace std;
 void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float max_w, float mincostheta )
 {
     dim3 blockDim(8,8,8);
@@ -61,24 +60,82 @@ void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, M
 }
 
 //////////////////////////////////////////////////////
-// Reset SDF
+// Color Truncated SDF Fusion
 //////////////////////////////////////////////////////
 
-__global__ void KernSdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
+__global__ void KernSdfFuse(
+        BoundedVolume<SDF_t> vol, BoundedVolume<float> colorVol,
+        Image<float> depth, Image<float4> normals, Mat<float,3,4> T_cw, ImageIntrinsics K,
+        Image<uchar3> img, Mat<float,3,4> T_iw, ImageIntrinsics Kimg,
+        float trunc_dist, float max_w, float mincostheta
+        )
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
     const int z = blockIdx.z*blockDim.z + threadIdx.z;
 
-    vol(x,y,z) = SDF_t(0.0/0.0, 0);
+    const float3 P_w = vol.VoxelPositionInUnits(x,y,z);
+    const float3 P_c = T_cw * P_w;
+    const float2 p_c = K.Project(P_c);
+    const float3 P_i = T_iw * P_w;
+    const float2 p_i = Kimg.Project(P_i);
+
+    if( depth.InBounds(p_c, 2) && img.InBounds(p_i,2) )
+    {
+        const float vd = P_c.z;
+//        const float md = depth.GetNearestNeighbour(p_c);
+//        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
+
+        const float md = depth.GetBilinear<float>(p_c);
+        const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
+        const float3 c3 = img.GetBilinear<float3>(p_i);
+        const float c = (c3.x + c3.y + c3.z) / (256.0f*3.0f);
+
+        const float costheta = dot(mdn, P_c) / -length(P_c);
+        const float sd = costheta * (md - vd);
+        const float w = costheta * 1.0f/vd;
+
+        if(sd <= -trunc_dist) {
+            // Further than truncation distance from surface
+            // We do nothing.
+        }else{
+//        }else if(sd < 5*trunc_dist) {
+            if(isfinite(md) && isfinite(w) && costheta > mincostheta ) {
+                const SDF_t curvol = vol(x,y,z);
+                SDF_t sdf( clamp(sd,-trunc_dist,trunc_dist) , w);
+                sdf += curvol;
+                sdf.LimitWeight(max_w);
+                vol(x,y,z) = sdf;
+                colorVol(x,y,z) = (w*c + colorVol(x,y,z) * curvol.w) / (w + curvol.w);
+            }
+        }
+    }
+ }
+
+void SdfFuse(
+        BoundedVolume<SDF_t> vol, BoundedVolume<float> colorVol,
+        Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K,
+        Image<uchar3> img, Mat<float,3,4> T_iw, ImageIntrinsics Kimg,
+        float trunc_dist, float max_w, float mincostheta
+) {
+    dim3 blockDim(8,8,8);
+    dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
+    KernSdfFuse<<<gridDim,blockDim>>>(vol, colorVol, depth, norm, T_cw, K, img, T_iw, Kimg, trunc_dist, max_w, mincostheta);
+    GpuCheckErrors();
 }
+
+//////////////////////////////////////////////////////
+// Reset SDF
+//////////////////////////////////////////////////////
 
 void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
 {
-    dim3 blockDim(8,8,8);
-    dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-    KernSdfReset<<<gridDim,blockDim>>>(vol, trunc_dist);
-    GpuCheckErrors();
+    vol.Fill(SDF_t(0.0/0.0, 0));
+}
+
+void SdfReset(BoundedVolume<float> vol)
+{
+    vol.Fill(0.5);
 }
 
 //////////////////////////////////////////////////////

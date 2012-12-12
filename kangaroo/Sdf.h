@@ -8,13 +8,7 @@ namespace Gpu
 
 #define COLOR_SDF
 
-struct
-#ifdef COLOR_SDF
-  __align__(16)
-#else
-  __align__(8)
-#endif
-SDF_t {
+struct __align__(8) SDF_t {
     inline __host__ __device__ SDF_t() {}
     inline __host__ __device__ SDF_t(float v) : val(v), w(1) {}
     inline __host__ __device__ SDF_t(float v, float w) : val(v), w(w) {}
@@ -32,24 +26,13 @@ SDF_t {
     {
         if(rhs.w > 0) {
             val = (w * val + rhs.w * rhs.val);
-#ifdef COLOR_SDF
-            color = (w * color + rhs.w * rhs.color);
-#endif
             w += rhs.w;
             val /= w;
-#ifdef COLOR_SDF
-            color /= w;
-#endif
         }
     }
 
     float w;
     float val;
-
-#ifdef COLOR_SDF
-    inline __host__ __device__ SDF_t(float v, float w, float color) : val(v), w(w), color(color) {}
-    float color;
-#endif
 };
 
 //struct __align__(8) SDF_t {

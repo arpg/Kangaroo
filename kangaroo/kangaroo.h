@@ -450,6 +450,8 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r );
 
 void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float near, float far, float trunc_dist, bool subpix = true);
 
+void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const BoundedVolume<SDF_t> vol, const BoundedVolume<float> colorVol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float near, float far, float trunc_dist, bool subpix = true);
+
 void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r);
 
 void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox );
@@ -458,7 +460,11 @@ void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K
 
 void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float maxw, float mincostheta );
 
+void SdfFuse(BoundedVolume<SDF_t> vol, BoundedVolume<float> colorVol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K, Image<uchar3> img, Mat<float,3,4> T_iw, ImageIntrinsics Kimg,float trunc_dist, float max_w, float mincostheta);
+
 void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist = 0);
+
+void SdfReset(BoundedVolume<float> vol);
 
 void SdfSphere(BoundedVolume<SDF_t> vol, float3 center, float r);
 
