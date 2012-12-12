@@ -91,4 +91,11 @@ float3 ConvertPixel(float p)
     return make_float3(p,p,p);
 }
 
+template<>
+__host__ __device__ inline
+float ConvertPixel(float3 p)
+{
+    return (p.x + p.y + p.z) / 3.0f;
+}
+
 }

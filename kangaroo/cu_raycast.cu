@@ -165,25 +165,10 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
         const float len_n_w = length(_n_w);
         const float3 n_w = len_n_w > 0 ? _n_w / len_n_w : make_float3(0,0,1);
         const float3 n_c = mulSO3inv(T_wc,n_w);
-        const float3 p_c = depth * ray_c;
 
         if(depth > 0 ) {
-            const float ambient = 0.4;
-            const float diffuse = 0.4;
-            const float specular = 0.2;
-            const float3 eyedir = -1.0f * p_c / length(p_c);
-            const float3 _lightdir = make_float3(0.4,0.4,-1);
-            const float3 lightdir = _lightdir / length(_lightdir);
-            const float ldotn = dot(lightdir,n_c);
-            const float3 lightreflect = 2*ldotn*n_c + (-1.0) * lightdir;
-            const float edotr = fmaxf(0,dot(eyedir,lightreflect));
-            const float spec = edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr*edotr;
-
             imgdepth(u,v) = depth;
-//          img(u,v) = (depth - near) / (far - near);
-//            img(u,v) = ambient + diffuse * ldotn  + specular * spec;
-            img(u,v) = (c  + specular * spec);
-//            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
+            img(u,v) = c;
             norm(u,v) = make_float4(n_c, 1);
         }else{
             imgdepth(u,v) = 0.0f/0.0f;
