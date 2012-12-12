@@ -80,7 +80,7 @@ public:
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
-    bool IsValid() {
+    bool IsValid() const {
         const uint3 size = Volume<T,Target,Management>::Voxels();
         return size.x >= 8 && size.y >= 8 && size.z >= 8;
     }

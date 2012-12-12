@@ -84,4 +84,11 @@ float4 ConvertPixel(uchar4 p)
     return make_float4(p.x,p.y,p.z,p.z);
 }
 
+template<>
+__host__ __device__ inline
+float3 ConvertPixel(float p)
+{
+    return make_float3(p,p,p);
+}
+
 }
