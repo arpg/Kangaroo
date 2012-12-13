@@ -84,9 +84,9 @@ __global__ void KernSdfFuse(
         if( depth.InBounds(p_c, 2) && img.InBounds(p_i,2) )
         {
             const float vd = P_c.z;
-    //        const float md = depth.GetNearestNeighbour(p_c);
-    //        const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
-    //        const float c = ConvertPixel<float,uchar3>( img.GetNearestNeighbour<uchar3>(p_i) );
+//            const float md = depth.GetNearestNeighbour(p_c);
+//            const float3 mdn = make_float3(normals.GetNearestNeighbour(p_c));
+//            const float c = ConvertPixel<float,uchar3>( img.GetNearestNeighbour(p_i) );
 
             const float md = depth.GetBilinear<float>(p_c);
             const float3 mdn = make_float3(normals.GetBilinear<float4>(p_c));
