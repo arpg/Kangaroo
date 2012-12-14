@@ -143,6 +143,16 @@ struct BoundingBox
         return boxmax - boxmin;
     }
 
+    inline __host__ __device__
+    void Enlarge(float3 scale)
+    {
+        const float3 center = boxmin + (boxmax - boxmin)/2.0f;
+        const float3 newHalfSize = (scale * Size()) / 2.0f;
+        boxmin = center - newHalfSize;
+        boxmax = center + newHalfSize;
+
+    }
+
     float3 boxmin;
     float3 boxmax;
 };

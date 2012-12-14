@@ -212,6 +212,7 @@ int main( int argc, char* argv[] )
 
             vol.bbox.Min() = Gpu::ToCuda(vicon.WorkspaceMin());
             vol.bbox.Max() = Gpu::ToCuda(vicon.WorkspaceMax());
+            vol.bbox.Enlarge(make_float3(1.5));
             trunc_dist = 2*length(voxsize);
             Gpu::SdfReset(vol, trunc_dist);
             glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );

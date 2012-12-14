@@ -62,9 +62,7 @@ void vMarchCube(
     float fTargetValue = 0.0f
 ) {
     const float3 p = vol.VoxelPositionInUnits(x,y,z);
-
-    // TODO: Allow voxel to have different scales in each direction
-    float fScale = vol.VoxelSizeUnits().x;
+    const float3 fScale = vol.VoxelSizeUnits();
 
     //Make a local copy of the values at the cube's corners
     float afCubeValue[8];
@@ -102,9 +100,9 @@ void vMarchCube(
                                  afCubeValue[ a2iEdgeConnection[iEdge][1] ], fTargetValue);
 
             asEdgeVertex[iEdge] = make_float3(
-                p.x + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][0]  +  fOffset * a2fEdgeDirection[iEdge][0]) * fScale,
-                p.y + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][1]  +  fOffset * a2fEdgeDirection[iEdge][1]) * fScale,
-                p.z + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][2]  +  fOffset * a2fEdgeDirection[iEdge][2]) * fScale
+                p.x + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][0]  +  fOffset * a2fEdgeDirection[iEdge][0]) * fScale.x,
+                p.y + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][1]  +  fOffset * a2fEdgeDirection[iEdge][1]) * fScale.y,
+                p.z + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][2]  +  fOffset * a2fEdgeDirection[iEdge][2]) * fScale.z
             );
 
             // TODO: Why do we have to negate this?
@@ -128,18 +126,16 @@ void vMarchCube(
         {
             int iVertex = a2iTriangleConnectionTable[iFlagIndex][3*iTriangle+iCorner];
 
-            float3 sColor;
-            if(volColor.IsValid()) {
-                const TColor c = volColor.GetUnitsTrilinearClamped(asEdgeVertex[iVertex]);
-                sColor = Gpu::ConvertPixel<float3,TColor>(c);
-            }else{
-                vGetColor(sColor, asEdgeVertex[iVertex], asEdgeNorm[iVertex]);
-            }
-
             face.mIndices[iCorner] = verts.size();
             verts.push_back(aiVector3D(asEdgeVertex[iVertex].x, asEdgeVertex[iVertex].y, asEdgeVertex[iVertex].z) );
             norms.push_back(aiVector3D(asEdgeNorm[iVertex].x,   asEdgeNorm[iVertex].y,   asEdgeNorm[iVertex].z) );
-            colors.push_back(aiColor4D(sColor.x, sColor.y, sColor.z, 1.0f));
+
+            if(volColor.IsValid()) {
+                const TColor c = volColor.GetUnitsTrilinearClamped(asEdgeVertex[iVertex]);
+                float3 sColor = Gpu::ConvertPixel<float3,TColor>(c);
+                colors.push_back(aiColor4D(sColor.x, sColor.y, sColor.z, 1.0f));
+            }
+
         }
 
         faces.push_back(face);
