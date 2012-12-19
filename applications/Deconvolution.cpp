@@ -25,7 +25,7 @@ using namespace pangolin;
 int main( int argc, char* argv[] )
 {
     // Open video device
-    CameraDevice video = OpenRpgCamera(argc,argv,2);
+    CameraDevice video = OpenRpgCamera(argc,argv,2,true);
 
     // Capture first image
     std::vector<rpg::ImageWrapper> images;
