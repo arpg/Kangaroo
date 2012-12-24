@@ -46,6 +46,8 @@ float distance(const cv::Mat& im1, const cv::Mat& im2)
         for(int c=0; c< im1.cols; ++c) {
             const float diff = (im1.at<unsigned char>(r,c)-m1) - (im2.at<unsigned char>(r,c)-m2);
             sum += abs(diff);
+//            const float diff = im1.at<unsigned char>(r,c) - im2.at<unsigned char>(r,c);
+//            sum += diff*diff;
         }
     }
     return sum / (255.0 * N);
@@ -57,17 +59,19 @@ int main( int argc, char* argv[] )
 
     std::vector<rpg::ImageWrapper> images;
 
-    const int max_level = 6;
+    const int max_images = 4000;
+    const int max_level = 5;
     std::vector<cv::Mat> pyramid;
     std::vector<cv::Mat> thumbnails;
 
-    while(video.Capture(images)) {
+    while(video.Capture(images) && thumbnails.size() < max_images ) {
         cv::buildPyramid(images[0].Image, pyramid, max_level);
         thumbnails.push_back( pyramid[max_level].clone() );
     }
 
     const size_t N = thumbnails.size();
     cout << "Num Images " << N << endl;
+    cout << thumbnails[0].cols << "x" << thumbnails[0].rows << endl;
 
     float dist_min = std::numeric_limits<float>::max();
     float dist_max = std::numeric_limits<float>::min();
@@ -85,32 +89,30 @@ int main( int argc, char* argv[] )
         }
     }
 
-//    const unsigned int w = images[0].width();
-//    const unsigned int h = images[0].height();
+    View& container = SetupPangoGL(640,480,0);
+    SceneGraph::ImageView costMatrix(true,false);
+    container.AddDisplay(costMatrix);
+    costMatrix.SetImage(M.data, M.cols, M.rows, GL_LUMINANCE32F_ARB, GL_LUMINANCE, GL_FLOAT);
+    costMatrix.SetBounds(0.0, 1.0, 0.0, 0.6, 1.0);
+    Handler2dImageSelect imgSelect(N,N);
+    costMatrix.SetHandler(&imgSelect);
 
-//    View& container = SetupPangoGL(640,480);
-//    SetupContainer(container, 1, (float)w/h);
+    SceneGraph::ImageView im1(true,false);
+    container.AddDisplay(im1);
+    im1.SetBounds(0.0, 0.5, 0.6, 1.0, 1.0);
+    SceneGraph::ImageView im2(true,false);
+    container.AddDisplay(im2);
+    im2.SetBounds(0.5, 1.0, 0.6, 1.0, 1.0);
 
-//    Var<bool> step("ui.step", false, false);
-//    Var<bool> run("ui.run", false, true);
-
-//    pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
-//    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
-
-    cv::namedWindow("cvwin");
-    cv::imshow("cvwin", M);
-    cv::waitKey(0);
-
-//    for(unsigned long frame=0; frame < thumbnails.size(); )
-//    {
-//        const bool go = true; //(frame==0) || run || Pushed(step);
-
-//        if(go) {
-//            cv::imshow("cvwin", thumbnails[frame++]);
-//            cv::waitKey(1);
-//        }
-
-////        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-////        pangolin::FinishGlutFrame();
-//    }
+    while(!pangolin::ShouldQuit())
+    {
+        if(imgSelect.IsSelected()) {
+            imgSelect.Deselect();
+            const Eigen::Vector2d p = imgSelect.GetSelectedPoint(true);
+            im1.SetImage(thumbnails[p(0)].data, thumbnails[p(0)].cols, thumbnails[p(0)].rows,  GL_LUMINANCE8, GL_LUMINANCE, GL_UNSIGNED_BYTE);
+            im2.SetImage(thumbnails[p(1)].data, thumbnails[p(1)].cols, thumbnails[p(1)].rows,  GL_LUMINANCE8, GL_LUMINANCE, GL_UNSIGNED_BYTE);
+        }
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        pangolin::FinishGlutFrame();
+    }
 }
