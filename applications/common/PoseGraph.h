@@ -37,6 +37,10 @@ struct Keyframe {
     {
     }
 
+    Sophus::SE3& GetT_wk() {
+        return m_T_wk;
+    }
+
     Sophus::SE3 GetT_wk() const {
         return m_T_wk;
     }

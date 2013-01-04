@@ -21,7 +21,7 @@ inline pangolin::View& SetupPangoGL(int w, int h, int ui_width = 180, std::strin
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
     // Tell the base view to arrange its children equally
-    if(ui_width == 0) {
+    if(ui_width != 0) {
         pangolin::CreatePanel("ui")
             .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(ui_width));
     }

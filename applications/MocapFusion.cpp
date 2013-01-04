@@ -23,6 +23,9 @@
 #include "common/PoseGraph.h"
 #include "common/GLPoseGraph.h"
 
+#include <CVars/CVar.h>
+#include "common/CVarHelpers.h"
+
 #include "MarchingCubes.h"
 
 #include <kangaroo/kangaroo.h>
@@ -208,6 +211,8 @@ int main( int argc, char* argv[] )
             posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_vicon);
             kf_sdf = posegraph.AddKeyframe();
 
+//            CVarUtils::AttachCVar<Sophus::SE3>("T_room_sdf", &(posegraph.GetKeyframe(kf_sdf).GetT_wk()) );
+
             // TODO: Use memory more appropriately.
 
             vol.bbox.Min() = Gpu::ToCuda(vicon.WorkspaceMin());
@@ -219,7 +224,8 @@ int main( int argc, char* argv[] )
 
             const Sophus::SE3 T_room_vicon = vicon.T_wf();
             const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
-            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_room_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
+            T_sdf_kin = T_room_kin;
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         const bool newViconData = vicon.IsNewData();

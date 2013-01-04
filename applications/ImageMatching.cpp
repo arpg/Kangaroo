@@ -44,13 +44,14 @@ float distance(const cv::Mat& im1, const cv::Mat& im2)
     float sum = 0;
     for(int r=0; r < im1.rows; ++r) {
         for(int c=0; c< im1.cols; ++c) {
+//            const float diff = im1.at<unsigned char>(r,c) - im2.at<unsigned char>(r,c);
             const float diff = (im1.at<unsigned char>(r,c)-m1) - (im2.at<unsigned char>(r,c)-m2);
             sum += abs(diff);
-//            const float diff = im1.at<unsigned char>(r,c) - im2.at<unsigned char>(r,c);
 //            sum += diff*diff;
         }
     }
     return sum / (255.0 * N);
+//    return sum / (255.0 * 5.0 * N);
 }
 
 int main( int argc, char* argv[] )
