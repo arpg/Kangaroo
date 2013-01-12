@@ -214,19 +214,21 @@ int main( int argc, char* argv[] )
                 }else{
                     Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
                 }
-                // populate kfs
-                for( int k=0; k< kfs.Rows(); k++)
-                {
-                    if(k < keyframes.size()) {
-                        kfs[k].img = keyframes[k].img;
-                        kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
-                        kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
-                    }else{
-                        kfs[k].img.ptr = 0;
-                    }
-                }
 
-                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_vw.inverse().matrix3x4(), K);
+                if(keyframes.size() > 0) {
+                    // populate kfs
+                    for( int k=0; k< kfs.Rows(); k++)
+                    {
+                        if(k < keyframes.size()) {
+                            kfs[k].img = keyframes[k].img;
+                            kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
+                            kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
+                        }else{
+                            kfs[k].img.ptr = 0;
+                        }
+                    }
+                    Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_vw.inverse().matrix3x4(), K);
+                }
             }
         }else{
             bool tracking_good = true;

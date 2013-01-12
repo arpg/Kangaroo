@@ -456,6 +456,8 @@ void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsic
 
 void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox );
 
+void RaycastPlane(Image<float> depth, Image<float> img, const Mat<float,3,4> T_wc, ImageIntrinsics K, const float3 n_w );
+
 //////////////////////////////////////////////////////
 
 void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float maxw, float mincostheta );

@@ -270,20 +270,22 @@ int main( int argc, char* argv[] )
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, K, knear,20) );
             if(work_vol.IsValid()) {
                 Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), K, 0.1, 20, trunc_dist, true );
+                Gpu::RaycastPlane(ray_d[0], ray_i[0], T_wv.matrix3x4(), K, make_float3(0,0,100));
 
-                // populate kfs
-                for( int k=0; k< kfs.Rows(); k++)
-                {
-                    if(k < keyframes.size()) {
-                        kfs[k].img = keyframes[k].img;
-                        kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
-                        kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
-                    }else{
-                        kfs[k].img.ptr = 0;
+                if(keyframes.size() > 0) {
+                    // populate kfs
+                    for( int k=0; k< kfs.Rows(); k++)
+                    {
+                        if(k < keyframes.size()) {
+                            kfs[k].img = keyframes[k].img;
+                            kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
+                            kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
+                        }else{
+                            kfs[k].img.ptr = 0;
+                        }
                     }
+                    Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), K);
                 }
-
-                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), K);
             }
         }else{
             tracking_good = true;
