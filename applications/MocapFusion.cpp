@@ -105,7 +105,6 @@ int main( int argc, char* argv[] )
     SceneGraph::GLAxis glsdf(2.0);
     SceneGraph::GLAxisAlignedBox glboxfrustum;
     SceneGraph::GLAxisAlignedBox glboxvol;
-    glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
     SceneGraph::GLGrid glGrid(5,1,true);
     SceneGraph::GLAxis glcamera(1.0);
     SceneGraph::GLAxis glcamera_vic(0.5);
@@ -220,7 +219,6 @@ int main( int argc, char* argv[] )
             vol.bbox.Enlarge(make_float3(1.5));
             trunc_dist = 2*length(voxsize);
             Gpu::SdfReset(vol, trunc_dist);
-            glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
 
             const Sophus::SE3 T_room_vicon = vicon.T_wf();
             const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
@@ -270,7 +268,7 @@ int main( int argc, char* argv[] )
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, K, knear,20) );
             if(work_vol.IsValid()) {
                 Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), K, 0.1, 20, trunc_dist, true );
-                Gpu::RaycastPlane(ray_d[0], ray_i[0], T_wv.matrix3x4(), K, make_float3(0,0,100));
+                Gpu::RaycastPlane(ray_d[0], ray_i[0], T_wv.matrix3x4(), K, make_float3(0,0,10000));
 
                 if(keyframes.size() > 0) {
                     // populate kfs
@@ -377,7 +375,10 @@ int main( int argc, char* argv[] )
 
         Gpu::BoundingBox bbox_work(T_sdf_kin.matrix3x4(), w, h, K, knear,kfar);
         bbox_work.Intersect(vol.bbox);
+
+        glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
         glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
+
 
         /////////////////////////////////////////////////////////////
         // Draw

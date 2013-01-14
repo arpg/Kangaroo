@@ -105,9 +105,12 @@ void vMarchCube(
                 p.z + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][2]  +  fOffset * a2fEdgeDirection[iEdge][2]) * fScale.z
             );
 
-            // TODO: Why do we have to negate this?
             const float3 deriv = vol.GetUnitsBackwardDiffDxDyDz( asEdgeVertex[iEdge] );
             asEdgeNorm[iEdge] = deriv / length(deriv);
+
+            if( !std::isfinite(asEdgeNorm[iEdge].x) || !std::isfinite(asEdgeNorm[iEdge].y) || !std::isfinite(asEdgeNorm[iEdge].z) ) {
+                asEdgeNorm[iEdge] = make_float3(0,0,0);
+            }
         }
     }
 
