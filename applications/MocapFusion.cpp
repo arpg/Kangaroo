@@ -23,6 +23,9 @@
 #include "common/PoseGraph.h"
 #include "common/GLPoseGraph.h"
 
+#include <CVars/CVar.h>
+#include "common/CVarHelpers.h"
+
 #include "MarchingCubes.h"
 
 #include <kangaroo/kangaroo.h>
@@ -120,7 +123,6 @@ int main( int argc, char* argv[] )
     SceneGraph::GLAxis glsdf(2.0);
     SceneGraph::GLAxisAlignedBox glboxfrustum;
     SceneGraph::GLAxisAlignedBox glboxvol;
-    glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
     SceneGraph::GLGrid glGrid(5,1,true);
     SceneGraph::GLAxis glcamera(1.0);
     SceneGraph::GLAxis glcamera_vic(0.5);
@@ -141,29 +143,29 @@ int main( int argc, char* argv[] )
 
     Var<bool> run("ui.run", true, true);
 
-    Var<bool> viewonly("ui.view only", false, true);
+    Var<bool> viewonly("ui.view_only", false, true);
     Var<bool> fuse("ui.fuse", true, true);
     Var<bool> reset("ui.reset", true, false);
 
-    Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
+    Var<int> show_level("ui.Show_Level", 2, 0, MaxLevels-1);
 
     Var<int> biwin("ui.size",5, 1, 20);
     Var<float> bigs("ui.gs",5, 1E-3, 5);
     Var<float> bigr("ui.gr",100, 1E-3, 200);
 
-    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
-    Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
+    Var<bool> pose_refinement("ui.Pose_Refinement", true, true);
+    Var<float> icp_c("ui.icp_c",0.1, 1E-3, 1);
 
-    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
-    Var<float> max_w("ui.max w", 10, 1E-4, 10);
-    Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
+    Var<float> trunc_dist("ui.trunc_dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    Var<float> max_w("ui.max_w", 10, 1E-4, 10);
+    Var<float> mincostheta("ui.min_cos_theta", 0.1, 0, 1);
 
-    Var<bool> save_kf("ui.Save KF", false, false);
-    Var<float> rgb_fl("ui.RGB focal length", 535.7,400,600);
-    Var<float> max_rmse("ui.Max RMSE",0.10,0,0.5);
+    Var<bool> save_kf("ui.Save_KF", false, false);
+    Var<float> rgb_fl("ui.RGB_focal_length", 535.7,400,600);
+    Var<float> max_rmse("ui.Max_RMSE",0.10,0,0.5);
     Var<float> rmse("ui.RMSE",0);
-    Var<bool> add_constraints("ui.Add Constraints", false, true);
-    Var<bool> use_vicon_for_sdf("ui.Use Vicon For SDF", false, true);
+    Var<bool> add_constraints("ui.Add_Constraints", false, true);
+    Var<bool> use_vicon_for_sdf("ui.Use_Vicon_For_SDF", false, true);
     Var<bool> reset_sdf("ui.reset_sdf", false, false);
 
 
@@ -200,7 +202,13 @@ int main( int argc, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glgraph.AddChild(&glposegraph);
 
-    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
+    CVarUtils::CreateGetCVar("T_kin_vicon", Sophus::SE3() );
+    CVarUtils::AttachCVar("WorkspaceMin", &(vicon.WorkspaceMin()));
+    CVarUtils::AttachCVar("WorkspaceMax", &(vicon.WorkspaceMax()));
+    CVarUtils::Load("cvars.xml");
+    posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(CVarUtils::GetCVar<Sophus::SE3>("T_kin_vicon" ) );
+
+    pangolin::RegisterKeyPressCallback(' ', [&add_constraints,&posegraph]() {add_constraints=false; posegraph.Start();} );
 
     //phidget.InitDriver("Phidgets");
     //phidget.RegisterIMUDataCallback();
@@ -221,6 +229,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(reset_sdf)) {
             const Sophus::SE3 T_kin_vicon = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
+            CVarUtils::SetCVar("T_kin_vicon", T_kin_vicon);
 
             // Reset posegraph
             keyframes.clear();
@@ -229,6 +238,8 @@ int main( int argc, char* argv[] )
             posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_vicon);
             kf_sdf = posegraph.AddKeyframe();
 
+//            CVarUtils::AttachCVar<Sophus::SE3>("T_room_sdf", &(posegraph.GetKeyframe(kf_sdf).GetT_wk()) );
+
             // TODO: Use memory more appropriately.
 
             vol.bbox.Min() = Gpu::ToCuda(vicon.WorkspaceMin());
@@ -236,11 +247,11 @@ int main( int argc, char* argv[] )
             vol.bbox.Enlarge(make_float3(1.5));
             trunc_dist = 2*length(voxsize);
             Gpu::SdfReset(vol, trunc_dist);
-            glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
 
             const Sophus::SE3 T_room_vicon = vicon.T_wf();
             const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
-            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_room_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
+            T_sdf_kin = T_room_kin;
+            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         const bool newViconData = vicon.IsNewData();
@@ -286,20 +297,22 @@ int main( int argc, char* argv[] )
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, K, knear,20) );
             if(work_vol.IsValid()) {
                 Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), K, 0.1, 20, trunc_dist, true );
+                Gpu::RaycastPlane(ray_d[0], ray_i[0], T_wv.matrix3x4(), K, make_float3(0,0,10000));
 
-                // populate kfs
-                for( int k=0; k< kfs.Rows(); k++)
-                {
-                    if(k < keyframes.size()) {
-                        kfs[k].img = keyframes[k].img;
-                        kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
-                        kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
-                    }else{
-                        kfs[k].img.ptr = 0;
+                if(keyframes.size() > 0) {
+                    // populate kfs
+                    for( int k=0; k< kfs.Rows(); k++)
+                    {
+                        if(k < keyframes.size()) {
+                            kfs[k].img = keyframes[k].img;
+                            kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
+                            kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
+                        }else{
+                            kfs[k].img.ptr = 0;
+                        }
                     }
+                    Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), K);
                 }
-
-                Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_wv.matrix3x4(), K);
             }
         }else{
             tracking_good = true;
@@ -378,8 +391,6 @@ int main( int argc, char* argv[] )
                     if(work_vol.IsValid()) {
                         Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
                     }
-                }else{
-                    cerr << "Tracking bad" << endl;
                 }
             }
         }
@@ -391,7 +402,10 @@ int main( int argc, char* argv[] )
 
         Gpu::BoundingBox bbox_work(T_sdf_kin.matrix3x4(), w, h, K, knear,kfar);
         bbox_work.Intersect(vol.bbox);
+
+        glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
         glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
+
 
         /////////////////////////////////////////////////////////////
         // Draw

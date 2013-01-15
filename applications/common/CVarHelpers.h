@@ -4,6 +4,7 @@
 #include <CVars/CVarVectorIO.h>
 
 #include <Eigen/Core>
+#include <sophus/se3.h>
 
 ////////////////////////////////////////////////////////////////////////////
 // Overloading Eigen for CVars
@@ -62,6 +63,43 @@ namespace CVarUtils
         }
         Stream.getline(str, 255, ']');
         Mat(nRows-1, nCols-1) = std::strtod(str, NULL);
+        return Stream;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    inline std::ostream& operator<<( std::ostream& Stream, const Sophus::SO3& R )
+    {
+        Stream << R.unit_quaternion().coeffs();
+        return Stream;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    inline std::ostream& operator<<( std::ostream& Stream, const Sophus::SE3& T )
+    {
+        Stream << "[" << T.so3() << "," << T.translation() << "]";
+        return Stream;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    inline std::istream& operator>>( std::istream& Stream, Sophus::SO3& R )
+    {
+        Stream >> R.unit_quaternion().coeffs();
+        return Stream;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    inline std::istream& operator>>( std::istream& Stream, Sophus::SE3& T )
+    {
+        char str[256];
+
+        Stream.getline(str, 255, '[');
+        if( Stream.gcount() > 1 ) {
+            return Stream;
+        }
+        Stream >> T.so3();
+        Stream.getline(str, 255, ',');
+        Stream >> T.translation();
+        Stream.getline(str, 255, ']');
         return Stream;
     }
 

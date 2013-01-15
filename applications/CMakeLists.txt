@@ -105,6 +105,7 @@ if(Kangaroo_FOUND)
     add_executable( Raycast Raycast.cpp)
     add_executable( SdfFusion SdfFusion.cpp)
     add_executable( MocapMultiDepthFusion MocapMultiDepthFusion.cpp)
+    add_executable( ImageMatching ImageMatching.cpp)
 
   if(CeresSolver_FOUND)
     include_directories( ${CeresSolver_INCLUDE_DIRS} )

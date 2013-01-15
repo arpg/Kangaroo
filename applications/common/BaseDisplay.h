@@ -21,18 +21,21 @@ inline pangolin::View& SetupPangoGL(int w, int h, int ui_width = 180, std::strin
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
 
     // Tell the base view to arrange its children equally
-    pangolin::CreatePanel("ui")
-        .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(ui_width));
+    if(ui_width != 0) {
+        pangolin::CreatePanel("ui")
+            .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(ui_width));
+    }
 
     pangolin::View& container = pangolin::CreateDisplay()
-            .SetBounds(0,1.0, pangolin::Attach::Pix(ui_width), 1.0)
-            .SetLayout(pangolin::LayoutEqual);
+            .SetBounds(0,1.0, pangolin::Attach::Pix(ui_width), 1.0);
 
     return container;
 }
 
 inline void SetupContainer(pangolin::View& container, int num_views, float aspect)
 {
+    container.SetLayout(pangolin::LayoutEqual);
+
     for(int i=0; i<num_views; ++i ) {
         pangolin::View& v = pangolin::CreateDisplay();
         v.SetAspect(aspect);

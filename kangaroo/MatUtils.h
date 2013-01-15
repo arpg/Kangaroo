@@ -190,6 +190,19 @@ float3 mulSE3inv(const Mat<float,3,4>& T_ab, const float3& r_a)
     );
 }
 
+__device__ __host__ inline
+Mat<float,3,4> SE3inv(const Mat<float,3,4>& T_ba)
+{
+    Mat<float,3,4> T_ab;
+    T_ab(0,0) = T_ba(0,0); T_ab(0,1) = T_ba(1,0); T_ab(0,2) = T_ba(2,0);
+    T_ab(1,0) = T_ba(0,1); T_ab(1,1) = T_ba(1,1); T_ab(1,2) = T_ba(2,1);
+    T_ab(2,0) = T_ba(0,2); T_ab(2,1) = T_ba(1,2); T_ab(2,2) = T_ba(2,2);
+    T_ab(0,3) = - (T_ab(0,0)* T_ba(0,3) + T_ab(0,1)* T_ba(1,3) + T_ab(0,2)* T_ba(2,3) );
+    T_ab(1,3) = - (T_ab(1,0)* T_ba(0,3) + T_ab(1,1)* T_ba(1,3) + T_ab(1,2)* T_ba(2,3) );
+    T_ab(2,3) = - (T_ab(2,0)* T_ba(0,3) + T_ab(2,1)* T_ba(1,3) + T_ab(2,2)* T_ba(2,3) );
+    return T_ab;
+}
+
 __host__ __device__ inline
 float3 SE3Translation(const Mat<float,3,4>& T_ba)
 {
@@ -379,7 +392,8 @@ float3 SE3gen5mul(const float4& p) {
 //////////////////////////////////////////////////////
 
 template<unsigned CR, unsigned C>
-inline __device__ __host__ Mat<float3,1,C> operator*(const Mat<float3, 1,CR>& lhs, const Mat<float,CR,C>& rhs)
+inline __device__ __host__
+Mat<float3,1,C> operator*(const Mat<float3, 1,CR>& lhs, const Mat<float,CR,C>& rhs)
 {
     Mat<float3,1,C> ret;
 
@@ -394,7 +408,8 @@ inline __device__ __host__ Mat<float3,1,C> operator*(const Mat<float3, 1,CR>& lh
 }
 
 // Homogeneous multiplication 3x4 * 3x1
-inline __device__ __host__ float3 operator*(const Mat<float3, 1,4>& T_ba, const float3& p_a)
+inline __device__ __host__
+float3 operator*(const Mat<float3, 1,4>& T_ba, const float3& p_a)
 {
     return make_float3(
             T_ba(0).x * p_a.x + T_ba(1).x * p_a.y + T_ba(2).x * p_a.z + T_ba(3).x,
@@ -408,7 +423,8 @@ inline __device__ __host__ float3 operator*(const Mat<float3, 1,4>& T_ba, const 
 //////////////////////////////////////////////////////
 
 template<unsigned R, unsigned C>
-inline __device__ __host__ SymMat<float,R*C> OuterProduct(const Mat<float3,R,C>& M, const float weight)
+inline __device__ __host__
+SymMat<float,R*C> OuterProduct(const Mat<float3,R,C>& M, const float weight)
 {
     const unsigned N = R*C;
     SymMat<float,N> ret;
@@ -435,6 +451,26 @@ inline __device__ __host__ Mat<float,R,1> mul_aTb(const Mat<float3,1,R>& a, cons
         ret(r,0) = dot(a(0,r), b);
     }
     return ret;
+}
+
+//////////////////////////////////////////////////////
+// Transform plane params
+//////////////////////////////////////////////////////
+
+inline __device__ __host__
+float3 Plane_b_from_a(const Mat<float,3,4> T_ab, const float3 n_a)
+{
+    const float ba_dot_na_p1 =
+            T_ab(0,3) * n_a.x +
+            T_ab(1,3) * n_a.y +
+            T_ab(2,3) * n_a.z + 1.0f;
+
+    // n_b
+    return make_float3(
+        (T_ab(0,0) * n_a.x + T_ab(1,0) * n_a.y + T_ab(2,0) * n_a.z) / ba_dot_na_p1,
+        (T_ab(0,1) * n_a.x + T_ab(1,1) * n_a.y + T_ab(2,1) * n_a.z) / ba_dot_na_p1,
+        (T_ab(0,2) * n_a.x + T_ab(1,2) * n_a.y + T_ab(2,2) * n_a.z) / ba_dot_na_p1
+    );
 }
 
 //////////////////////////////////////////////////////
