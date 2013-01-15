@@ -111,6 +111,16 @@ if(Kangaroo_FOUND)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
 
+    message("Looking for phidgets and sensorfusion.")
+    find_package( PHIDGETS QUIET )
+    find_package( SensorFusion QUIET )
+    if(PHIDGETS_FOUND AND SensorFusion_FOUND )
+        message("Both SensorFusion and Phidgets libraries found -- enabling SensorFusion for MocapFusion")
+        include_directories( ${SENSORFUSION_INCLUDE_DIRS} ${PHIDGETS_INCLUDE_DIR} )
+        set(CeresSolver_LIBRARIES ${CeresSolver_LIBRARIES} ${PHIDGETS_LIBRARIES} ${SENSORFUSION_LIBRARIES} )
+        add_definitions( -DUSE_SENSORFUSION )
+    endif()
+
     add_executable( OddsAndEnds OddsAndEnds.cpp MarchingCubes.cpp)
     target_link_libraries( OddsAndEnds ${CeresSolver_LIBRARIES} )
 
