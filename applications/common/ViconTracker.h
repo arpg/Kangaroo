@@ -94,11 +94,11 @@ public:
         m_workspace_max = Eigen::Vector3d(-1E6,-1E6,-1E6);
     }
 
-    inline const Eigen::Vector3d& WorkspaceMin() {
+    inline Eigen::Vector3d& WorkspaceMin() {
         return m_workspace_min;
     }
 
-    inline const Eigen::Vector3d& WorkspaceMax() {
+    inline Eigen::Vector3d& WorkspaceMax() {
         return m_workspace_max;
     }
 

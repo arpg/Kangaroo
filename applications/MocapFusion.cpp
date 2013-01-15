@@ -125,29 +125,29 @@ int main( int argc, char* argv[] )
 
     Var<bool> run("ui.run", true, true);
 
-    Var<bool> viewonly("ui.view only", false, true);
+    Var<bool> viewonly("ui.view_only", false, true);
     Var<bool> fuse("ui.fuse", true, true);
     Var<bool> reset("ui.reset", true, false);
 
-    Var<int> show_level("ui.Show Level", 2, 0, MaxLevels-1);
+    Var<int> show_level("ui.Show_Level", 2, 0, MaxLevels-1);
 
     Var<int> biwin("ui.size",5, 1, 20);
     Var<float> bigs("ui.gs",5, 1E-3, 5);
     Var<float> bigr("ui.gr",100, 1E-3, 200);
 
-    Var<bool> pose_refinement("ui.Pose Refinement", true, true);
-    Var<float> icp_c("ui.icp c",0.1, 1E-3, 1);
+    Var<bool> pose_refinement("ui.Pose_Refinement", true, true);
+    Var<float> icp_c("ui.icp_c",0.1, 1E-3, 1);
 
-    Var<float> trunc_dist("ui.trunc dist", 2*length(voxsize), 2*length(voxsize),0.5);
-    Var<float> max_w("ui.max w", 10, 1E-4, 10);
-    Var<float> mincostheta("ui.min cos theta", 0.1, 0, 1);
+    Var<float> trunc_dist("ui.trunc_dist", 2*length(voxsize), 2*length(voxsize),0.5);
+    Var<float> max_w("ui.max_w", 10, 1E-4, 10);
+    Var<float> mincostheta("ui.min_cos_theta", 0.1, 0, 1);
 
-    Var<bool> save_kf("ui.Save KF", false, false);
-    Var<float> rgb_fl("ui.RGB focal length", 535.7,400,600);
-    Var<float> max_rmse("ui.Max RMSE",0.10,0,0.5);
+    Var<bool> save_kf("ui.Save_KF", false, false);
+    Var<float> rgb_fl("ui.RGB_focal_length", 535.7,400,600);
+    Var<float> max_rmse("ui.Max_RMSE",0.10,0,0.5);
     Var<float> rmse("ui.RMSE",0);
-    Var<bool> add_constraints("ui.Add Constraints", false, true);
-    Var<bool> use_vicon_for_sdf("ui.Use Vicon For SDF", false, true);
+    Var<bool> add_constraints("ui.Add_Constraints", false, true);
+    Var<bool> use_vicon_for_sdf("ui.Use_Vicon_For_SDF", false, true);
     Var<bool> reset_sdf("ui.reset_sdf", false, false);
 
 
@@ -184,7 +184,13 @@ int main( int argc, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glgraph.AddChild(&glposegraph);
 
-    pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
+    CVarUtils::CreateGetCVar("T_kin_vicon", Sophus::SE3() );
+    CVarUtils::AttachCVar("WorkspaceMin", &(vicon.WorkspaceMin()));
+    CVarUtils::AttachCVar("WorkspaceMax", &(vicon.WorkspaceMax()));
+    CVarUtils::Load("cvars.xml");
+    posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(CVarUtils::GetCVar<Sophus::SE3>("T_kin_vicon" ) );
+
+    pangolin::RegisterKeyPressCallback(' ', [&add_constraints,&posegraph]() {add_constraints=false; posegraph.Start();} );
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
@@ -202,6 +208,7 @@ int main( int argc, char* argv[] )
 
         if(Pushed(reset_sdf)) {
             const Sophus::SE3 T_kin_vicon = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
+            CVarUtils::SetCVar("T_kin_vicon", T_kin_vicon);
 
             // Reset posegraph
             keyframes.clear();
@@ -362,8 +369,6 @@ int main( int argc, char* argv[] )
                     if(work_vol.IsValid()) {
                         Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
                     }
-                }else{
-                    cerr << "Tracking bad" << endl;
                 }
             }
         }
