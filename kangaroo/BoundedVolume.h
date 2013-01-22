@@ -40,6 +40,13 @@ public:
     }
 
     inline __host__
+    BoundedVolume(unsigned int w, unsigned int h, unsigned int d, const BoundingBox& bbox )
+        : Volume<T,Target,Management>(w,h,d),
+          bbox(bbox)
+    {
+    }
+
+    inline __host__
     BoundedVolume(unsigned int w, unsigned int h, unsigned int d, float3 min_bounds, float3 max_bounds)
         : Volume<T,Target,Management>(w,h,d),
           bbox(min_bounds,max_bounds)
@@ -73,7 +80,7 @@ public:
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
-    bool IsValid() {
+    bool IsValid() const {
         const uint3 size = Volume<T,Target,Management>::Voxels();
         return size.x >= 8 && size.y >= 8 && size.z >= 8;
     }

@@ -50,9 +50,10 @@ inline void vGetColor(float3 &rfColor, const float3 &rfPosition, const float3 &r
 }
 
 //vMarchCube performs the Marching Cubes algorithm on a single cube
-template<typename T>
+template<typename T, typename TColor>
 void vMarchCube(
     const BoundedVolume<T,Gpu::TargetHost> vol,
+    const BoundedVolume<TColor,Gpu::TargetHost> volColor,
     int x, int y, int z,
     std::vector<aiVector3D>& verts,
     std::vector<aiVector3D>& norms,
@@ -61,9 +62,7 @@ void vMarchCube(
     float fTargetValue = 0.0f
 ) {
     const float3 p = vol.VoxelPositionInUnits(x,y,z);
-
-    // TODO: Allow voxel to have different scales in each direction
-    float fScale = vol.VoxelSizeUnits().x;
+    const float3 fScale = vol.VoxelSizeUnits();
 
     //Make a local copy of the values at the cube's corners
     float afCubeValue[8];
@@ -101,14 +100,17 @@ void vMarchCube(
                                  afCubeValue[ a2iEdgeConnection[iEdge][1] ], fTargetValue);
 
             asEdgeVertex[iEdge] = make_float3(
-                p.x + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][0]  +  fOffset * a2fEdgeDirection[iEdge][0]) * fScale,
-                p.y + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][1]  +  fOffset * a2fEdgeDirection[iEdge][1]) * fScale,
-                p.z + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][2]  +  fOffset * a2fEdgeDirection[iEdge][2]) * fScale
+                p.x + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][0]  +  fOffset * a2fEdgeDirection[iEdge][0]) * fScale.x,
+                p.y + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][1]  +  fOffset * a2fEdgeDirection[iEdge][1]) * fScale.y,
+                p.z + (a2fVertexOffset[ a2iEdgeConnection[iEdge][0] ][2]  +  fOffset * a2fEdgeDirection[iEdge][2]) * fScale.z
             );
 
-            // TODO: Why do we have to negate this?
             const float3 deriv = vol.GetUnitsBackwardDiffDxDyDz( asEdgeVertex[iEdge] );
             asEdgeNorm[iEdge] = deriv / length(deriv);
+
+            if( !std::isfinite(asEdgeNorm[iEdge].x) || !std::isfinite(asEdgeNorm[iEdge].y) || !std::isfinite(asEdgeNorm[iEdge].z) ) {
+                asEdgeNorm[iEdge] = make_float3(0,0,0);
+            }
         }
     }
 
@@ -127,13 +129,16 @@ void vMarchCube(
         {
             int iVertex = a2iTriangleConnectionTable[iFlagIndex][3*iTriangle+iCorner];
 
-            float3 sColor;
-            vGetColor(sColor, asEdgeVertex[iVertex], asEdgeNorm[iVertex]);
-
             face.mIndices[iCorner] = verts.size();
             verts.push_back(aiVector3D(asEdgeVertex[iVertex].x, asEdgeVertex[iVertex].y, asEdgeVertex[iVertex].z) );
             norms.push_back(aiVector3D(asEdgeNorm[iVertex].x,   asEdgeNorm[iVertex].y,   asEdgeNorm[iVertex].z) );
-            colors.push_back(aiColor4D(sColor.x, sColor.y, sColor.z, 1.0f));
+
+            if(volColor.IsValid()) {
+                const TColor c = volColor.GetUnitsTrilinearClamped(asEdgeVertex[iVertex]);
+                float3 sColor = Gpu::ConvertPixel<float3,TColor>(c);
+                colors.push_back(aiColor4D(sColor.x, sColor.y, sColor.z, 1.0f));
+            }
+
         }
 
         faces.push_back(face);
@@ -170,12 +175,12 @@ aiMesh* MeshFromLists(
         mesh->mFaces[i] = faces[i];
     }
 
-//    if( colors.size() == verts.size()) {
-//        mesh->mColors[0] = new aiColor4D[colors.size()];
-//        for(int i=0; i < colors.size(); ++i) {
-//            mesh->mColors[0][i] = colors[i];
-//        }
-//    }
+    if( colors.size() == verts.size()) {
+        mesh->mColors[0] = new aiColor4D[colors.size()];
+        for(int i=0; i < colors.size(); ++i) {
+            mesh->mColors[0][i] = colors[i];
+        }
+    }
 
     return mesh;
 }
@@ -205,8 +210,8 @@ void SaveMesh(std::string filename, aiMesh* mesh)
     std::cout << "Mesh export result: " << res << std::endl;
 }
 
-template<typename T>
-void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol )
+template<typename T, typename TColor>
+void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol, const BoundedVolume<TColor,TargetHost> volColor )
 {
     std::vector<aiVector3D> verts;
     std::vector<aiVector3D> norms;
@@ -216,7 +221,7 @@ void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol )
     for(GLint iX = 0; iX < vol.Voxels().x-1; iX++) {
         for(GLint iY = 0; iY < vol.Voxels().y-1; iY++) {
             for(GLint iZ = 0; iZ < vol.Voxels().z-1; iZ++) {
-                vMarchCube(vol, iX,iY,iZ, verts, norms, faces, colors);
+                vMarchCube(vol, volColor, iX,iY,iZ, verts, norms, faces, colors);
             }
         }
     }
@@ -226,8 +231,6 @@ void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol )
 }
 
 // Instantiate templates
-template void SaveMesh<SDF_t>(std::string, const BoundedVolume<SDF_t,TargetHost,DontManage> vol);
-
-
+template void SaveMesh<SDF_t,float>(std::string, const BoundedVolume<SDF_t,TargetHost,DontManage> vol, const BoundedVolume<float,TargetHost> volColor);
 
 }

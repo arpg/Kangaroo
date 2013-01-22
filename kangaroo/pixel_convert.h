@@ -79,9 +79,30 @@ float3 ConvertPixel(uchar3 p)
 
 template<>
 __host__ __device__ inline
+float ConvertPixel(uchar3 p)
+{
+    return (p.x+p.y+p.z) / (3.0f*255.0f);
+}
+
+template<>
+__host__ __device__ inline
 float4 ConvertPixel(uchar4 p)
 {
     return make_float4(p.x,p.y,p.z,p.z);
+}
+
+template<>
+__host__ __device__ inline
+float3 ConvertPixel(float p)
+{
+    return make_float3(p,p,p);
+}
+
+template<>
+__host__ __device__ inline
+float ConvertPixel(float3 p)
+{
+    return (p.x + p.y + p.z) / 3.0f;
 }
 
 }

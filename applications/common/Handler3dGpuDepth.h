@@ -9,7 +9,7 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
     {
     }
 
-    void GetPosNormal(pangolin::View& view, int x, int y, double p[3], double Pw[3], double Pc[3], double n[3])
+    void GetPosNormal(pangolin::View& view, int x, int y, double p[3], double Pw[3], double Pc[3], double n[3], double default_z)
     {
         const GLint viewport[4] = {view.v.l,view.v.b,view.v.w,view.v.h};
         const pangolin::OpenGlMatrix proj = cam_state->GetProjectionMatrix();
@@ -22,7 +22,7 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
         const float zw = 0.5*(1 + proj.m[2*4+2] + proj.m[3*4+2] / z);
         gluUnProject(x, y, zw, mv.m, proj.m, viewport, &Pw[0], &Pw[1], &Pw[2]);
         pangolin::LieApplySE34x4vec3(Pc, mv.m, Pw);
-        p[0] = x; p[1] = y; p[2] = std::isfinite(z) ? zw : 1;
+        p[0] = x; p[1] = y; p[2] = std::isfinite(z) ? zw : default_z;
     }
 
 protected:

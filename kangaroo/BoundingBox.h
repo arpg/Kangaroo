@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MatUtils.h"
+#include "ImageIntrinsics.h"
 #include <iostream>
 
 namespace Gpu
@@ -35,6 +36,17 @@ struct BoundingBox
         float near, float far
     ) {
         FitToFrustum(T_wc,w,h,fu,fv,u0,v0,near,far);
+    }
+
+    // Construct bounding box from Frustum.
+    inline __host__
+    BoundingBox(
+        const Mat<float,3,4> T_wc,
+        float w, float h,
+        ImageIntrinsics K,
+        float near, float far
+    ) {
+        FitToFrustum(T_wc,w,h,K.fu,K.fv,K.u0,K.v0,near,far);
     }
 
     inline __host__ __device__
@@ -84,6 +96,16 @@ struct BoundingBox
     }
 
     inline __host__
+    void FitToFrustum(
+        const Mat<float,3,4> T_wc,
+        float w, float h,
+        ImageIntrinsics K,
+        float near, float far
+    ) {
+        FitToFrustum(T_wc,w,h,K.fu,K.fv,K.u0,K.v0,near,far);
+    }
+
+    inline __host__
     void Clear()
     {
         boxmin = make_float3(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max());
@@ -121,16 +143,32 @@ struct BoundingBox
         return boxmax - boxmin;
     }
 
+    inline __host__ __device__
+    void Enlarge(float3 scale)
+    {
+        const float3 center = boxmin + (boxmax - boxmin)/2.0f;
+        const float3 newHalfSize = (scale * Size()) / 2.0f;
+        boxmin = center - newHalfSize;
+        boxmax = center + newHalfSize;
+
+    }
+
     float3 boxmin;
     float3 boxmax;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const BoundingBox& bbox)
+inline std::ostream& operator<<( std::ostream& os, const Gpu::BoundingBox& bbox)
 {
-    os << "(" << bbox.boxmin.x << "," << bbox.boxmin.y << "," << bbox.boxmin.z << ")";
-    os << " - ";
-    os << "(" << bbox.boxmax.x << "," << bbox.boxmax.y << "," << bbox.boxmax.z << ")";
+    os << bbox.Min() << " - " << bbox.Max();
     return os;
+}
+
+inline std::istream& operator>>( std::istream& is, Gpu::BoundingBox& bbox)
+{
+    is >> bbox.Min();
+    is.ignore(3, '-');
+    is >> bbox.Max();
+    return is;
 }
 
 }

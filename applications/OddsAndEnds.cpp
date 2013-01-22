@@ -1,35 +1,127 @@
+//  demo.cpp
+//
+//	Here is an example on how to use the descriptor presented in the following paper:
+//	A. Alahi, R. Ortiz, and P. Vandergheynst. FREAK: Fast Retina Keypoint. In IEEE Conference on Computer Vision and Pattern Recognition, 2012.
+//  CVPR 2012 Open Source Award winner
+//
+//	Copyright (C) 2011-2012  Signal processing laboratory 2, EPFL,
+//	Kirell Benzi (kirell.benzi@epfl.ch),
+//	Raphael Ortiz (raphael.ortiz@a3.epfl.ch),
+//	Alexandre Alahi (alexandre.alahi@epfl.ch)
+//	and Pierre Vandergheynst (pierre.vandergheynst@epfl.ch)
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//   * Redistribution's of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//
+//   * Redistribution's in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//
+//   * The name of the copyright holders may not be used to endorse or promote products
+//     derived from this software without specific prior written permission.
+//
+//  This software is provided by the copyright holders and contributors "as is" and
+//  any express or implied warranties, including, but not limited to, the implied
+//  warranties of merchantability and fitness for a particular purpose are disclaimed.
+//  In no event shall the Intel Corporation or contributors be liable for any direct,
+//  indirect, incidental, special, exemplary, or consequential damages
+//  (including, but not limited to, procurement of substitute goods or services;
+//  loss of use, data, or profits; or business interruption) however caused
+//  and on any theory of liability, whether in contract, strict liability,
+//  or tort (including negligence or otherwise) arising in any way out of
+//  the use of this software, even if advised of the possibility of such damage.
+
 #include <iostream>
+#include <string>
+#include <vector>
 
-#include "common/PoseGraph.h"
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/nonfree/features2d.hpp>
+#include <opencv2/legacy/legacy.hpp>
 
+//#include "freak.h"
+//#include "hammingseg.h"
 
-using namespace std;
+int main( int argc, char** argv ) {
+//    // check http://opencv.itseez.com/doc/tutorials/features2d/table_of_content_features2d/table_of_content_features2d.html
+//    // for OpenCV general detection/matching framework details
 
+//    if( argc != 3 ) {
+//        help(argv);
+//        return -1;
+//    }
 
-int main( int /*argc*/, char* argv[] )
-{
-    PoseGraph posegraph;
-    const int coord_vicon = posegraph.AddSecondaryCoordinateFrame();
-    const int kf_sdf = posegraph.AddKeyframe();
+//    // Load images
+//    Mat imgA = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE );
+//    if( !imgA.data ) {
+//        std::cout<< " --(!) Error reading image " << argv[1] << std::endl;
+//        return -1;
+//    }
 
-    const Sophus::SE3 T_vk(Sophus::SO3(1,2,3),Eigen::Vector3d(4,5,6));
-    const Sophus::SE3 T_sr(Sophus::SO3(3,2,1),Eigen::Vector3d(6,5,4));
+//    Mat imgB = imread(argv[2], CV_LOAD_IMAGE_GRAYSCALE );
+//    if( !imgA.data ) {
+//        std::cout << " --(!) Error reading image " << argv[2] << std::endl;
+//        return -1;
+//    }
 
-    for( int i=0; i<1000; ++i) {
-        Sophus::SE3 T_rv(Sophus::SO3(i*0.01,i*-0.02, i*0.03), Eigen::Vector3d(i*0.01,2*i*0.02,0) );
-        Sophus::SE3 T_sk = T_sr * T_rv * T_vk;
+//    std::vector<KeyPoint> keypointsA, keypointsB;
+//    Mat descriptorsA, descriptorsB;
+//    std::vector<DMatch> matches;
 
-        const int kfid = posegraph.AddKeyframe(new Keyframe(T_sk));
-//        posegraph.SetKeyframeFreedom(kfid,false,false);
-        posegraph.AddIndirectUnaryEdge(kfid,coord_vicon,T_rv);
-        posegraph.AddBinaryEdge(kf_sdf,kfid,T_sk);
-    }
+//    // DETECTION
+//    // Any openCV detector such as
+//    FastFeatureDetector detector(30);
 
-    posegraph.Solve();
+//    // DESCRIPTOR
+//    // Our proposed FREAK descriptor
+//    // (roation invariance, scale invariance, pattern radius corresponding to SMALLEST_KP_SIZE,
+//    // number of octaves, optional vector containing the selected pairs)
+//    // FREAK extractor(true, true, 22, 4, std::vector<int>());
+//    FREAK extractor;
 
-    cout << T_sr.inverse().matrix3x4() << endl << endl;
-    cout << T_vk.inverse().matrix3x4() << endl << endl;
+//    // MATCHER
+//    // The standard Hamming distance can be used such as
+//    // BruteForceMatcher<Hamming> matcher;
+//    // or the proposed cascade of hamming distance using SSSE3
+//#if CV_SSSE3
+//    BruteForceMatcher< HammingSeg<30,4> > matcher;
+//#else
+//    BruteForceMatcher<Hamming> matcher;
+//#endif
 
-    cout << posegraph.GetKeyframe(kf_sdf).GetT_wk().matrix3x4() << endl << endl;
-    cout << posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().matrix3x4() << endl << endl;
+//    detector.detect( imgA, keypointsA );
+//    keypointsA.clear();
+//    keypointsA.reserve(1000);
+
+//    // detect
+//    double t = (double)getTickCount();
+//    detector.detect( imgA, keypointsA );
+//    detector.detect( imgB, keypointsB );
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    std::cout << "detection time [s]: " << t/1.0 << std::endl;
+
+//    // extract
+//    t = (double)getTickCount();
+//    extractor.compute( imgA, keypointsA, descriptorsA );
+//    extractor.compute( imgB, keypointsB, descriptorsB );
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    std::cout << "extraction time [s]: " << t << std::endl;
+
+//    // match
+//    t = (double)getTickCount();
+//    matcher.match(descriptorsA, descriptorsB, matches);
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    std::cout << "matching time [s]: " << t << std::endl;
+
+//    // Draw matches
+//    Mat imgMatch;
+//    drawMatches(imgA, keypointsA, imgB, keypointsB, matches, imgMatch);
+
+//    namedWindow("matches", CV_WINDOW_KEEPRATIO);
+//    imshow("matches", imgMatch);
+//    waitKey(0);
 }

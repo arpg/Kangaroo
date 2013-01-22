@@ -95,7 +95,6 @@ int main( int /*argc*/, char* argv[] )
 
 
     pangolin::RegisterKeyPressCallback(' ', [&posegraph]() {posegraph.Start();} );
-    pangolin::RegisterKeyPressCallback('t', [&posegraph,coord_z]() {posegraph.SetSecondaryCoordinateFrameFree(coord_z);});
     pangolin::RegisterKeyPressCallback('v', [&hist_vicon]() {hist_vicon.SetVisible(!hist_vicon.IsVisible());});
 
     // Define OpenGL Render state

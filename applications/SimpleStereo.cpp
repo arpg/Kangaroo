@@ -43,7 +43,7 @@ int main( int argc, char* argv[] )
     glClearColor(1,1,1,0);
 
     // Open video device
-    CameraDevice video = OpenRpgCamera(argc,argv);
+    CameraDevice video = OpenRpgCamera(argc,argv,2,true);
 
     // Capture first image
     std::vector<rpg::ImageWrapper> images;

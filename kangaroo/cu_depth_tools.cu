@@ -57,32 +57,29 @@ void FilterBadKinectData(Image<float> dFiltered, Image<float> dKinectDepth)
 
 template<typename Ti>
 __global__ void KernDepthToVbo(
-    Image<float4> dVbo, const Image<Ti> dDepth, float fu, float fv, float u0, float v0, float depthscale
+    Image<float4> dVbo, const Image<Ti> dDepth, ImageIntrinsics K, float depthscale
 ) {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
     const float kz = depthscale * dDepth(u,v);
 
     // (x,y,1) = kinv * (u,v,1)'
-    const float z = kz;
-    const float x = z * (u-u0) / fu;
-    const float y = z * (v-v0) / fv;
-
-    dVbo(u,v) = make_float4(x,y,z,1);
+    const float3 P = K.Unproject(u,v,kz);
+    dVbo(u,v) = make_float4(P.x,P.y,P.z,1);
 }
 
-void DepthToVbo(Image<float4> dVbo, const Image<unsigned short> dDepth, float fu, float fv, float u0, float v0, float depthscale)
+void DepthToVbo(Image<float4> dVbo, const Image<unsigned short> dDepth, ImageIntrinsics K, float depthscale)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dVbo);
-    KernDepthToVbo<unsigned short><<<gridDim,blockDim>>>(dVbo, dDepth, fu, fv, u0, v0, depthscale);
+    KernDepthToVbo<unsigned short><<<gridDim,blockDim>>>(dVbo, dDepth, K, depthscale);
 }
 
-void DepthToVbo(Image<float4> dVbo, const Image<float> dDepth, float fu, float fv, float u0, float v0, float depthscale)
+void DepthToVbo(Image<float4> dVbo, const Image<float> dDepth, ImageIntrinsics K, float depthscale)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim,gridDim, dVbo);
-    KernDepthToVbo<float><<<gridDim,blockDim>>>(dVbo, dDepth, fu, fv, u0, v0, depthscale);
+    KernDepthToVbo<float><<<gridDim,blockDim>>>(dVbo, dDepth, K, depthscale);
 }
 
 //////////////////////////////////////////////////////
@@ -129,7 +126,7 @@ void ColourVbo(Image<uchar4> dId, const Image<float4> dPd, const Image<uchar3> d
 //////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin>
-__global__ void KernTextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0)
+__global__ void KernTextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth)
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -140,7 +137,7 @@ __global__ void KernTextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, c
 
         const float4 N_d = norm(u,v);
         const float3 N_w = mulSO3(T_wd, N_d);
-        const float3 P_d = d * make_float3((u-u0)/fu,(v-v0)/fv, 1);
+        const float3 P_d = Kdepth.Unproject(u,v,d);
         const float3 P_w = T_wd * P_d;
 
         // project into kf
@@ -157,21 +154,21 @@ __global__ void KernTextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, c
 }
 
 template<typename Tout, typename Tin>
-void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0)
+void TextureDepth(Image<Tout> img, const ImageKeyframe<Tin> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim, img);
-    KernTextureDepth<Tout,Tin><<<gridDim,blockDim>>>(img,kf,depth,norm, T_wd,fu,fv,u0,v0);
+    KernTextureDepth<Tout,Tin><<<gridDim,blockDim>>>(img,kf,depth,norm, T_wd, Kdepth);
 }
 
-template void TextureDepth<float4,uchar3>(Image<float4> img, const ImageKeyframe<uchar3> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+template void TextureDepth<float4,uchar3>(Image<float4> img, const ImageKeyframe<uchar3> kf, const Image<float> depth, const Image<float4> norm, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth);
 
 //////////////////////////////////////////////////////
 // Create textured view given depth image and keyframes
 //////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin, size_t N>
-__global__ void KernTextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0)
+__global__ void KernTextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth)
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -182,7 +179,7 @@ __global__ void KernTextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N
 
         const float4 N_d = norm(u,v);
         const float3 N_w = mulSO3(T_wd, N_d);
-        const float3 P_d = d * make_float3((u-u0)/fu,(v-v0)/fv, 1);
+        const float3 P_d = Kdepth.Unproject(u,v,d);
         const float3 P_w = T_wd * P_d;
 
         float w = 0;
@@ -212,13 +209,13 @@ __global__ void KernTextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N
 }
 
 template<typename Tout, typename Tin, size_t N>
-void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0)
+void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth)
 {
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim,gridDim, img);
-    KernTextureDepth<Tout,Tin,N><<<gridDim,blockDim>>>(img,kfs,depth,norm,phong,T_wd,fu,fv,u0,v0);
+    KernTextureDepth<Tout,Tin,N><<<gridDim,blockDim>>>(img,kfs,depth,norm,phong,T_wd,Kdepth);
 }
 
-template void TextureDepth<float4,uchar3,10>(Image<float4> img, const Mat<ImageKeyframe<uchar3>,10> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, float fu, float fv, float u0, float v0);
+template void TextureDepth<float4,uchar3,10>(Image<float4> img, const Mat<ImageKeyframe<uchar3>,10> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth);
 
 }

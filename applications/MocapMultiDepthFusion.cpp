@@ -47,8 +47,8 @@ struct Sensor {
           vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW ),
           cbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW )
     {
-        u0 = w/2.0f;
-        v0 = h/2.0f;
+        K.u0 = w/2.0f;
+        K.v0 = h/2.0f;
 
         glT_wv = new SceneGraph::GLAxis(0.1);
         glT_vs = new SceneGraph::GLMovableAxis(0.001,false,false);
@@ -74,7 +74,7 @@ struct Sensor {
     int w, h;
     pangolin::GlBufferCudaPtr vbo;
     pangolin::GlBufferCudaPtr cbo;
-    float fu,fv,u0,v0;
+    Gpu::ImageIntrinsics K;
 
     Eigen::Vector3d nd_c;
 
@@ -175,7 +175,7 @@ int main( int argc, char* argv[] )
                 Gpu::Image<float4> imgvbo((float4*)*var, sensor.w, sensor.h);
 
                 Eigen::Matrix3d U; U << sensor.w, 0, sensor.w,  sensor.h/2, sensor.h, sensor.h,  1, 1, 1;
-                Eigen::Matrix3d Q = -(MakeKinv(sensor.fu,sensor.fv,sensor.u0,sensor.v0) * U).transpose();
+                Eigen::Matrix3d Q = -(sensor.K.InverseMatrix() * U).transpose();
                 Eigen::Matrix3d Qinv = Q.inverse();
                 Eigen::Vector3d plane_invz = Q * sensor.nd_c;
 
@@ -214,8 +214,8 @@ int main( int argc, char* argv[] )
                     Sensor* newsensor = new Sensor(sensor_name, vicon, dw,dh);
                     it = sensors.insert(sensor_name, newsensor ).first;
 
-                    newsensor->fu = video.GetProperty<float>("Depth" +  boost::lexical_cast<std::string>(ni) + "FocalLength",0);
-                    newsensor->fv = newsensor->fu;
+                    newsensor->K.fu = video.GetProperty<float>("Depth" +  boost::lexical_cast<std::string>(ni) + "FocalLength",0);
+                    newsensor->K.fv = newsensor->K.fu;
 
                     // add to posegraph
                     graph.AddChild(newsensor->glT_wv);
@@ -244,13 +244,13 @@ int main( int argc, char* argv[] )
                 imgd.CopyFrom<Gpu::TargetHost,Gpu::DontManage>(images[ni].Image);
                 Gpu::BilateralFilter<float,unsigned short>(imgf,imgd,bigs,bigr,biwin,200);
                 Gpu::ElementwiseScaleBias<float,float,float>(imgf,imgf, 1.0f/1000.0f);
-                Gpu::DepthToVbo(imgv, imgf, sensor.fu, sensor.fv, sensor.u0, sensor.v0 );
+                Gpu::DepthToVbo(imgv, imgf, sensor.K );
                 Gpu::NormalsFromVbo(imgn, imgv);
 
                 if(Pushed(fuseonce) || fuse) {
                     // integrate gtd into TSDF
                     Eigen::Matrix<double,3,4> T_cw = (Sophus::SE3(sensor.glT_wv->GetPose4x4_po() * sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
-                    Gpu::SdfFuse(vol, imgf, imgn, T_cw, sensor.fu, sensor.fv, sensor.u0, sensor.v0, trunc_dist, max_w, mincostheta );
+                    Gpu::SdfFuse(vol, imgf, imgn, T_cw, sensor.K, trunc_dist, max_w, mincostheta );
                 }
 
                 {
@@ -270,7 +270,7 @@ int main( int argc, char* argv[] )
         // Raycast current view
         {
             Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
-            Gpu::RaycastSdf(rayd, rayn, rayi, vol, T_vw.inverse().matrix3x4(), 420,420,320,320, 0.1, 1000, true );
+            Gpu::RaycastSdf(rayd, rayn, rayi, vol, T_vw.inverse().matrix3x4(), Gpu::ImageIntrinsics(420,420,320,320), 0.1, 1000, true );
         }
 
         int sn = 0;
