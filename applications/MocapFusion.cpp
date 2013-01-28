@@ -31,20 +31,6 @@
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
 #include <kangaroo/BoundedVolume.h>
-#include <CVars/CVar.h>
-
-#ifdef USE_SENSORFUSION
-
-#include <RPG/Devices/IMU/IMUDevice.h>
-#include "SensorFusion/SensorFusionCeres.h"
-IMUDevice phidget;
-
-void NewData(const IMUData& data)
-{
-
-}
-
-#endif
 
 using namespace std;
 using namespace pangolin;
@@ -61,8 +47,6 @@ struct KinectKeyframe
     Sophus::SE3 T_iw;
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
 };
-
-
 
 int main( int argc, char* argv[] )
 {
@@ -86,8 +70,8 @@ int main( int argc, char* argv[] )
     );
     const double knear = 0.4;
     const double kfar = 4;
-    const int volres = 384; //256;
-    //const int volres = 256;
+//    const int volres = 384; //256;
+    const int volres = 256;
     const float volrad = 2;
 
     const Eigen::Vector4d its(1,2,3,4);
@@ -109,10 +93,8 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_c(w,h);
 //    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad)); // in middle
-    //Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad)); // in front
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-4,-4,-1), make_float3(4,4,2)); // in front
+    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad)); // in front
 //    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-0.25,-0.5,0.75), make_float3(0.25,0.5,1.25)); // dress form.
-
 
     const float3 voxsize = vol.VoxelSizeUnits();
 
@@ -210,9 +192,6 @@ int main( int argc, char* argv[] )
 
     pangolin::RegisterKeyPressCallback(' ', [&add_constraints,&posegraph]() {add_constraints=false; posegraph.Start();} );
 
-    //phidget.InitDriver("Phidgets");
-    //phidget.RegisterIMUDataCallback();
-
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
         const bool go = frame==-1 || run;
@@ -281,7 +260,6 @@ int main( int argc, char* argv[] )
 
         if(Pushed(reset)) {
             T_sdf_kin = Sophus::SE3();
-            glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
             Gpu::SdfReset(vol, trunc_dist);
             keyframes.clear();
             posegraph.Clear();
