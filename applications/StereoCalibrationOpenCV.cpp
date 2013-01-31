@@ -432,8 +432,10 @@ int main(int argc, char** argv)
     bool showRectified = true;
 
     string sDir = ".";
-    string sRegExLeft = ".*left.*";
-    string sRegExRight = ".*right.*";
+//    string sRegExLeft = ".*left.*";
+//    string sRegExRight = ".*right.*";
+    string sRegExLeft = ".*0.png";
+    string sRegExRight = ".*1.png";
 
     for( int i = 1; i < argc; i++ )
     {

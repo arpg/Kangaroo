@@ -46,8 +46,7 @@ class Application
 {
 public:
     Application()
-        : // window(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, __FILE__ ),
-          shouldQuit(false)
+        : shouldQuit(false)
     {
     }
 
@@ -57,7 +56,8 @@ public:
 
     void InitCamera(int argc, char** argv)
     {
-        OpenRpgCamera(camera,argc,argv);
+        GetPot clArgs(argc,argv);
+        rpg::InitCam(camera,clArgs);
 
         camera.Capture(img);
         width = img[0].width();
@@ -69,15 +69,23 @@ public:
 //        camParams = MatlabCamera( width,height, camParamsVec);
 
         mvl::CameraModel cam[] = {
-            (std::string)"/home/rpg/Data/Flea3/lcmod.xml",
-            (std::string)"/home/rpg/Data/Flea3/rcmod.xml"
+            clArgs.follow( ".", "-sdir"  ) + "/" + clArgs.follow( "lcmod.xml", "-lcmod" ),
+            clArgs.follow( ".", "-sdir"  ) + "/" + clArgs.follow( "rcmod.xml", "-rcmod" )
         };
-
-        camParams = MatlabCamera( width,height,
-            cam[0].GetModel()->warped.fx, cam[0].GetModel()->warped.fy,
-            cam[0].GetModel()->warped.cx, cam[0].GetModel()->warped.cy,
-            cam[0].GetModel()->warped.kappa1, cam[0].GetModel()->warped.kappa2, cam[0].GetModel()->warped.tau1, cam[0].GetModel()->warped.tau2, cam[0].GetModel()->warped.kappa3
-        );
+        
+        if( cam[0].Type() == MVL_CAMERA_WARPED) {
+            camParams = MatlabCamera( width,height,
+                cam[0].GetModel()->warped.fx, cam[0].GetModel()->warped.fy,
+                cam[0].GetModel()->warped.cx, cam[0].GetModel()->warped.cy,
+                cam[0].GetModel()->warped.kappa1, cam[0].GetModel()->warped.kappa2, cam[0].GetModel()->warped.tau1, cam[0].GetModel()->warped.tau2, cam[0].GetModel()->warped.kappa3
+            );
+        }else{
+            camParams = MatlabCamera( width,height,
+                cam[0].GetModel()->warped.fx, cam[0].GetModel()->warped.fy,
+                cam[0].GetModel()->warped.cx, cam[0].GetModel()->warped.cy,
+                0,0,0,0,0
+            );
+        }
 
         Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
         Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
@@ -109,10 +117,12 @@ public:
         // Setup Trackers
         for(int i=0; i<2; ++i) {
             tracker[i] = new Tracker(width,height);
-            //tracker[i]->target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);
-            tracker[i]->target.LoadEPS("/home/rpg/Code/Builds/Kangaroo/applications/stereo.eps", 72/0.0254);
+            if(!tracker[i]->target.LoadEPS("stereo.eps", 72/0.0254)) {
+                tracker[i]->target.GenerateRandom(60, trad, 3*trad, trad, targetSizeMeters);                
+                tracker[i]->target.SaveEPS("stereo.eps", 72/0.0254);
+                tracker[i]->target.SaveRotatedEPS("stereo-portrait.eps", 72/0.0254);
+            }
         }
-//        tracker[0]->target.SaveRotatedEPS("stereo.eps", 72/0.0254);
     }
 
     void OptimiseRun()
@@ -196,7 +206,7 @@ public:
             }
 
             if(Pushed(save_cam_model)) {
-                SaveCamModelLeftRightVisionConvention("/home/rpg/Data/Flea3/_", camParams, T_rl.inverse().matrix());
+                SaveCamModelLeftRightVisionConvention("./", camParams, T_rl.inverse().matrix());
             }
 
             if( Pushed(save_kf) ) {
@@ -212,9 +222,7 @@ public:
                     kf.obs[i] = tracker[i]->TargetPatternObservations();
                     kf.T_fw[i] = tracker[i]->T_hw;
                 }
-                kfMutex.lock();
                 keyframes.push_back(kf);
-                kfMutex.unlock();
             }
 
             // Display
@@ -237,7 +245,7 @@ public:
             // Draw Threshold image
             container[3].Activate();
             glColor3f(1,1,1);
-            tex8.Upload(tracker[0]->tI.get(), GL_LUMINANCE, GL_UNSIGNED_BYTE);
+            tex8.Upload(tracker[1]->tI.get(), GL_LUMINANCE, GL_UNSIGNED_BYTE);
             tex8.RenderToViewportFlipY();
 
             // Draw current tracker poses
@@ -277,7 +285,6 @@ public:
     std::vector<rpg::ImageWrapper> img;
     GLuint m_glTex[2];
     int width, height;
-    boost::mutex kfMutex;
 
     MatlabCamera camParams;
     Tracker* tracker[2];

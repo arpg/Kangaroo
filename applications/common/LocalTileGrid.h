@@ -38,19 +38,43 @@ struct Tile
         return (i==0) ? this : ( i<0 ? adj[2] : adj[5] );
     }
     
+    Eigen::Vector3d* Vertex(int vert)
+    {
+        return verts[vert];
+    }
+    
     inline Tile* Face(int face)
     {
         return adj[face];
     }
-
-    inline Tile* OppositeFace(int face)
+    
+    Eigen::Vector4i FaceOrderedVertexIndices(int xyz_dir, bool is_positive)
     {
-        return adj[(face+3) % 6];
+        const int constbit = 1 << xyz_dir;
+        
+        int v = 0;
+        Eigen::Vector4i ind;
+        
+        for(int i=0; i<8; ++i) {
+            if( (bool)(constbit & i) == is_positive) {
+                ind[v++] = i;
+            }
+        }
+        return ind;
     }
 
-    void CanonicalExpansion(int face)
+    Eigen::Vector3d FaceNormal(int xyz_dir, bool is_positive)
     {
-
+        Eigen::Vector4i vs = FaceOrderedVertexIndices(xyz_dir, is_positive);
+        
+        if( is_positive) {
+            // Adjust ordering for consistent face normals
+            std::swap(vs[1], vs[2]);
+        }
+        
+        const Eigen::Vector3d dir1 = *Vertex(vs[1]) - *Vertex(vs[0]);
+        const Eigen::Vector3d dir2 = *Vertex(vs[2]) - *Vertex(vs[0]);
+        return dir1.cross(dir2);
     }
 
 protected:

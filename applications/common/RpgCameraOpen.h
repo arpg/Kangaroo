@@ -3,6 +3,7 @@
 #include <pangolin/pangolin.h>
 #include <RPG/Devices/Camera/CameraDevice.h>
 #include <RPG/Utils/GetPot>
+#include <RPG/Utils/InitCam.h>
 #include <boost/lexical_cast.hpp>
 
 class PangolinRpgVideoAdapterDriver : public CameraDriver
@@ -18,63 +19,9 @@ protected:
     pangolin::VideoInput pangovid[MAX_CAMS];
 };
 
-const char USAGE[] =
-"Usage:     program -idev <input> <options>\n"
-"\n"
-"where input device can be: FileReader Bumblebee2 etc\n"
-"\n"
-"Input Specific Options:\n"
-"   FileReader:      -lfile <regular expression for left image channel>\n"
-"                    -rfile <regular expression for right image channel>\n"
-"                    -sdir  <directory where source images are located [default '.']>\n"
-"                    -sf    <start frame [default 0]>\n"
-"\n"
-"General Options:    -lcmod <left camera model xml file>\n"
-"                    -rcmod <right camera model xml file>\n"
-"					 -gt <ground truth file> [not required]\n"
-"\n"
-"Example:\n"
-"program  -idev FileReader  -lcmod lcmod.xml  -rcmod rcmod.xml  -lfile \"left.*pgm\"  -rfile \"right.*pgm\"\n\n";
-
 inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = false)
 {
-    if( argc < 2 ) {
-        std::cout << USAGE;
-        exit(0);
-    }
-
-    GetPot cl(argc,argv);
-
-    camera.SetProperty("NumChannels", numChannels);
-    camera.SetProperty("DataSourceDir", cl.follow( ".", "-sdir"  ) );
-    camera.SetProperty("Channel-0", cl.follow( ".*left.*pgm", "-lfile" ) );
-    camera.SetProperty("Channel-1", cl.follow( ".*right.*pgm", "-rfile" ) );
-    camera.SetProperty("StartFrame", cl.follow(0,"-sf") );
-    camera.SetProperty("ForceGrayscale", forceGrayscale);
-    camera.SetProperty("lcmod", cl.follow( "lcmod.xml", "-lcmod" ) );
-    camera.SetProperty("rcmod", cl.follow( "rcmod.xml", "-rcmod" ) );
-    camera.SetProperty("groundtruth", cl.follow( "", "-gt" ) );
-    unsigned int    nFPS                = cl.follow( 30, 1, "-fps"  );
-    std::string     sResolution         = cl.follow( "VGA", 1, "-res"  ); // follow format of XGA, SVGA, VGA, QVGA, QQVGA, etc.
-    camera.SetProperty("FPS", nFPS);
-    camera.SetProperty("Resolution", sResolution);
-
-
-    int numNodes = 0;
-
-    while(true) {
-        std::string arg = boost::lexical_cast<std::string>(numNodes);
-        if(!cl.search( ("-n"+arg).c_str() ) ) break;
-        camera.SetProperty("Node-" + arg, cl.follow("", ("-n"+arg).c_str() ) );
-        numNodes++;
-    }
-    camera.SetProperty("NumNodes", numNodes);
-
-    camera.SetProperty("GetDepth", !cl.search("-no-depth"));
-    camera.SetProperty("GetRGB", !cl.search("-no-rgb"));
-    camera.SetProperty("GetIr", cl.search("-with-ir"));
-
-    camera.InitDriver( cl.follow( "FileReader", "-idev" ) );
+    rpg::InitCam(camera, argc, argv);
 }
 
 inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
