@@ -137,6 +137,11 @@ public:
         m_vecT_wf.clear();
     }
 
+    inline void SetOffset(const Sophus::SE3& T_offset)
+    {
+        m_T_offset = T_offset;
+    }
+
     inline const std::vector<Sophus::SE3>& History()
     {
         return m_vecT_wf;
@@ -144,7 +149,7 @@ public:
 
     inline void TrackingEvent(const vrpn_TRACKERCB tData )
     {
-        m_T_wf = Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)),
+        m_T_wf = m_T_offset * Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)),
             Eigen::Vector3d(tData.pos[0], tData.pos[1], tData.pos[2])
         );
         m_connected = true;
@@ -221,6 +226,7 @@ protected:
     Eigen::Vector3d m_workspace_min;
     Eigen::Vector3d m_workspace_max;
 
+    Sophus::SE3 m_T_offset;
     Sophus::SE3 m_T_wf;
     std::vector<Sophus::SE3> m_vecT_wf;
 

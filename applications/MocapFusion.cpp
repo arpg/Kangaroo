@@ -179,7 +179,22 @@ int main( int argc, char* argv[] )
     PoseGraph posegraph;
     int coord_vicon = posegraph.AddSecondaryCoordinateFrame();
     int kf_sdf = posegraph.AddKeyframe();
-    ViconTracking vicon("Local2", "192.168.10.1");
+    ViconConnection connection("192.168.10.1");
+    ViconTracking vicon("Local2", connection);
+
+    //wait for the reference plane pose
+    ViconTracking vicon_refPlan("Ref_Plane", connection);
+    printf("Waiting for reference plane position\n");
+    fflush(stdout);
+    Sophus::SE3 T_vicon_ref;
+    while(vicon_refPlan.IsNewData() == false){
+        usleep(10000);
+    }
+     T_vicon_ref = vicon_refPlan.T_wf();
+
+     //set the offset to bring the vicon into the ref coordinate frame
+     vicon.SetOffset(T_vicon_ref.inverse());
+
 
     GLPoseGraph glposegraph(posegraph);
     glgraph.AddChild(&glposegraph);
@@ -207,14 +222,14 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(reset_sdf)) {
-            const Sophus::SE3 T_kin_vicon = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
-            CVarUtils::SetCVar("T_kin_vicon", T_kin_vicon);
+            const Sophus::SE3 T_kin_fiducials = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
+            CVarUtils::SetCVar("T_kin_vicon", T_kin_fiducials);
 
             // Reset posegraph
             keyframes.clear();
             posegraph.Clear();
             coord_vicon = posegraph.AddSecondaryCoordinateFrame();
-            posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_vicon);
+            posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_fiducials);
             kf_sdf = posegraph.AddKeyframe();
 
 //            CVarUtils::AttachCVar<Sophus::SE3>("T_room_sdf", &(posegraph.GetKeyframe(kf_sdf).GetT_wk()) );
@@ -227,16 +242,16 @@ int main( int argc, char* argv[] )
             trunc_dist = 2*length(voxsize);
             Gpu::SdfReset(vol, trunc_dist);
 
-            const Sophus::SE3 T_room_vicon = vicon.T_wf();
-            const Sophus::SE3 T_room_kin = T_room_vicon * T_kin_vicon.inverse();
-            T_sdf_kin = T_room_kin;
+            const Sophus::SE3 T_vicon_fiducials = vicon.T_wf();
+            const Sophus::SE3 T_vicon_kin = T_vicon_fiducials * T_kin_fiducials.inverse();
+            T_sdf_kin = T_vicon_kin;
             Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         const bool newViconData = vicon.IsNewData();
-        const Sophus::SE3 T_room_vicon = vicon.T_wf();
-        const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
-        const Sophus::SE3 Tv_sdf_kin = T_room_sdf.inverse() * T_room_vicon * posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().inverse();
+        const Sophus::SE3 T_vicon_figucials = vicon.T_wf();
+        const Sophus::SE3 T_vicon_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
+        const Sophus::SE3 Tv_sdf_kin = T_vicon_sdf.inverse() * T_vicon_figucials * posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().inverse();
         if(use_vicon_for_sdf) {
             tracking_good = newViconData;
             T_sdf_kin = Tv_sdf_kin;
@@ -355,7 +370,7 @@ int main( int argc, char* argv[] )
                         // Add to pose graph
                         const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
                         const int kf_kin = posegraph.AddKeyframe(new Keyframe(T_room_sdf * T_sdf_kin));
-                        posegraph.AddIndirectUnaryEdge(kf_kin,coord_vicon,T_room_vicon);
+                        posegraph.AddIndirectUnaryEdge(kf_kin,coord_vicon,T_vicon_figucials);
                         posegraph.AddBinaryEdge(kf_sdf,kf_kin,T_sdf_kin);
                     }
                 }
@@ -375,7 +390,7 @@ int main( int argc, char* argv[] )
 
 //        glAxisVicon.SetPose(T_room_vicon.matrix());
         glcamera_vic.SetPose(Tv_sdf_kin.matrix());
-        glsdf.SetPose(T_room_sdf.matrix());
+        glsdf.SetPose(T_vicon_sdf.matrix());
         glcamera.SetPose(T_sdf_kin.matrix());
 
         Gpu::BoundingBox bbox_work(T_sdf_kin.matrix3x4(), w, h, K, knear,kfar);
