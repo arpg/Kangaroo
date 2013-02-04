@@ -31,6 +31,7 @@
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
 #include <kangaroo/BoundedVolume.h>
+#include "RPG/Utils/GetPot"
 
 using namespace std;
 using namespace pangolin;
@@ -50,6 +51,7 @@ struct KinectKeyframe
 
 int main( int argc, char* argv[] )
 {
+    GetPot cl( argc, argv );
     // Initialise window
     View& container = SetupPangoGLWithCuda(1024, 768);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
@@ -70,9 +72,9 @@ int main( int argc, char* argv[] )
     );
     const double knear = 0.4;
     const double kfar = 4;
-//    const int volres = 384; //256;
-    const int volres = 256;
-    const float volrad = 2;
+    const int volres = 384; //256;
+    //const int volres = 256;
+    const float volrad = 3;
 
     const Eigen::Vector4d its(1,2,3,4);
 
@@ -182,15 +184,28 @@ int main( int argc, char* argv[] )
     ViconConnection connection("192.168.10.1");
     ViconTracking vicon("Local2", connection);
 
-    //wait for the reference plane pose
-    ViconTracking vicon_refPlan("Ref_Plane", connection);
-    printf("Waiting for reference plane position\n");
-    fflush(stdout);
     Sophus::SE3 T_vicon_ref;
-    while(vicon_refPlan.IsNewData() == false){
-        usleep(10000);
+    std::string sRef     = cl.follow( "", 1, "-ref" );
+    if(sRef.empty() == false){
+        std::string word;
+        std::stringstream stream(sRef);
+        std::vector<double> vals;
+        while( getline(stream, word, ',') ){
+            vals.push_back(boost::lexical_cast<double>(word));
+        }
+        if(vals.size() != 16){
+            std::cout << "Attempted to read in reference plane position, but incorrect number of matrix entries provided. Must be 16 numbers" << std::endl;
+        }else{
+            Eigen::Matrix4d mat;
+            for(int ii = 0 ; ii < 4 ; ii++){
+                for(int jj = 0 ; jj < 4 ; jj++){
+                    mat(ii,jj) = vals[ii*4 + jj];
+                }
+            }
+            T_vicon_ref = mat;
+            std::cout << "Ref plane matrix successfully read" << std::endl;
+        }
     }
-     T_vicon_ref = vicon_refPlan.T_wf();
 
      //set the offset to bring the vicon into the ref coordinate frame
      vicon.SetOffset(T_vicon_ref.inverse());
