@@ -10,6 +10,8 @@ namespace Gpu
 
 //////////////////////////////////////////////////////
 // Truncated SDF Fusion
+// KinectFusion: Real-Time Dense Surface Mapping and Tracking, Newcombe et. al.
+// http://www.doc.ic.ac.uk/~rnewcomb/
 //////////////////////////////////////////////////////
 
 __global__ void KernSdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> normals, Mat<float,3,4> T_cw, ImageIntrinsics K, float trunc_dist, float max_w, float mincostheta )
@@ -61,6 +63,9 @@ void SdfFuse(BoundedVolume<SDF_t> vol, Image<float> depth, Image<float4> norm, M
 
 //////////////////////////////////////////////////////
 // Color Truncated SDF Fusion
+// Similar extension to KinectFusion as described by:
+// Robust Tracking for Real-Time Dense RGB-D Mapping with Kintinous
+// Whelan et. al.
 //////////////////////////////////////////////////////
 
 __global__ void KernSdfFuse(

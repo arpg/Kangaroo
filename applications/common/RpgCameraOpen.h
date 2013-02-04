@@ -21,7 +21,7 @@ protected:
 
 inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = false)
 {
-    rpg::InitCam(camera, argc, argv);
+    rpg::InitCam(camera, argc, argv, numChannels, forceGrayscale);
 }
 
 inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
