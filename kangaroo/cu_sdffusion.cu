@@ -178,5 +178,33 @@ void SdfSphere(BoundedVolume<SDF_t> vol, float3 center, float r)
     GpuCheckErrors();
 }
 
+//////////////////////////////////////////////////////
+// Take SDF Difference to depthmap
+//////////////////////////////////////////////////////
+
+__global__ void KernSdfDistance(Image<float> dist, Image<float> depth, BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float trunc_distance)
+{
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+    
+    if( u < depth.w && v < depth.h ) {
+        const float z = depth(u,v);
+        const float3 p_c = z * K.Unproject(u,v);
+        const float3 p_w = T_wc * p_c;
+        
+        const SDF_t sdf = vol.GetUnitsTrilinearClamped(p_w);
+        dist(u,v) = (sdf.val + trunc_distance) / (2* trunc_distance);
+    }    
+}
+
+
+void SdfDistance(Image<float> dist, Image<float> depth, BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float trunc_distance)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim, gridDim, depth);
+
+    KernSdfDistance<<<gridDim,blockDim>>>(dist, depth, vol, T_wc, K, trunc_distance);
+    GpuCheckErrors();
+}
 
 }

@@ -104,6 +104,7 @@ if(Kangaroo_FOUND)
     add_executable( Features Features.cpp)
     add_executable( Raycast Raycast.cpp)
     add_executable( SdfFusion SdfFusion.cpp)
+    add_executable( SdfDifference SdfDifference.cpp)
     add_executable( MocapMultiDepthFusion MocapMultiDepthFusion.cpp)
     add_executable( ImageMatching ImageMatching.cpp)
 
