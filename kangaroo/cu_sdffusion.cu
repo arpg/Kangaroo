@@ -193,7 +193,7 @@ __global__ void KernSdfDistance(Image<float> dist, Image<float> depth, BoundedVo
         const float3 p_w = T_wc * p_c;
         
         const SDF_t sdf = vol.GetUnitsTrilinearClamped(p_w);
-        dist(u,v) = (sdf.val + trunc_distance) / (2* trunc_distance);
+        dist(u,v) = sdf.val; //(sdf.val + trunc_distance) / (2* trunc_distance);
     }    
 }
 

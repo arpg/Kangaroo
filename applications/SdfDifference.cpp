@@ -59,7 +59,9 @@ int main( int argc, char* argv[] )
 
     Gpu::Image<float,  Gpu::TargetDevice, Gpu::Manage> ray_i(w,h);
     Gpu::Image<float,  Gpu::TargetDevice, Gpu::Manage> ray_d(w,h);
+    Gpu::Image<float,  Gpu::TargetDevice, Gpu::Manage> ray_dist(w,h);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
+    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> vis(w,h);
     Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol;
     Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol2;
     
@@ -79,9 +81,11 @@ int main( int argc, char* argv[] )
         ModelViewLookAtRDF(0,0,-2,0,0,0,0,-1,0)
     );
 
-    Var<float> trunc_dist_factor("ui.trunc vol factor",2, 1, 4);
+    Var<float> trunc_dist_factor("ui.trunc_vol_factor",2, 1, 4);
+    Var<bool> switch_sdf("ui.switch_sdf",false,true);
+    Var<bool> diff_sdf("ui.diff_sdf",true,true);
 
-    ActivateDrawImage<float> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
+    ActivateDrawImage<float4> adrayimg(vis, GL_RGBA32F, true, true);
 
     Handler3DGpuDepth rayhandler(ray_d, s_cam, AxisNone);
     SetupContainer(container, 2, (float)w/h);
@@ -91,16 +95,18 @@ int main( int argc, char* argv[] )
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
 
     while(!pangolin::ShouldQuit())
-    {
+    {   
         const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
         Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
         const Gpu::BoundingBox roi(T_vw.inverse().matrix3x4(), w, h, K, 0, 50);
-        Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( roi );
-        Gpu::BoundedVolume<Gpu::SDF_t> work_vol2 = vol2.SubBoundingVolume( roi );
+        Gpu::BoundedVolume<Gpu::SDF_t> work_vol = (switch_sdf ? vol2 : vol).SubBoundingVolume( roi );
+        Gpu::BoundedVolume<Gpu::SDF_t> work_vol2 = (switch_sdf ? vol : vol2).SubBoundingVolume( roi );
         if(work_vol.IsValid()) {
             Gpu::RaycastSdf(ray_d, ray_n, ray_i, work_vol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
-            Gpu::SdfDistance(ray_i, ray_d, work_vol2, T_vw.inverse().matrix3x4(), K, trunc_dist);
+            Gpu::SdfDistance(ray_dist, ray_d, work_vol2, T_vw.inverse().matrix3x4(), K, trunc_dist);
+            if(!diff_sdf) Gpu::Fill<float>(ray_dist, 0.0f);
+            Gpu::Remap(vis, ray_i, ray_dist, -trunc_dist, trunc_dist);
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

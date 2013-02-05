@@ -472,4 +472,9 @@ void SdfSphere(BoundedVolume<SDF_t> vol, float3 center, float r);
 
 void SdfDistance(Image<float> dist, Image<float> depth, BoundedVolume<SDF_t> vol, const Mat<float,3,4> T_wc, ImageIntrinsics K, float trunc_distance);
 
+//////////////////////////////////////////////////////
+
+void Remap(Image<float4> out, const Image<float> img, const Image<float> score, float min, float max);
+
+
 }
