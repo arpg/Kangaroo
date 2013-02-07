@@ -39,7 +39,7 @@ __global__ void KernRemap(Image<float4> out, const Image<float> img, const Image
         float ci = img(u,v);
         if(ci == 0.0f) ci = 1.0;
         const float4 ci4 = make_float4(ci,ci,ci,1);
-        const float mix = abs(0.5 - ov);
+        const float mix = 2*abs(0.5 - ov);
         const float4 cm4 = hsv2rgb(360*ov, 1.0, 1.0 );
         out(u,v) = (1-mix)*ci4 + mix*cm4;
     }

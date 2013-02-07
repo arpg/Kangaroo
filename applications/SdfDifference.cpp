@@ -37,13 +37,14 @@ using namespace pangolin;
 
 int main( int argc, char* argv[] )
 {
+    const int w = 1024;
+    const int h = 768;
+
     // Initialise window
-    View& container = SetupPangoGLWithCuda(1024, 768);
+    View& container = SetupPangoGLWithCuda(w, h);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
     // Open video device
-    const int w = 640;
-    const int h = 480;
 
     const Gpu::ImageIntrinsics K(
         570.342,
