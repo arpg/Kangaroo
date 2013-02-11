@@ -127,7 +127,7 @@ int main( int argc, char* argv[] )
                     R = R * Sophus::SO3::exp(x);
                 }
             }
-        glaxis.SetPose(Sophus::SE3(R.inverse(),Eigen::Vector3d(0,0,2)).matrix());
+        glaxis.SetPose(Sophus::SE3d(R.inverse(),Eigen::Vector3d(0,0,2)).matrix());
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

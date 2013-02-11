@@ -70,7 +70,7 @@ int main( int /*argc*/, char* argv[] )
             Keyframe* kf = new Keyframe();
             kfid = posegraph.AddKeyframe(kf);
         }else{
-            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
+            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3d(hist_vis_odometry.m_T_on[i]) );
         }
 
         if(gpstime < vistime) {

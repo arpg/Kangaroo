@@ -27,7 +27,7 @@ using namespace std;
 using namespace pangolin;
 using namespace Gpu;
 
-void Save(std::string prefix, Sophus::SE3 T_vc, float f)
+void Save(std::string prefix, Sophus::SE3d T_vc, float f)
 {
     const Eigen::Matrix<double,6,1> cartT_vc = SceneGraph::GLT2Cart(T_vc.matrix());
     cout << cartT_vc << endl;
@@ -71,7 +71,7 @@ int main( int argc, char* argv[] )
 //    const double baseline = -camera.GetProperty<double>("RGBDepthBaseline", 80) / 1000.0;
 //    Eigen::Matrix3d Krgb;
 //    Krgb << ifl, 0, w/2.0,   0, ifl, h/2.0,  0,0,1;
-//    const Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),Eigen::Vector3d(baseline,0,0)).inverse();
+//    const Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3(),Eigen::Vector3d(baseline,0,0)).inverse();
 //    Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
@@ -143,7 +143,7 @@ int main( int argc, char* argv[] )
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
 
-    Sophus::SE3 T_wl;
+    Sophus::SE3d T_wl;
 
     GetPot cl(argc,argv);
     const int nid = cl.follow(0, "-camid");
@@ -160,7 +160,7 @@ int main( int argc, char* argv[] )
         if(go) {
             camera.Capture(img);
             const bool newViconData = vicon.IsNewData();
-            const Sophus::SE3 T_wv = vicon.T_wf();
+            const Sophus::SE3d T_wv = vicon.T_wf();
 
             // Save current as last
             pyrVprev.Swap(pyrV);
@@ -176,14 +176,14 @@ int main( int argc, char* argv[] )
             }
 
             if( Pushed(reset) || frame == 0 ) {
-                T_wl = Sophus::SE3();
+                T_wl = Sophus::SE3d();
                 if(vicon.IsConnected()) {
                     T_wl = vicon.T_wf();
                 }
             }
 
             if(pose_refinement) {
-                Sophus::SE3 T_pl;
+                Sophus::SE3d T_pl;
 
                 if(frame > 0) {
     //                for(int l=MaxLevels-1; l >=0; --l)
@@ -201,7 +201,7 @@ int main( int argc, char* argv[] )
                             );
                             Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                             Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
-                            T_pl = T_pl * Sophus::SE3::exp(x);
+                            T_pl = T_pl * Sophus::SE3d::exp(x);
                         }
                     }
 

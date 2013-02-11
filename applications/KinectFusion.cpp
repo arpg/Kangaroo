@@ -70,7 +70,7 @@ int main( int argc, char* argv[] )
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
-    Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),c_d).inverse();
+    Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3d(),c_d).inverse();
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> drgb(w,h);
@@ -152,7 +152,7 @@ int main( int argc, char* argv[] )
     container[3].SetDrawFunction(boost::ref(adnormals));
 //    container[5].SetDrawFunction(boost::ref(adraynorm));
 
-    Sophus::SE3 T_wl;
+    Sophus::SE3d T_wl;
 
     pangolin::RegisterKeyPressCallback(' ', [&reset,&viewonly]() { reset = true; viewonly=false;} );
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
@@ -187,7 +187,7 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(reset)) {
-            T_wl = Sophus::SE3();
+            T_wl = Sophus::SE3d();
 
             vol.bbox = reset_bb;
             Gpu::SdfReset(vol);
@@ -205,7 +205,7 @@ int main( int argc, char* argv[] )
         if(viewonly) {
             const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
-            Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
+            Sophus::SE3d T_vw(s_cam.GetModelViewMatrix());
             const Gpu::BoundingBox roi(T_vw.inverse().matrix3x4(), w, h, K, 0, 50);
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( roi );
             Gpu::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
@@ -255,7 +255,7 @@ int main( int argc, char* argv[] )
                 }
 
                 if(pose_refinement && frame > 0) {
-                    Sophus::SE3 T_lp;
+                    Sophus::SE3d T_lp;
 
 //                    const int l = show_level;
 //                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
@@ -287,11 +287,11 @@ int main( int argc, char* argv[] )
                                 // Solve for rotation only
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
-                                T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
+                                T_lp = T_lp * Sophus::SE3d(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
                             }else{
                                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
-                                T_lp = T_lp * Sophus::SE3::exp(x);
+                                T_lp = T_lp * Sophus::SE3d::exp(x);
                             }
 
                         }

@@ -67,28 +67,30 @@ namespace CVarUtils
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    inline std::ostream& operator<<( std::ostream& Stream, const Sophus::SO3& R )
+    inline std::ostream& operator<<( std::ostream& Stream, const Sophus::SO3d& R )
     {
         Stream << R.unit_quaternion().coeffs();
         return Stream;
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    inline std::ostream& operator<<( std::ostream& Stream, const Sophus::SE3& T )
+    inline std::ostream& operator<<( std::ostream& Stream, const Sophus::SE3d& T )
     {
         Stream << "[" << T.so3() << "," << T.translation() << "]";
         return Stream;
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    inline std::istream& operator>>( std::istream& Stream, Sophus::SO3& R )
+    inline std::istream& operator>>( std::istream& Stream, Sophus::SO3d& R )
     {
-        Stream >> R.unit_quaternion().coeffs();
+        Eigen::Matrix<double,4,1> coeffs;
+        Stream >> coeffs;
+        R.setQuaternion(Eigen::Quaterniond(coeffs));
         return Stream;
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    inline std::istream& operator>>( std::istream& Stream, Sophus::SE3& T )
+    inline std::istream& operator>>( std::istream& Stream, Sophus::SE3d& T )
     {
         char str[256];
 

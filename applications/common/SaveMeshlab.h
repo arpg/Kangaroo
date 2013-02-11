@@ -8,12 +8,12 @@
 
 struct KinectKeyframe
 {
-    KinectKeyframe(int w, int h, Sophus::SE3 T_iw)
+    KinectKeyframe(int w, int h, Sophus::SE3d T_iw)
         : img(w,h), T_iw(T_iw)
     {
     }
 
-    Sophus::SE3 T_iw;
+    Sophus::SE3d T_iw;
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
 };
 

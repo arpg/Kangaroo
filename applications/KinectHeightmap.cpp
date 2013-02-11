@@ -68,8 +68,8 @@ int main( int /*argc*/, char* argv[] )
     // Vicon to Camera
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
     Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1, 0,-1,0;
-//    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
-    Sophus::SE3 T_cv = Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(0.705949,0.707893,0.0214006,-0.00803969)), Eigen::Vector3d(0.0579258,0.00239071,-0.31165) );
+//    Sophus::SE3d T_cv = Sophus::SE3d(Sophus::SO3(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
+    Sophus::SE3d T_cv = Sophus::SE3d(Sophus::SO3(Eigen::Quaterniond(0.705949,0.707893,0.0214006,-0.00803969)), Eigen::Vector3d(0.0579258,0.00239071,-0.31165) );
 
     // Camera (rgb) to depth
     Eigen::Matrix3d R_dc;
@@ -77,13 +77,13 @@ int main( int /*argc*/, char* argv[] )
           -1.4779096108364480e-03, 9.9992385683542895e-01, -1.2251380107679535e-02,
           1.7470421412464927e-02, 1.2275341476520762e-02, 9.9977202419716948e-01;
     Eigen::Vector3d c_d(1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02);
-    Sophus::SE3 T_cd = Sophus::SE3(R_dc,c_d).inverse();
+    Sophus::SE3d T_cd = Sophus::SE3d(R_dc,c_d).inverse();
 
     // Reference (depth) to world
-    Sophus::SE3 T_wr;
+    Sophus::SE3d T_wr;
 
     // Reference (depth) to live (depth)
-    Sophus::SE3 T_lr;
+    Sophus::SE3d T_lr;
 
     // Capture first image
     std::vector<rpg::ImageWrapper> img;
@@ -224,10 +224,10 @@ int main( int /*argc*/, char* argv[] )
 //                cout << (Eigen::Matrix<double,12,12>)lss.JTJ << endl;
 //                cout << x.transpose() << endl;
                 if(calib_update) {
-                    T_cd = T_cd * Sophus::SE3::exp(x.segment<6>(0));
+                    T_cd = T_cd * Sophus::SE3d::exp(x.segment<6>(0));
                 }
                 if(pose_update) {
-                    T_lr = T_lr * Sophus::SE3::exp(x.segment<6>(6));
+                    T_lr = T_lr * Sophus::SE3d::exp(x.segment<6>(6));
                 }
                 cout << lss.sqErr / lss.obs << endl;
                 texdebug << dDebug;
@@ -244,7 +244,7 @@ int main( int /*argc*/, char* argv[] )
                     Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( (Eigen::Matrix<double,6,6>)lss.JTJ );
                     Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( (Eigen::Matrix<double,6,1>)lss.JTy );
                     if(pose_update) {
-                        T_lr = T_lr * Sophus::SE3::exp(x);
+                        T_lr = T_lr * Sophus::SE3d::exp(x);
                     }
                 }
                 texdebug << dDebug;
@@ -281,7 +281,7 @@ int main( int /*argc*/, char* argv[] )
                 dIr.CopyFrom(dI);
                 dVr.CopyFrom(dV);
                 dNr.CopyFrom(dN);
-                T_lr = Sophus::SE3();
+                T_lr = Sophus::SE3d();
             }
 
             if(Pushed(save_map)) {
@@ -305,7 +305,7 @@ int main( int /*argc*/, char* argv[] )
         texnorm.RenderToViewportFlipY();
         GlSlUtilities::UseNone();
 
-        const Sophus::SE3 T_wl = T_wr * T_lr.inverse();
+        const Sophus::SE3d T_wl = T_wr * T_lr.inverse();
 
         s_cam.Follow(T_wl.matrix(),lockToCam);
         view3d.ActivateAndScissor(s_cam);

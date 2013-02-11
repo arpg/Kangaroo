@@ -40,12 +40,12 @@ using namespace pangolin;
 
 struct KinectKeyframe
 {
-    KinectKeyframe(int w, int h, Sophus::SE3 T_iw)
+    KinectKeyframe(int w, int h, Sophus::SE3d T_iw)
         : img(w,h), T_iw(T_iw)
     {
     }
 
-    Sophus::SE3 T_iw;
+    Sophus::SE3d T_iw;
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
 };
 
@@ -80,7 +80,7 @@ int main( int argc, char* argv[] )
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
-    Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),c_d).inverse();
+    Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3(),c_d).inverse();
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
@@ -172,7 +172,7 @@ int main( int argc, char* argv[] )
 //    container[4].SetDrawFunction(boost::ref(adnormals));
 //    container[4].SetDrawFunction(boost::ref(adraynorm));
 
-    Sophus::SE3 T_sdf_kin;
+    Sophus::SE3d T_sdf_kin;
     bool tracking_good = true;
 
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
@@ -184,7 +184,7 @@ int main( int argc, char* argv[] )
     ViconConnection connection("192.168.10.1");
     ViconTracking vicon("Local2", connection);
 
-    Sophus::SE3 T_vicon_ref;
+    Sophus::SE3d T_vicon_ref;
     std::string sRef     = cl.follow( "", 1, "-ref" );
     if(sRef.empty() == false){
         std::string word;
@@ -214,11 +214,11 @@ int main( int argc, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glgraph.AddChild(&glposegraph);
 
-    CVarUtils::CreateGetCVar("T_kin_vicon", Sophus::SE3() );
+    CVarUtils::CreateGetCVar("T_kin_vicon", Sophus::SE3d() );
     CVarUtils::AttachCVar("WorkspaceMin", &(vicon.WorkspaceMin()));
     CVarUtils::AttachCVar("WorkspaceMax", &(vicon.WorkspaceMax()));
     CVarUtils::Load("cvars.xml");
-    posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(CVarUtils::GetCVar<Sophus::SE3>("T_kin_vicon" ) );
+    posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(CVarUtils::GetCVar<Sophus::SE3d>("T_kin_vicon" ) );
 
     pangolin::RegisterKeyPressCallback(' ', [&add_constraints,&posegraph]() {add_constraints=false; posegraph.Start();} );
 
@@ -237,7 +237,7 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(reset_sdf)) {
-            const Sophus::SE3 T_kin_fiducials = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
+            const Sophus::SE3d T_kin_fiducials = posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk();
             CVarUtils::SetCVar("T_kin_vicon", T_kin_fiducials);
 
             // Reset posegraph
@@ -247,7 +247,7 @@ int main( int argc, char* argv[] )
             posegraph.GetSecondaryCoordinateFrame(coord_vicon).SetT_wk(T_kin_fiducials);
             kf_sdf = posegraph.AddKeyframe();
 
-//            CVarUtils::AttachCVar<Sophus::SE3>("T_room_sdf", &(posegraph.GetKeyframe(kf_sdf).GetT_wk()) );
+//            CVarUtils::AttachCVar<Sophus::SE3d>("T_room_sdf", &(posegraph.GetKeyframe(kf_sdf).GetT_wk()) );
 
             // TODO: Use memory more appropriately.
 
@@ -257,16 +257,16 @@ int main( int argc, char* argv[] )
             trunc_dist = 2*length(voxsize);
             Gpu::SdfReset(vol, trunc_dist);
 
-            const Sophus::SE3 T_vicon_fiducials = vicon.T_wf();
-            const Sophus::SE3 T_vicon_kin = T_vicon_fiducials * T_kin_fiducials.inverse();
+            const Sophus::SE3d T_vicon_fiducials = vicon.T_wf();
+            const Sophus::SE3d T_vicon_kin = T_vicon_fiducials * T_kin_fiducials.inverse();
             T_sdf_kin = T_vicon_kin;
             Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_sdf_kin.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         const bool newViconData = vicon.IsNewData();
-        const Sophus::SE3 T_vicon_figucials = vicon.T_wf();
-        const Sophus::SE3 T_vicon_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
-        const Sophus::SE3 Tv_sdf_kin = T_vicon_sdf.inverse() * T_vicon_figucials * posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().inverse();
+        const Sophus::SE3d T_vicon_figucials = vicon.T_wf();
+        const Sophus::SE3d T_vicon_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
+        const Sophus::SE3d Tv_sdf_kin = T_vicon_sdf.inverse() * T_vicon_figucials * posegraph.GetSecondaryCoordinateFrame(coord_vicon).GetT_wk().inverse();
         if(use_vicon_for_sdf) {
             tracking_good = newViconData;
             T_sdf_kin = Tv_sdf_kin;
@@ -289,7 +289,7 @@ int main( int argc, char* argv[] )
         }
 
         if(Pushed(reset)) {
-            T_sdf_kin = Sophus::SE3();
+            T_sdf_kin = Sophus::SE3d();
             Gpu::SdfReset(vol, trunc_dist);
             keyframes.clear();
             posegraph.Clear();
@@ -301,7 +301,7 @@ int main( int argc, char* argv[] )
         }
 
         if(viewonly) {
-            Sophus::SE3 T_wv(s_cam.GetModelViewMatrix().Inverse());
+            Sophus::SE3d T_wv(s_cam.GetModelViewMatrix().Inverse());
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( Gpu::BoundingBox(T_wv.matrix3x4(), w, h, K, knear,20) );
             if(work_vol.IsValid()) {
                 Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wv.matrix3x4(), K, 0.1, 20, trunc_dist, true );
@@ -338,7 +338,7 @@ int main( int argc, char* argv[] )
                 }
 
                 if( pose_refinement && frame > 0) {
-                    Sophus::SE3 T_lp;
+                    Sophus::SE3d T_lp;
 
 //                    const int l = show_level;
 //                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
@@ -370,11 +370,11 @@ int main( int argc, char* argv[] )
                                 // Solve for rotation only
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
-                                T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
+                                T_lp = T_lp * Sophus::SE3d(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
                             }else{
                                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
-                                T_lp = T_lp * Sophus::SE3::exp(x);
+                                T_lp = T_lp * Sophus::SE3d::exp(x);
                             }
                         }
                     }
@@ -383,7 +383,7 @@ int main( int argc, char* argv[] )
 
                     if(!use_vicon_for_sdf && add_constraints && newViconData && tracking_good) {
                         // Add to pose graph
-                        const Sophus::SE3 T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
+                        const Sophus::SE3d T_room_sdf = posegraph.GetKeyframe(kf_sdf).GetT_wk();
                         const int kf_kin = posegraph.AddKeyframe(new Keyframe(T_room_sdf * T_sdf_kin));
                         posegraph.AddIndirectUnaryEdge(kf_kin,coord_vicon,T_vicon_figucials);
                         posegraph.AddBinaryEdge(kf_sdf,kf_kin,T_sdf_kin);

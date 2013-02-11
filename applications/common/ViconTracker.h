@@ -106,7 +106,7 @@ public:
         return m_workspace_max - m_workspace_min;
     }
 
-    inline const Sophus::SE3& T_wf()
+    inline const Sophus::SE3d& T_wf()
     {
         m_newdata = false;
         return m_T_wf;
@@ -137,12 +137,12 @@ public:
         m_vecT_wf.clear();
     }
 
-    inline void SetOffset(const Sophus::SE3& T_offset)
+    inline void SetOffset(const Sophus::SE3d& T_offset)
     {
         m_T_offset = T_offset;
     }
 
-    inline const std::vector<Sophus::SE3>& History()
+    inline const std::vector<Sophus::SE3d>& History()
     {
         return m_vecT_wf;
     }
@@ -226,9 +226,9 @@ protected:
     Eigen::Vector3d m_workspace_min;
     Eigen::Vector3d m_workspace_max;
 
-    Sophus::SE3 m_T_offset;
-    Sophus::SE3 m_T_wf;
-    std::vector<Sophus::SE3> m_vecT_wf;
+    Sophus::SE3d m_T_offset;
+    Sophus::SE3d m_T_wf;
+    std::vector<Sophus::SE3d> m_vecT_wf;
 
     bool m_connected;
     bool m_newdata;

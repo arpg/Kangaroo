@@ -42,7 +42,7 @@ inline double Tic()
 struct Observation
 {
     Eigen::MatrixXd obs;
-    Sophus::SE3 T_fw;
+    Sophus::SE3d T_fw;
 };
 
 Eigen::Matrix<double,2,3> dpi_dx(const Eigen::Vector3d& x)
@@ -75,8 +75,8 @@ double err(
         const MatlabCamera& cam,
         const Target& target,
         const std::vector<Observation>& vicon_obs,
-        const Sophus::SE3& T_cf,
-        const Sophus::SE3& T_wt
+        const Sophus::SE3d& T_cf,
+        const Sophus::SE3d& T_wt
 ) {
     int num_seen = 0;
     double sumsqerr = 0;
@@ -105,8 +105,8 @@ void OptimiseTargetVicon(
     const MatlabCamera& cam,
     const Target& target,
     const std::vector<Observation>& vicon_obs,
-    Sophus::SE3& T_cf,
-    Sophus::SE3& T_wt
+    Sophus::SE3d& T_cf,
+    Sophus::SE3d& T_wt
 ) {
     int num_seen;
     double sumsqerr;
@@ -158,8 +158,8 @@ void OptimiseTargetVicon(
 
         JTJ.ldlt().solveInPlace(JTy);
 
-        T_cf = T_cf * Sophus::SE3::exp(-1.0 * JTy.segment<6>(0));
-        T_wt = T_wt * Sophus::SE3::exp(-1.0 * JTy.segment<6>(6));
+        T_cf = T_cf * Sophus::SE3d::exp(-1.0 * JTy.segment<6>(0));
+        T_wt = T_wt * Sophus::SE3d::exp(-1.0 * JTy.segment<6>(6));
     }
 }
 
@@ -188,13 +188,13 @@ std::istream& operator>> (std::istream& is, Eigen::Quaternion<T>& o){
     return is;
 }
 
-std::ostream& operator<< (std::ostream& os, const Sophus::SE3& o){
+std::ostream& operator<< (std::ostream& os, const Sophus::SE3d& o){
     const Eigen::Vector3d& t = o.translation();
     os << t(0) << " " << t(1) << " " << t(2) << " " << o.unit_quaternion();
     return os;
 }
 
-std::istream& operator>> (std::istream& is, Sophus::SE3& o){
+std::istream& operator>> (std::istream& is, Sophus::SE3d& o){
     Eigen::Quaterniond q;
     is >> o.translation()(0);
     is >> o.translation()(1);
@@ -213,10 +213,10 @@ int main( int argc, char* argv[] )
     std::vector<Observation> vicon_obs;
 
     // vicon frame to camera transform
-    Sophus::SE3 T_cf;
+    Sophus::SE3d T_cf;
 
     // Target to World transform
-    Sophus::SE3 T_wt;
+    Sophus::SE3d T_wt;
 
     CameraDevice video;
     OpenRpgCamera(video,argc,argv);
@@ -282,7 +282,7 @@ int main( int argc, char* argv[] )
     GridCalibrator calibrator("PinholeRadTan", w, h, pattern);
 #endif
 
-    Var<Sophus::SE3> vicon_T_wf("vicon.T_wf");
+    Var<Sophus::SE3d> vicon_T_wf("vicon.T_wf");
 
     double rms = 0;
     Var<double> var_rms("ui.rms");
@@ -313,9 +313,9 @@ int main( int argc, char* argv[] )
         if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
             Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
             Eigen::Matrix3d RDFvicon; RDFvicon << 0,1,0,  0,0,1,   1,0,0;
-            T_cf = Sophus::SE3(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
-//            T_cf = Sophus::SE3();
-            T_wt = (Sophus::SE3)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
+            T_cf = Sophus::SE3d(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
+//            T_cf = Sophus::SE3d();
+            T_wt = (Sophus::SE3d)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
             cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
         }
 
@@ -336,7 +336,7 @@ int main( int argc, char* argv[] )
               calibrator.add_view(obs, visibleCircles);
 #endif
 
-              vicon_obs.push_back((Observation){obs,((Sophus::SE3)vicon_T_wf).inverse() });
+              vicon_obs.push_back((Observation){obs,((Sophus::SE3d)vicon_T_wf).inverse() });
               cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
             }
         }
@@ -363,14 +363,14 @@ int main( int argc, char* argv[] )
             cout << "Vicon to camera (T_cv)" << endl;
 //            const Eigen::Quaterniond q = T_cf.so3().unit_quaternion();
 //            const Eigen::Vector3d t = T_cf.translation();
-//            cout << "Sophus::SE3(Sophus::SO3(Eigen::Quaterniond(" << q.w() << "," << q.x() << "," << q.y() << "," << q.z() << ")), Eigen::Vector3d(" << t[0] << "," << t[1] << "," << t[2] << ") )" << endl;
+//            cout << "Sophus::SE3d(Sophus::SO3(Eigen::Quaterniond(" << q.w() << "," << q.x() << "," << q.y() << "," << q.z() << ")), Eigen::Vector3d(" << t[0] << "," << t[1] << "," << t[2] << ") )" << endl;
             cout << "T_cv" << mvl::T2Cart(T_cf.matrix()).transpose() << endl;
         }
 
         if(Pushed(reset)) {
             vicon_obs.clear();
-            T_cf = Sophus::SE3();
-            T_wt = Sophus::SE3();
+            T_cf = Sophus::SE3d();
+            T_wt = Sophus::SE3d();
         }
 
         //    calibrator.iterate(rms);

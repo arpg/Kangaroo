@@ -98,7 +98,7 @@ int main( int argc, char* argv[] )
     Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
     T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
 
-    const Sophus::SE3 T_rl_orig = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
+    const Sophus::SE3d T_rl_orig = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
     double k1 = 0;
     double k2 = 0;
 
@@ -155,7 +155,7 @@ int main( int argc, char* argv[] )
     Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
     // Stereo transformation (post-rectification)
-    Sophus::SE3 T_rl = T_rl_orig;
+    Sophus::SE3d T_rl = T_rl_orig;
 
     const double baseline = T_rl.translation().norm();
 

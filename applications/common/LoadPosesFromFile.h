@@ -5,7 +5,7 @@
 #include <vector>
 
 inline void LoadPosesFromFile(
-    std::vector<Sophus::SE3>& vecT_wh, const std::string& filename, int startframe,
+    std::vector<Sophus::SE3d>& vecT_wh, const std::string& filename, int startframe,
     const Eigen::Matrix4d T_hf, const Eigen::Matrix4d T_fh
 ) {
     // Parse Ground truth
@@ -18,7 +18,7 @@ inline void LoadPosesFromFile(
                 ifs >> row(i);
             }
             if(lines >= startframe) {
-                Sophus::SE3 T_wr( T_hf * mvl::Cart2T(row) * T_fh );
+                Sophus::SE3d T_wr( T_hf * mvl::Cart2T(row) * T_fh );
                 vecT_wh.push_back(T_wr);
             }
         }

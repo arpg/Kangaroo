@@ -249,7 +249,7 @@ int main( int argc, char* argv[] )
 
                 if(Pushed(fuseonce) || fuse) {
                     // integrate gtd into TSDF
-                    Eigen::Matrix<double,3,4> T_cw = (Sophus::SE3(sensor.glT_wv->GetPose4x4_po() * sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
+                    Eigen::Matrix<double,3,4> T_cw = (Sophus::SE3d(sensor.glT_wv->GetPose4x4_po() * sensor.glT_vs->GetPose4x4_po())).inverse().matrix3x4();
                     Gpu::SdfFuse(vol, imgf, imgn, T_cw, sensor.K, trunc_dist, max_w, mincostheta );
                 }
 
@@ -269,7 +269,7 @@ int main( int argc, char* argv[] )
 
         // Raycast current view
         {
-            Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
+            Sophus::SE3d T_vw(s_cam.GetModelViewMatrix());
             Gpu::RaycastSdf(rayd, rayn, rayi, vol, T_vw.inverse().matrix3x4(), Gpu::ImageIntrinsics(420,420,320,320), 0.1, 1000, true );
         }
 

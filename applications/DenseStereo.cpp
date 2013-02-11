@@ -100,7 +100,7 @@ int main( int argc, char* argv[] )
     Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
     T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
 
-    const Sophus::SE3 T_rl_orig = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
+    const Sophus::SE3d T_rl_orig = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
     double k1 = 0;
     double k2 = 0;
 
@@ -122,8 +122,8 @@ int main( int argc, char* argv[] )
     }
 
     // Load history
-    Sophus::SE3 T_wc;
-    vector<Sophus::SE3> gtPoseT_wh;
+    Sophus::SE3d T_wc;
+    vector<Sophus::SE3d> gtPoseT_wh;
     LoadPosesFromFile(gtPoseT_wh, video.GetProperty("DataSourceDir") + "/pose.txt", video.GetProperty("StartFrame",0), T_vis_ro, T_ro_vis);
 
 #ifdef PLANE_FIT
@@ -176,7 +176,7 @@ int main( int argc, char* argv[] )
     Image<float, TargetHost, Manage> hDisp(lw,lh);
 
 #ifdef COSTVOL_TIME
-    Sophus::SE3 T_wv;
+    Sophus::SE3d T_wv;
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,MAXD);
     Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 #endif
@@ -200,7 +200,7 @@ int main( int argc, char* argv[] )
 #endif // HM_FUSION
 
     // Stereo transformation (post-rectification)
-    Sophus::SE3 T_rl = T_rl_orig;
+    Sophus::SE3d T_rl = T_rl_orig;
 
     // Build camera distortion lookup tables
     if(rectify) {

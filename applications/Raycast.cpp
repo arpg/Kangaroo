@@ -66,7 +66,7 @@ int main( int argc, char* argv[] )
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {
-        Sophus::SE3 T_cw(s_cam.GetModelViewMatrix());
+        Sophus::SE3d T_cw(s_cam.GetModelViewMatrix());
 
         Gpu::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), K, near, far, 0, subpix );
 

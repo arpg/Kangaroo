@@ -19,17 +19,17 @@ inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size
     return K;
 }
 
-inline Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
+inline Sophus::SE3d CreateScanlineRectifiedLookupAndT_rl(
     Gpu::Image<float2> dlookup_left, Gpu::Image<float2> dlookup_right,
-    const Sophus::SE3 T_rl,
+    const Sophus::SE3d T_rl,
     const Eigen::Matrix3d& lK, double lk1, double lk2,
     const Eigen::Matrix3d& rK, double rk1, double rk2
 ) {
     Eigen::Matrix3d lKinv = MakeKinv(lK);
     Eigen::Matrix3d rKinv = MakeKinv(rK);
 
-    const Sophus::SO3 R_rl = T_rl.so3();
-    const Sophus::SO3 R_lr = R_rl.inverse();
+    const Sophus::SO3d R_rl = T_rl.so3();
+    const Sophus::SO3d R_lr = R_rl.inverse();
     const Eigen::Vector3d l_r = T_rl.translation();
     const Eigen::Vector3d r_l = - (R_lr * l_r);
 
@@ -55,7 +55,7 @@ inline Sophus::SE3 CreateScanlineRectifiedLookupAndT_rl(
 
     // By definition, the right camera now lies exactly on the x-axis with the same orientation
     // as the left camera.
-    const Sophus::SE3 T_nr_nl = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(-r_l.norm(),0,0) );
+    const Sophus::SE3d T_nr_nl = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(-r_l.norm(),0,0) );
 
     // Homographies which should be applied to left and right images to scan-line rectify them
     const Eigen::Matrix3d Hl_nl = lK * mR_nl.transpose() * lKinv;

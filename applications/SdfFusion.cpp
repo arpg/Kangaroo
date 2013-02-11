@@ -97,8 +97,8 @@ int main( int argc, char* argv[] )
             stacks_capture.SetModelViewMatrix(stacks_view.GetModelViewMatrix());
         }
 
-        Sophus::SE3 T_vw(stacks_view.GetModelViewMatrix());
-        Sophus::SE3 T_cw(stacks_capture.GetModelViewMatrix());
+        Sophus::SE3d T_vw(stacks_view.GetModelViewMatrix());
+        Sophus::SE3d T_cw(stacks_capture.GetModelViewMatrix());
 
         if(Pushed(sdfreset)) {
             Gpu::SdfReset(vol, trunc_dist);

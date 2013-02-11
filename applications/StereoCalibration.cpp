@@ -105,7 +105,7 @@ public:
 //        Eigen::Vector3d l_r;
 //        l_r <<    -0.203528, -0.000750334, 0.00403201;
 
-//        T_rl = Sophus::SE3(R_rl, l_r);
+//        T_rl = Sophus::SE3d(R_rl, l_r);
     }
 
     void InitTrackers()
@@ -289,7 +289,7 @@ public:
     MatlabCamera camParams;
     Tracker* tracker[2];
 
-    Sophus::SE3 T_rl;
+    Sophus::SE3d T_rl;
     std::vector<StereoKeyframe> keyframes;
 
     bool shouldQuit;

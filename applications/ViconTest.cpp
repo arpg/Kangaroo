@@ -66,7 +66,7 @@ int main( int argc, char* argv[] )
         glEnable(GL_DEPTH_TEST);
 
         // Draw History
-        const std::vector<Sophus::SE3>& history = tracker1.History();
+        const std::vector<Sophus::SE3d>& history = tracker1.History();
         const int N = history.size();
         for(int i=0; i<N; i+= subsample) {
             glPushMatrix();

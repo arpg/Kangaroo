@@ -11,19 +11,19 @@
 #include <sophus/se3.h>
 #include "CeresQuatXYZW.h"
 
-double* pt(Sophus::SE3& T) {
+double* pt(Sophus::SE3d& T) {
     return T.translation().data();
 }
 
-double* pq(Sophus::SE3& T) {
+double* pq(Sophus::SE3d& T) {
     return const_cast<double*>(T.so3().unit_quaternion().coeffs().data());
 }
 
-const double* pt(const Sophus::SE3& T) {
+const double* pt(const Sophus::SE3d& T) {
     return const_cast<double*>(T.translation().data());
 }
 
-const double* pq(const Sophus::SE3& T) {
+const double* pq(const Sophus::SE3d& T) {
     return T.so3().unit_quaternion().coeffs().data();
 }
 
@@ -32,29 +32,29 @@ struct Keyframe {
     Keyframe() {
     }
 
-    Keyframe(Sophus::SE3 T_wk)
+    Keyframe(Sophus::SE3d T_wk)
         : m_T_wk(T_wk)
     {
     }
 
-    Sophus::SE3& GetT_wk() {
+    Sophus::SE3d& GetT_wk() {
         return m_T_wk;
     }
 
-    Sophus::SE3 GetT_wk() const {
+    Sophus::SE3d GetT_wk() const {
         return m_T_wk;
     }
 
-    void SetT_wk(Sophus::SE3 T_wk) {
+    void SetT_wk(Sophus::SE3d T_wk) {
         m_T_wk = T_wk;
     }
 
-    Sophus::SE3 m_T_wk;
+    Sophus::SE3d m_T_wk;
 };
 
 struct UnaryEdge6DofCostFunction
 {
-    UnaryEdge6DofCostFunction( Sophus::SE3 T_wk )
+    UnaryEdge6DofCostFunction( Sophus::SE3d T_wk )
         : m_T_wk(T_wk)
     {
     }
@@ -70,13 +70,13 @@ struct UnaryEdge6DofCostFunction
         return true;
     }
 
-    Sophus::SE3 m_T_wk;
+    Sophus::SE3d m_T_wk;
 };
 
 // Indirect measurement of T_wk through T_wz given frame transform T_zk
 struct UnaryEdgeIndirect6DofCostFunction
 {
-    UnaryEdgeIndirect6DofCostFunction( Sophus::SE3 T_wz )
+    UnaryEdgeIndirect6DofCostFunction( Sophus::SE3d T_wz )
         : m_T_wz(T_wz)
     {
     }
@@ -97,7 +97,7 @@ struct UnaryEdgeIndirect6DofCostFunction
         return true;
     }
 
-    Sophus::SE3 m_T_wz;
+    Sophus::SE3d m_T_wz;
 };
 
 struct UnaryEdgeXYCostFunction
@@ -121,7 +121,7 @@ struct UnaryEdgeXYCostFunction
 
 struct BinaryEdgeXYZQuatCostFunction
 {
-    BinaryEdgeXYZQuatCostFunction( Sophus::SE3 T_ba)
+    BinaryEdgeXYZQuatCostFunction( Sophus::SE3d T_ba)
         : m_T_ba(T_ba)
     {
     }
@@ -141,12 +141,12 @@ struct BinaryEdgeXYZQuatCostFunction
     }
 
     // Observed transformation
-    Sophus::SE3 m_T_ba;
+    Sophus::SE3d m_T_ba;
 };
 
 struct BinaryEdgeXYZQuatIndirectCostFunction
 {
-    BinaryEdgeXYZQuatIndirectCostFunction( Sophus::SE3 T_zb_za)
+    BinaryEdgeXYZQuatIndirectCostFunction( Sophus::SE3d T_zb_za)
         : m_T_zb_za(T_zb_za)
     {
     }
@@ -171,7 +171,7 @@ struct BinaryEdgeXYZQuatIndirectCostFunction
     }
 
     // Observed transformation
-    Sophus::SE3 m_T_zb_za;
+    Sophus::SE3d m_T_zb_za;
 };
 
 class PoseGraph {
@@ -222,7 +222,7 @@ public:
         return keyframes[a];
     }
 
-    int AddSecondaryCoordinateFrame(Sophus::SE3 T_kz = Sophus::SE3() )
+    int AddSecondaryCoordinateFrame(Sophus::SE3d T_kz = Sophus::SE3() )
     {
         Keyframe* kf = new Keyframe(T_kz);
         const int id = coord_frames.size();
@@ -238,7 +238,7 @@ public:
         return coord_frames[z];
     }
 
-    void AddBinaryEdge(int b, int a, Sophus::SE3 T_ba)
+    void AddBinaryEdge(int b, int a, Sophus::SE3d T_ba)
     {
         Keyframe& kfa = GetKeyframe(a);
         Keyframe& kfb = GetKeyframe(b);
@@ -264,7 +264,7 @@ public:
         );
     }
 
-    void AddUnaryEdge(int a, Sophus::SE3 T_wa)
+    void AddUnaryEdge(int a, Sophus::SE3d T_wa)
     {
         Keyframe& kfa = GetKeyframe(a);
 
@@ -277,7 +277,7 @@ public:
         );
     }
 
-    int AddRelativeKeyframe(int keyframe_a, Sophus::SE3 T_ak)
+    int AddRelativeKeyframe(int keyframe_a, Sophus::SE3d T_ak)
     {
         const int k = AddKeyframe();
         Keyframe& kf_a = GetKeyframe(keyframe_a);
@@ -289,7 +289,7 @@ public:
         return k;
     }
 
-    void AddIndirectUnaryEdge(int kf_a, int coord_z, Sophus::SE3 T_w_az)
+    void AddIndirectUnaryEdge(int kf_a, int coord_z, Sophus::SE3d T_w_az)
     {
         Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
         Keyframe& kfa = GetKeyframe(kf_a);
@@ -307,7 +307,7 @@ public:
 //        problem->SetParameterBlockConstant( pq(coz.m_T_wk) );
     }
 
-    void AddIndirectBinaryEdge(int b, int a, int coord_z, Sophus::SE3 T_bz_az)
+    void AddIndirectBinaryEdge(int b, int a, int coord_z, Sophus::SE3d T_bz_az)
     {
         Keyframe& coz = GetSecondaryCoordinateFrame(coord_z);
         Keyframe& kfa = GetKeyframe(a);

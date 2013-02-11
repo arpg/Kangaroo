@@ -57,7 +57,7 @@ int main( int /*argc*/, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glGraph.AddChild(&glposegraph);
 
-//    const Sophus::SE3 T_hz(Sophus::SO3(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
+//    const Sophus::SE3d T_hz(Sophus::SO3(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
 //    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_vis_ro);
     int coord_z = posegraph.AddSecondaryCoordinateFrame(T_ro_vis);
 
@@ -75,21 +75,21 @@ int main( int /*argc*/, char* argv[] )
 //            Keyframe* kf = new Keyframe();
 //            kfid = posegraph.AddKeyframe(kf);
 //        }else{
-//            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
+//            kfid = posegraph.AddRelativeKeyframe(i-1, Sophus::SE3d(hist_vis_odometry.m_T_on[i]) );
 //        }
 
-////        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_wh[i] ) * T_hz );
-//        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3(hist_vicon.m_T_wh[i] )  );
+////        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3d(hist_vis_odometry.m_T_wh[i] ) * T_hz );
+//        posegraph.AddIndirectUnaryEdge(kfid, coord_z, Sophus::SE3d(hist_vicon.m_T_wh[i] )  );
 //    }
 
     // Populate Pose Graph
     for( int i=0; /*i < 1000 &&*/ i < num_poses; ++i )
     {
-        Keyframe* kf = new Keyframe(Sophus::SE3(hist_vicon.m_T_wh[i]) );
+        Keyframe* kf = new Keyframe(Sophus::SE3d(hist_vicon.m_T_wh[i]) );
         const int kfid = posegraph.AddKeyframe(kf);
-        posegraph.AddUnaryEdge(kfid, Sophus::SE3(hist_vicon.m_T_wh[i] )  );
+        posegraph.AddUnaryEdge(kfid, Sophus::SE3d(hist_vicon.m_T_wh[i] )  );
         if(i > 0 ) {
-            posegraph.AddIndirectBinaryEdge(kfid-1, kfid, coord_z, Sophus::SE3(hist_vis_odometry.m_T_on[i]) );
+            posegraph.AddIndirectBinaryEdge(kfid-1, kfid, coord_z, Sophus::SE3d(hist_vis_odometry.m_T_on[i]) );
         }
     }
 

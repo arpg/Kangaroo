@@ -3,7 +3,7 @@
 #include <Mvlpp/Mvl.h>
 #include <Mvlpp/Cameras.h>
 
-inline Sophus::SE3 T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl::CameraModel& rcmod, const Eigen::Matrix3d& targetRDF)
+inline Sophus::SE3d T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl::CameraModel& rcmod, const Eigen::Matrix3d& targetRDF)
 {
     // Transformation matrix to adjust to target RDF
     Eigen::Matrix4d Tadj[2] = {Eigen::Matrix4d::Identity(),Eigen::Matrix4d::Identity()};
@@ -17,5 +17,5 @@ inline Sophus::SE3 T_rlFromCamModelRDF(const mvl::CameraModel& lcmod, const mvl:
     // Computer transformation to right camera frame from left
     const Eigen::Matrix4d T_rl = T_rw_ * T_lw_.inverse();
 
-    return Sophus::SE3(T_rl.block<3,3>(0,0), T_rl.block<3,1>(0,3) );
+    return Sophus::SE3d(T_rl.block<3,3>(0,0), T_rl.block<3,1>(0,3) );
 }
