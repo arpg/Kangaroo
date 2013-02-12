@@ -148,15 +148,7 @@ int main( int argc, char* argv[] )
 
     GlBufferCudaPtr vbo(GlArrayBuffer, lw,lh,GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBufferCudaPtr cbo(GlArrayBuffer, lw,lh,GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr ibo(GlElementArrayBuffer, lw,lh,GL_UNSIGNED_INT, 2 );
-
-    // Generate Index Buffer Object for rendering mesh
-    {
-        CudaScopedMappedPtr var(ibo);
-        Gpu::Image<uint2> dIbo((uint2*)*var,lw,lh);
-        GenerateTriangleStripIndexBuffer(dIbo);
-    }
-
+    GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
 
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};

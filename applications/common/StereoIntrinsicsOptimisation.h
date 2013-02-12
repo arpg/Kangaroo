@@ -7,7 +7,7 @@
 
 struct StereoKeyframe
 {
-    Sophus::SE3 T_fw[2];
+    Sophus::SE3d T_fw[2];
     Eigen::Matrix<double,2,Eigen::Dynamic> obs[2];
 };
 
@@ -41,7 +41,7 @@ static void OptimiseIntrinsicsPoses(
     Eigen::Matrix<double,3,Eigen::Dynamic> pattern,
     std::vector<StereoKeyframe>& keyframes,
     MatlabCamera& cam,
-    Sophus::SE3& T_rl
+    Sophus::SE3d& T_rl
 ) {
     // keyframes.size might increase asynchronously, so save
     const int N = keyframes.size();
@@ -63,7 +63,7 @@ static void OptimiseIntrinsicsPoses(
         // For each observation
         for( size_t on=0; on < pattern.cols(); ++on ) {
             // Construct block contributions for JTJ and JTy
-            const Sophus::SE3 T_lt = keyframes[kf].T_fw[0];
+            const Sophus::SE3d T_lt = keyframes[kf].T_fw[0];
 
             const Eigen::Vector3d Pt = pattern.col(on);
             const Eigen::Vector3d Pl = T_lt * Pt;
