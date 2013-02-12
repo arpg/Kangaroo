@@ -93,7 +93,7 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
 
-    Sophus::SO3 R;
+    Sophus::SO3d R;
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); )
     {

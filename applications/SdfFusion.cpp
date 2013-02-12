@@ -41,7 +41,7 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> gtd(w,h);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> gtn(w,h);
 
-    pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
+    pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w*h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
 
     Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);

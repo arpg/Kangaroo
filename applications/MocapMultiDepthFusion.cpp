@@ -44,8 +44,8 @@ namespace CVarUtils {
 struct Sensor {
     Sensor(std::string name, ViconConnection& viconSharedConnection, int w, int h)
         :name(name), tracker(name, viconSharedConnection), w(w), h(h),
-          vbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW ),
-          cbo(pangolin::GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW )
+          vbo(pangolin::GlArrayBuffer, w*h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW ),
+          cbo(pangolin::GlArrayBuffer, w*h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW )
     {
         K.u0 = w/2.0f;
         K.v0 = h/2.0f;

@@ -38,7 +38,7 @@ list(APPEND SRC_CU
     cu_convolution.cu cu_deconvolution.cu
     cu_rof_denoising.cu cu_tgv.cu
     cu_segment_test.cu
-    cu_painting.cu
+    cu_painting.cu cu_remap.cu
     cu_raycast.cu cu_sdffusion.cu
 )
 

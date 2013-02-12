@@ -113,17 +113,10 @@ int main( int /*argc*/, char* argv[] )
 
     HeightmapFusion hm(10,10,50,-0.02,2.0);
 
-    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr nbo_hm(GlArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr ibo_hm(GlElementArrayBuffer, hm.WidthPixels(), hm.HeightPixels(), GL_UNSIGNED_INT, 2 );
-
-    //generate index buffer for heightmap
-    {
-        CudaScopedMappedPtr var(ibo_hm);
-        Gpu::Image<uint2> dIbo((uint2*)*var,hm.WidthPixels(),hm.HeightPixels());
-        GenerateTriangleStripIndexBuffer(dIbo);
-    }
+    GlBufferCudaPtr vbo_hm(GlArrayBuffer, hm.WidthPixels()*hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo_hm(GlArrayBuffer, hm.WidthPixels()*hm.HeightPixels(), GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr nbo_hm(GlArrayBuffer, hm.WidthPixels()*hm.HeightPixels(), GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBuffer ibo_hm = pangolin::MakeTriangleStripIboForVbo(hm.WidthPixels(), hm.HeightPixels());
 
     glPixelStorei(GL_PACK_ALIGNMENT,1);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
@@ -132,9 +125,8 @@ int main( int /*argc*/, char* argv[] )
     GlTextureCudaArray texnorm(w,h,GL_RGBA32F_ARB, false);
     GlTextureCudaArray texdebug(w,h,GL_RGBA32F_ARB, false);
 
-    GlBufferCudaPtr vbo(GlArrayBuffer, w,h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo(GlArrayBuffer, w,h,GL_UNSIGNED_BYTE,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-//    GlBufferCudaPtr ibo(GlElementArrayBuffer, w,h,GL_UNSIGNED_INT,2 );
+    GlBufferCudaPtr vbo(GlArrayBuffer, w*h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo(GlArrayBuffer, w*h,GL_UNSIGNED_BYTE,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
 
     // Create Smart viewports for each camera image that preserve aspect
     const int N = 3;
@@ -323,14 +315,14 @@ int main( int /*argc*/, char* argv[] )
 
         //draw the global heightmap
         if(show_heightmap) {
-            RenderVboIboCboNbo(vbo_hm,ibo_hm,cbo_hm,nbo_hm,hm.WidthPixels(), hm.HeightPixels(), show_mesh, show_colour, show_normals);
+            RenderVboIboCboNbo(vbo_hm,ibo_hm,cbo_hm,nbo_hm, show_mesh, show_colour, show_normals);
         }
 
         if(tracking_good && show_kinect) {
             glSetFrameOfReferenceF(T_wl);
             glDrawAxis(0.2);
             glColor3f(1,1,1);
-            RenderVboCbo(vbo, cbo, w, h);
+            RenderVboCbo(vbo, cbo);
             glUnsetFrameOfReference();
         }
 
