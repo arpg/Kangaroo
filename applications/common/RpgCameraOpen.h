@@ -21,7 +21,17 @@ protected:
 
 inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = false)
 {
-    rpg::InitCam(camera, argc, argv, numChannels, forceGrayscale);
+    GetPot clArgs( argc, argv );
+    rpg::ParseCamArgs( camera, clArgs );
+    camera.SetProperty("NumChannels",   numChannels );
+    camera.SetProperty("ForceGreyscale", forceGrayscale );
+
+    std::string     sDeviceDriver       = clArgs.follow( "FileReader", 1, "-idev" );
+
+    // init driver
+    if( !camera.InitDriver( sDeviceDriver ) ) {
+        std::cerr << "Invalid input device." << std::endl;
+    }
 }
 
 inline void InitRpgCamera( CameraDevice& camera, const std::string& str_uri)
