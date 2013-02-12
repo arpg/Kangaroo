@@ -198,6 +198,15 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const bool bDiscardMaxMin = false, const float fMinDepth = 0, const float fMaxDepth = 100
     );
 
+LeastSquaresSystem<float,6> CalibrationRgbdFromDepthESM(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr, const Image<float> dDepth,
+    const Mat<float,3,3>& K,const Mat<float,3,4>& T_di,const Mat<float,3,4>& T_lr, float c,
+    float fu, float fv, float u0, float v0,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug,
+    const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
+);
+
 LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     const Image<float4> dPl,
     const Image<float4> dPr, const Image<float4> dNr,
