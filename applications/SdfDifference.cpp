@@ -99,7 +99,7 @@ int main( int argc, char* argv[] )
     {   
         const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
-        Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
+        Sophus::SE3d T_vw(s_cam.GetModelViewMatrix());
         const Gpu::BoundingBox roi(T_vw.inverse().matrix3x4(), w, h, K, 0, 50);
         Gpu::BoundedVolume<Gpu::SDF_t> work_vol = (switch_sdf ? vol2 : vol).SubBoundingVolume( roi );
         Gpu::BoundedVolume<Gpu::SDF_t> work_vol2 = (switch_sdf ? vol : vol2).SubBoundingVolume( roi );
