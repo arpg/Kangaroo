@@ -175,8 +175,8 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                 };
 
                 const float w = LSReweightTukey(y,c);
-                lss.JTJ = OuterProduct(Jl,w);
-                lss.JTy = mul_aTb(Jl, y*w);
+                lss.JTJ = OuterProduct(J,w);
+                lss.JTy = mul_aTb(J, y*w);
                 lss.obs = 1;
                 lss.sqErr = y*y;
 
@@ -205,11 +205,6 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
     const float fMinDepth, const float fMaxDepth
 ) {
     const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
-    Mat<float,3> KPr;
-
-    KPr(0) = fu*Pr(0) + u0*Pr(2);
-    KPr(1) = fv*Pr(1) + v0*Pr(2);
-    KPr(2) = Pr(2);
 
     const Mat<float,3,4>& T_di_inv = SE3inv(T_di);
 
@@ -281,21 +276,23 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
                 };
 
                 const float w = LSReweightTukey(y,c);
-                lss.JTJ = OuterProduct(Jl,w);
-                lss.JTy = mul_aTb(Jl, y*w);
+                lss.JTJ = OuterProduct(J,w);
+                lss.JTy = mul_aTb(J, y*w);
                 lss.obs = 1;
                 lss.sqErr = y*y;
 
                 const float debug = (abs(y) + 128) / 255.0f;
-                dDebug(u,v) = make_float4(debug,0,w,1);
+                dDebug(u,v) = make_float4(debug,0,1,1);
         //        dDebug(u,v) = make_float4(debug,debug,debug,1);
         //        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
         //        dDebug(u,v) = make_float4(1.0/Pr4.z,1.0/Pr4.z,1.0/Pr4.z,1);
             }
         }else{
+            // green are points that do not fall in camera
             dDebug(u,v) = make_float4(0,1,0,1);
         }
     }else{
+        // black are points not considered in LSS
         dDebug(u,v) = make_float4(0,0,0,1);
     }
 }

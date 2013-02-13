@@ -38,12 +38,12 @@ using namespace pangolin;
 
 struct KinectRgbdKeyframe
 {
-    KinectRgbdKeyframe(int w, int h, Sophus::SE3 T_iw)
-        : img_d(w,h),img_rgb(w,h), T_iw(T_iw)
+    KinectRgbdKeyframe(int w, int h, Sophus::SE3 Twi)
+        : img_d(w,h),img_rgb(w,h), T_wi(Twi)
     {
     }
 
-    Sophus::SE3 T_iw;
+    Sophus::SE3 T_wi;
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img_d;
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img_rgb;
 };
@@ -91,6 +91,8 @@ int main( int argc, char* argv[] )
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(image_w,image_h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_v(image_w,image_h);
     Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_n(image_w,image_h);
+    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage>  dImage(image_w,image_h);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  dDepth(image_w,image_h);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage>  dDebug(image_w,image_h);
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dScratch(image_w*sizeof(Gpu::LeastSquaresSystem<float,12>),image_h);
 
@@ -107,8 +109,9 @@ int main( int argc, char* argv[] )
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> lss_debug(image_w,image_h);
 
     boost::ptr_vector<KinectRgbdKeyframe> keyframes;
-    Gpu::Mat<Gpu::ImageKeyframe<uchar3>,10> kfs;
-    Eigen::Matrix4d T_di = Eigen::Matrix4d::Identity();
+//    Eigen::Matrix4d T_di = Eigen::Matrix4d::Identity();
+    // set at solution
+    Eigen::Matrix4d T_di = T_cd.inverse().matrix();
 
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
@@ -151,25 +154,24 @@ int main( int argc, char* argv[] )
     Var<float> max_rmse("ui.Max RMSE",0.10,0,0.5);
     Var<float> rmse("ui.RMSE",0);
     Var<bool> bCalibrate("ui.Calibrate",0);
+    Var<bool> bStep("ui.Step",0);
 
     ActivateDrawPyramid<float,MaxLevels> adrayimg(ray_i, GL_LUMINANCE32F_ARB, true, true);
-    ActivateDrawPyramid<float4,MaxLevels> adraycolor(ray_c, GL_RGBA32F, true, true);
-    ActivateDrawPyramid<float4,MaxLevels> adraynorm(ray_n, GL_RGBA32F, true, true);
 //    ActivateDrawPyramid<float,MaxLevels> addepth( kin_d, GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
-    ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
+    ActivateDrawImage<unsigned char> adImage( dImage, GL_LUMINANCE8, false, true);
+    ActivateDrawImage<float> adDepth( dDepth, GL_LUMINANCE32F_ARB, false, true);
+    ActivateDrawImage<float4> addebug( lss_debug, GL_RGBA32F_ARB, false, true);
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
-    SetupContainer(container, 4, (float)image_w/image_h);
+    SetupContainer(container, 5, (float)image_w/image_h);
     container[0].SetDrawFunction(boost::ref(adrayimg))
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
-    container[2].SetDrawFunction(boost::ref(adraycolor))
-                .SetHandler(&rayhandler);
-//    container[3].SetDrawFunction(boost::ref(addebug));
-    container[3].SetDrawFunction(boost::ref(adnormals));
-//    container[5].SetDrawFunction(boost::ref(adraynorm));
+    container[2].SetDrawFunction(boost::ref(addebug));
+    container[3].SetDrawFunction(boost::ref(adImage));
+    container[4].SetDrawFunction(boost::ref(adDepth));
 
     Sophus::SE3 T_wl;
 
@@ -180,6 +182,8 @@ int main( int argc, char* argv[] )
     //this will capture a keyframe
     pangolin::RegisterKeyPressCallback('k', [&save_kf]() { save_kf = true; } );
     pangolin::RegisterKeyPressCallback('c', [&bCalibrate]() { bCalibrate = true; } );
+    pangolin::RegisterKeyPressCallback('s', [&bStep]() { bStep = true; } );
+
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
@@ -233,54 +237,6 @@ int main( int argc, char* argv[] )
                     Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
                 }
 
-                //if the user wants to capture a keyframe, store the rgb and depth images into the keyframe struct
-                if(Pushed(save_kf)) {
-                    KinectRgbdKeyframe* kf = new KinectRgbdKeyframe(image_w,image_h,T_cd * T_wl.inverse());
-                    Gpu::ConvertImage<unsigned char,uchar3>(kf->img_rgb, Gpu::Image<uchar3, Gpu::TargetDevice>((uchar3*)img[0].Image.data,image_w,image_h));
-                    kf->img_d.CopyFrom(ray_d[0]);
-                    keyframes.push_back(kf);
-                    std::cout << "Pushing keyframe number " << keyframes.size() << std::endl;
-                }
-
-                if(Pushed(bCalibrate)){
-                    std::cout << "Solving for calibration..." << std::endl;
-                    //run the calibration
-                    //the least squares system used for the optimization
-                    Gpu::LeastSquaresSystem<float,6> lss;
-                    lss.SetZero();
-                    for(int kk = 0 ; kk < 10 ; kk++){
-                        std::cout << "Preparing iteration " << kk << std::endl;
-                        for(int ii = 0 ; ii < keyframes.size() ; ii++){
-                            for(int jj = 0 ; jj < keyframes.size() ; jj++){
-                                if(ii!= jj){
-                                    const KinectRgbdKeyframe& keyframe_l = keyframes[ii];
-                                    const KinectRgbdKeyframe& keyframe_r = keyframes[jj];
-                                    const Sophus::SE3 T_rw = keyframe_r.T_iw;
-                                    const Sophus::SE3 T_lw = keyframe_l.T_iw;
-                                    const Sophus::SE3 T_lr = T_lw * T_rw.inverse();
-                                    Eigen::Matrix<float,3,4> eigen_fT_di = T_di.block<3,4>(0,0).cast<float>();
-                                    Eigen::Matrix<float,3,3> eigen_fK = K.Matrix().cast<float>();
-                                    Gpu::Mat<float,3,4> fT_di = eigen_fT_di;
-                                    Gpu::Mat<float,3,3> fK = eigen_fK;
-                                    lss = lss + Gpu::CalibrationRgbdFromDepthESM(keyframe_l.img_rgb,keyframe_r.img_rgb,keyframe_r.img_d,
-                                                                                 fK,fT_di,
-                                                                                 T_lr.matrix3x4(), 10,K.fu, K.fv, K.u0, K.v0, lss_workspace,
-                                                                                 lss_debug,false, 0.5, 10.0 );
-                                }
-                            }
-                        }
-                    }
-
-                    //solve the system
-                    Eigen::Matrix<double,6,6>   LHS = lss.JTJ;
-                    Eigen::Vector6d             RHS = lss.JTy;
-                    Eigen::Vector6d             X;
-
-                    Eigen::FullPivLU<Eigen::Matrix<double,6,6> >    lu_JTJ(LHS);
-                    X = - (lu_JTJ.solve(RHS));
-                    std::cout << "Starting iteration with SQRE " << lss.sqErr << " with result " << X.transpose() << std::endl;
-                    T_di = Sophus::SE3::exp(X).matrix();
-                }
 
 //                if(keyframes.size() > 0) {
 //                    // populate kfs
@@ -297,7 +253,7 @@ int main( int argc, char* argv[] )
 //                    Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_vw.inverse().matrix3x4(), K);
 //                }
             }
-        }else{
+        } else {
             bool tracking_good = true;
 
             const Gpu::BoundingBox roi(Gpu::BoundingBox(T_wl.matrix3x4(), image_w, image_h, K, knear,kfar));
@@ -385,38 +341,40 @@ int main( int argc, char* argv[] )
             if(pose_refinement && fuse == false){
                 //if the user wants to capture a keyframe, store the rgb and depth images into the keyframe struct
                 if(Pushed(save_kf)) {
-                    KinectRgbdKeyframe* kf = new KinectRgbdKeyframe(image_w,image_h,T_cd * T_wl.inverse());
-                    drgb.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)img[0].Image.data,image_w,image_h));
+                    KinectRgbdKeyframe* kf = new KinectRgbdKeyframe(image_w,image_h,T_wl);
+                    drgb.MemcpyFromHost(img[0].Image.data);
                     Gpu::ConvertImage<unsigned char,uchar3>(kf->img_rgb, drgb);
                     kf->img_d.CopyFrom(ray_d[0]);
                     keyframes.push_back(kf);
                     std::cout << "Pushing keyframe number " << keyframes.size() << std::endl;
                 }
 
-                if(Pushed(bCalibrate)){
+                if(bCalibrate == true && bStep == true){
+                    bStep = false;
                     std::cout << "Solving for calibration..." << std::endl;
                     //run the calibration
                     //the least squares system used for the optimization
                     Gpu::LeastSquaresSystem<float,6> lss;
                     lss.SetZero();
-                    for(int kk = 0 ; kk < 10 ; kk++){
-                        std::cout << "Preparing iteration " << kk << std::endl;
+                    //for(int kk = 0 ; kk < 10 ; kk++){
+//                        std::cout << "Preparing iteration " << kk << std::endl;
                         for(int ii = 0 ; ii < keyframes.size() ; ii++){
                             for(int jj = 0 ; jj < keyframes.size() ; jj++){
                                 if(ii!= jj){
                                     const KinectRgbdKeyframe& keyframe_l = keyframes[ii];
                                     const KinectRgbdKeyframe& keyframe_r = keyframes[jj];
-                                    const Sophus::SE3 T_rw = keyframe_r.T_iw;
-                                    const Sophus::SE3 T_lw = keyframe_l.T_iw;
-                                    const Sophus::SE3 T_lr = T_lw * T_rw.inverse();
+                                    const Sophus::SE3 T_wr = keyframe_r.T_wi;
+                                    const Sophus::SE3 T_wl = keyframe_l.T_wi;
+//                                    const Sophus::SE3 T_lr = T_lw * T_rw.inverse();
+                                    const Sophus::SE3 T_lr = T_wl.inverse() * T_wr;
                                     Eigen::Matrix<float,3,4> eigen_fT_di = T_di.block<3,4>(0,0).cast<float>();
                                     Eigen::Matrix<float,3,3> eigen_fK = K.Matrix().cast<float>();
                                     Gpu::Mat<float,3,4> fT_di = eigen_fT_di;
                                     Gpu::Mat<float,3,3> fK = eigen_fK;
                                     lss = lss + Gpu::CalibrationRgbdFromDepthESM(keyframe_l.img_rgb,keyframe_r.img_rgb,keyframe_r.img_d,
-                                                                                 fK,fT_di,
-                                                                                 T_lr.matrix3x4(), 10,K.fu, K.fv, K.u0, K.v0, lss_workspace,
-                                                                                 lss_debug,false, 0.5, 10.0 );
+                                                                                 fK, fT_di,
+                                                                                 T_lr.matrix3x4(), 10, K.fu, K.fv, K.u0, K.v0, lss_workspace,
+                                                                                 lss_debug,false, 0.3, 30.0 );
                                 }
                             }
                         }
@@ -429,10 +387,10 @@ int main( int argc, char* argv[] )
 
                         Eigen::FullPivLU<Eigen::Matrix<double,6,6> >    lu_JTJ(LHS);
                         X = - (lu_JTJ.solve(RHS));
-                        std::cout << "Starting iteration with SQRE " << lss.sqErr << " with result " << X.transpose() << std::endl;
                         T_di = T_di * Sophus::SE3::exp(X).matrix();
+                        std::cout << "SQRE " << lss.sqErr/lss.obs << "[" << lss.obs << "] with T_di: " << Sophus::SE3(T_di).log().transpose() << std::endl;
                     }
-                }
+                //}
             }
 
         }
@@ -457,12 +415,17 @@ int main( int argc, char* argv[] )
 
         /////////////////////////////////////////////////////////////
         // Draw
-        addebug.SetImage(dDebug.SubImage(0,0,image_w>>show_level,image_h>>show_level));
-//        addepth.SetImageScale(scale);
-//        addepth.SetLevel(show_level);
-        adnormals.SetLevel(show_level);
+        if( show_level < keyframes.size() ) {
+            const KinectRgbdKeyframe& kfrm = keyframes[ show_level ];
+            adImage.SetImage( kfrm.img_rgb );
+            // normalize depth image
+            float fMaxDepth = 10.0;
+            dDepth.CopyFrom( kfrm.img_d );
+            nppiDivC_32f_C1IR( fMaxDepth, dDepth.ptr, dDepth.pitch, dDepth.Size() );
+            adDepth.SetImage( dDepth );
+        }
+        addebug.SetImage( lss_debug );
         adrayimg.SetLevel(viewonly? 0 : show_level);
-//        adraynorm.SetLevel(show_level);
 
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
