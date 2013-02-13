@@ -146,8 +146,8 @@ int main( int argc, char* argv[] )
         s_cam.SetModelViewMatrix(gtPoseT_wh[0].inverse().matrix());
     }
 
-    GlBufferCudaPtr vbo(GlArrayBuffer, lw,lh,GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo(GlArrayBuffer, lw,lh,GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr vbo(GlArrayBuffer, lw*lh,GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    GlBufferCudaPtr cbo(GlArrayBuffer, lw*lh,GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
     GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
 
     // Allocate Camera Images on device for processing

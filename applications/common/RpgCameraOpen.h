@@ -19,12 +19,12 @@ protected:
     pangolin::VideoInput pangovid[MAX_CAMS];
 };
 
-inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGrayscale = false)
+inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numChannels = 2, bool forceGreyscale = false)
 {
     GetPot clArgs( argc, argv );
     rpg::ParseCamArgs( camera, clArgs );
     camera.SetProperty("NumChannels",   numChannels );
-    camera.SetProperty("ForceGreyscale", forceGrayscale );
+    camera.SetProperty("ForceGreyscale", forceGreyscale );
 
     std::string     sDeviceDriver       = clArgs.follow( "FileReader", 1, "-idev" );
 
