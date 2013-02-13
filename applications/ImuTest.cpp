@@ -2,6 +2,8 @@
 #include <boost/thread.hpp>
 #include <pangolin/pangolin.h>
 #include <RPG/Devices/IMU/IMUDevice.h>
+#include <RPG/Utils/InitIMU.h>
+#include <RPG/Devices/VirtualDevice.h>
 
 using namespace pangolin;
 using namespace std;
@@ -10,23 +12,25 @@ using namespace std;
 
 struct Application
 {
-    Application()
-        : log(1024*1024), plotter(&log)
+    Application(GetPot& clArgs)
+        : log(30*1024*1024), plotter(&log)
     {
+        VirtualDevice::SetRealtime();
+        
         // Setup IMU
+        rpg::ParseIMUArgs(imu, clArgs);
         imu.SetProperty("GetAHRS", true);
         imu.SetProperty("GetGyro", true);
         imu.SetProperty("GetAccelerometer", true);
         imu.SetProperty("HzAHRS", 1000);
 
-        if( imu.InitDriver( "MicroStrain" ) ) {
-            IMUDriverDataCallback f = boost::bind(&Application::NewIMUData, this, _1);
-            imu.RegisterIMUDataCallback( f );
-        }else{
-            std::cout << "Invalid input device." << std::endl;
+        if( !imu.InitDriver(clArgs.follow( "IMULog", "-idev" )) ) {
             exit(-1);
         }
-
+        
+        IMUDriverDataCallback f = boost::bind(&Application::NewIMUData, this, _1);
+        imu.RegisterIMUDataCallback( f );
+        
         // Create OpenGL window in single line thanks to GLUT
         pangolin::CreateGlutWindowAndBind("Main",640,480);
         glEnable (GL_BLEND);
@@ -41,8 +45,7 @@ struct Application
         imu.DeinitDriver();
     }
 
-
-    void NewIMUData(IMUData data)
+    void NewIMUData(const IMUData& data)
     {
         log.Log(
             data.gyro(0), data.gyro(1), data.gyro(2),
@@ -68,9 +71,11 @@ protected:
     Plotter plotter;
 };
 
-int main( int /*argc*/, char* argv[] )
+int main( int argc, char* argv[] )
 {
-    Application app;
+    GetPot clArgs(argc,argv);
+    
+    Application app(clArgs);
     app.Run();
     return 0;
 }
