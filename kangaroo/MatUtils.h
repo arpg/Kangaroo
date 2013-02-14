@@ -83,6 +83,7 @@ __host__ __device__ inline
 Mat<float,3,4> operator*(const Mat<float,3,4>& T_cb, const Mat<float,3,4>& T_ba)
 {
     Mat<float,3,4> m;
+    /*
     m(0,0)= T_cb(0,0) * T_ba(0,0) + T_cb(0,1) * T_ba(1,0) + T_cb(0,2) * T_ba(2,0) + T_cb(0,3);
     m(1,0)= T_cb(1,0) * T_ba(0,0) + T_cb(1,1) * T_ba(1,0) + T_cb(1,2) * T_ba(2,0) + T_cb(1,3);
     m(2,0)= T_cb(2,0) * T_ba(0,0) + T_cb(2,1) * T_ba(1,0) + T_cb(2,2) * T_ba(2,0) + T_cb(2,3);
@@ -92,6 +93,19 @@ Mat<float,3,4> operator*(const Mat<float,3,4>& T_cb, const Mat<float,3,4>& T_ba)
     m(0,2)= T_cb(0,0) * T_ba(0,2) + T_cb(0,1) * T_ba(1,2) + T_cb(0,2) * T_ba(2,2) + T_cb(0,3);
     m(1,2)= T_cb(1,0) * T_ba(0,2) + T_cb(1,1) * T_ba(1,2) + T_cb(1,2) * T_ba(2,2) + T_cb(1,3);
     m(2,2)= T_cb(2,0) * T_ba(0,2) + T_cb(2,1) * T_ba(1,2) + T_cb(2,2) * T_ba(2,2) + T_cb(2,3);
+    */
+    m(0,0)= T_cb(0,0) * T_ba(0,0) + T_cb(0,1) * T_ba(1,0) + T_cb(0,2) * T_ba(2,0);
+    m(1,0)= T_cb(1,0) * T_ba(0,0) + T_cb(1,1) * T_ba(1,0) + T_cb(1,2) * T_ba(2,0);
+    m(2,0)= T_cb(2,0) * T_ba(0,0) + T_cb(2,1) * T_ba(1,0) + T_cb(2,2) * T_ba(2,0);
+    m(0,1)= T_cb(0,0) * T_ba(0,1) + T_cb(0,1) * T_ba(1,1) + T_cb(0,2) * T_ba(2,1);
+    m(1,1)= T_cb(1,0) * T_ba(0,1) + T_cb(1,1) * T_ba(1,1) + T_cb(1,2) * T_ba(2,1);
+    m(2,1)= T_cb(2,0) * T_ba(0,1) + T_cb(2,1) * T_ba(1,1) + T_cb(2,2) * T_ba(2,1);
+    m(0,2)= T_cb(0,0) * T_ba(0,2) + T_cb(0,1) * T_ba(1,2) + T_cb(0,2) * T_ba(2,2);
+    m(1,2)= T_cb(1,0) * T_ba(0,2) + T_cb(1,1) * T_ba(1,2) + T_cb(1,2) * T_ba(2,2);
+    m(2,2)= T_cb(2,0) * T_ba(0,2) + T_cb(2,1) * T_ba(1,2) + T_cb(2,2) * T_ba(2,2);
+    m(0,3)= T_cb(0,3) + T_cb(0,0) * T_ba(0,3) + T_cb(0,1) * T_ba(1,3) + T_cb(0,2) * T_ba(2,3);
+    m(1,3)= T_cb(1,3) + T_cb(1,0) * T_ba(0,3) + T_cb(1,1) * T_ba(1,3) + T_cb(1,2) * T_ba(2,3);
+    m(2,3)= T_cb(2,3) + T_cb(2,0) * T_ba(0,3) + T_cb(2,1) * T_ba(1,3) + T_cb(2,2) * T_ba(2,3);
     return m;
 }
 

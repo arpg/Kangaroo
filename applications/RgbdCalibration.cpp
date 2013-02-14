@@ -109,9 +109,12 @@ int main( int argc, char* argv[] )
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> lss_debug(image_w,image_h);
 
     boost::ptr_vector<KinectRgbdKeyframe> keyframes;
-//    Eigen::Matrix4d T_di = Eigen::Matrix4d::Identity();
-    // set at solution
-    Eigen::Matrix4d T_di = T_cd.inverse().matrix();
+    Eigen::Matrix4d T_di = Eigen::Matrix4d::Identity();
+//     set at solution
+    //Eigen::Matrix4d T_di = T_cd.inverse().matrix();
+    // Kinect T
+    // 0.0252783  0.00240222 -0.00611408    -0.26625   -0.265614   -0.263682
+    // 0.0232425 0.00899586 0.00497145  -0.435737  -0.441952  -0.452373
 
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
@@ -310,7 +313,7 @@ int main( int argc, char* argv[] )
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
                                 T_lp = T_lp * Sophus::SE3(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
-                            }else{
+                            } else {
                                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
                                 T_lp = T_lp * Sophus::SE3::exp(x);
@@ -361,16 +364,18 @@ int main( int argc, char* argv[] )
                         for(int ii = 0 ; ii < keyframes.size() ; ii++){
                             for(int jj = 0 ; jj < keyframes.size() ; jj++){
                                 if(ii!= jj){
-                                    const KinectRgbdKeyframe& keyframe_l = keyframes[ii];
-                                    const KinectRgbdKeyframe& keyframe_r = keyframes[jj];
+                                    const KinectRgbdKeyframe& keyframe_r = keyframes[ii];
+                                    const KinectRgbdKeyframe& keyframe_l = keyframes[jj];
                                     const Sophus::SE3 T_wr = keyframe_r.T_wi;
                                     const Sophus::SE3 T_wl = keyframe_l.T_wi;
-//                                    const Sophus::SE3 T_lr = T_lw * T_rw.inverse();
                                     const Sophus::SE3 T_lr = T_wl.inverse() * T_wr;
                                     Eigen::Matrix<float,3,4> eigen_fT_di = T_di.block<3,4>(0,0).cast<float>();
                                     Eigen::Matrix<float,3,3> eigen_fK = K.Matrix().cast<float>();
                                     Gpu::Mat<float,3,4> fT_di = eigen_fT_di;
                                     Gpu::Mat<float,3,3> fK = eigen_fK;
+
+
+                                    // build system
                                     lss = lss + Gpu::CalibrationRgbdFromDepthESM(keyframe_l.img_rgb,keyframe_r.img_rgb,keyframe_r.img_d,
                                                                                  fK, fT_di,
                                                                                  T_lr.matrix3x4(), 10, K.fu, K.fv, K.u0, K.v0, lss_workspace,

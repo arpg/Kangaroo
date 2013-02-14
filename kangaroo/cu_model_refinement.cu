@@ -206,7 +206,7 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
 ) {
     const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
 
-    const Mat<float,3,4>& T_di_inv = SE3inv(T_di);
+    const Mat<float,3,4> T_di_inv = SE3inv(T_di);
 
     //This is the point in the left camera, which is transformed from Pr using : K * T_di^-2 * T_lr * T_di * Pr
     const Mat<float,3> KPl = K*T_di_inv*T_lr*T_di*Pr;
@@ -242,16 +242,17 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
 //                };
 
                 const Mat<float,1,3> dIldPiK = dIl * dpi_at_KPL * K;
+                const Mat<float,3,4> T_id_T_lr = T_di_inv * T_lr * T_di;
                 //const Mat<float,1,3> dIrdPr = dIr * dPr;
 
-                // Sparse Jl = dIldPlKT_lr * gen_i * Pr
+                // Sparse Jl = dIldPlKT_lr * -gen_i * Tlr * gen_i * Pr
                 const Mat<float,1,6> Jl = {
-                    -dIldPiK(0)*T_lr(3,0),
-                    -dIldPiK(1)*T_lr(3,1),
-                    -dIldPiK(2)*T_lr(3,2),
-                    Pr(2)*(T_lr(1,1)*dIldPiK(2) - T_lr(2,1)*dIldPiK(1)) - Pr(1)*(T_lr(1,2)*dIldPiK(2) - T_lr(2,2)*dIldPiK(1)),
-                    Pr(2)*(T_lr(0,0)*dIldPiK(2) - T_lr(2,0)*dIldPiK(0)) - Pr(0)*(T_lr(0,2)*dIldPiK(2) - T_lr(2,2)*dIldPiK(0)),
-                    Pr(1)*(T_lr(0,0)*dIldPiK(1) - T_lr(1,0)*dIldPiK(0)) - Pr(0)*(T_lr(0,1)*dIldPiK(1) - T_lr(1,1)*dIldPiK(0))
+                    -dIldPiK(0)*T_id_T_lr(3,0),
+                    -dIldPiK(1)*T_id_T_lr(3,1),
+                    -dIldPiK(2)*T_id_T_lr(3,2),
+                    Pr(2)*(T_id_T_lr(1,1)*dIldPiK(2) - T_id_T_lr(2,1)*dIldPiK(1)) - Pr(1)*(T_id_T_lr(1,2)*dIldPiK(2) - T_id_T_lr(2,2)*dIldPiK(1)),
+                    Pr(2)*(T_id_T_lr(0,0)*dIldPiK(2) - T_id_T_lr(2,0)*dIldPiK(0)) - Pr(0)*(T_id_T_lr(0,2)*dIldPiK(2) - T_id_T_lr(2,2)*dIldPiK(0)),
+                    Pr(1)*(T_id_T_lr(0,0)*dIldPiK(1) - T_id_T_lr(1,0)*dIldPiK(0)) - Pr(0)*(T_id_T_lr(0,1)*dIldPiK(1) - T_id_T_lr(1,1)*dIldPiK(0))
                 };
 
                 // Sparse Jr = dIrdPrK * gen_i * Pr
@@ -275,7 +276,7 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
                     (Jr(5) + Jl(5))/2
                 };
 
-                const float w = LSReweightTukey(y,c);
+                const float w = 1;//LSReweightTukey(y,c);
                 lss.JTJ = OuterProduct(J,w);
                 lss.JTy = mul_aTb(J, y*w);
                 lss.obs = 1;
@@ -283,15 +284,12 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
 
                 const float debug = (abs(y) + 128) / 255.0f;
                 dDebug(u,v) = make_float4(debug,0,1,1);
-        //        dDebug(u,v) = make_float4(debug,debug,debug,1);
-        //        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
-        //        dDebug(u,v) = make_float4(1.0/Pr4.z,1.0/Pr4.z,1.0/Pr4.z,1);
             }
-        }else{
+        } else {
             // green are points that do not fall in camera
             dDebug(u,v) = make_float4(0,1,0,1);
         }
-    }else{
+    } else {
         // black are points not considered in LSS
         dDebug(u,v) = make_float4(0,0,0,1);
     }
@@ -464,7 +462,7 @@ LeastSquaresSystem<float,6> CalibrationRgbdFromDepthESM(
 
 LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const Image<unsigned char> dImgl,
-    const Image<unsigned char> dImgr, const Image<float> dDispr,
+    const Image<unsigned char> dImgr, const Image<float> dDepth,
     const Mat<float,3,4> KT_lr, float c,
     float fu, float fv, float u0, float v0,
     Image<unsigned char> dWorkspace, Image<float4> dDebug,
@@ -474,7 +472,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
-    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin, fMinDepth, fMaxDepth );
+    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDepth, KT_lr, c, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin, fMinDepth, fMaxDepth );
     return lss.FinalSystem();
 }
 
