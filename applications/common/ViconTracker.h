@@ -97,7 +97,7 @@ protected:
         
         ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
         self->TrackingEvent(
-            Sophus::SE3( Sophus::SO3(Eigen::Quaterniond(tData.quat)), Eigen::Vector3d(tData.pos[0], tData.pos[1], tData.pos[2] ),
+            Sophus::SE3d( Sophus::SO3d(Eigen::Quaterniond(tData.quat)), Eigen::Vector3d(tData.pos[0], tData.pos[1], tData.pos[2] ) ),
             time_now_s,
             tData.msg_time.tv_sec + 1e-6 * tv.tv_usec
         );
