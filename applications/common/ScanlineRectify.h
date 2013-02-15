@@ -55,7 +55,7 @@ inline Sophus::SE3d CreateScanlineRectifiedLookupAndT_rl(
 
     // By definition, the right camera now lies exactly on the x-axis with the same orientation
     // as the left camera.
-    const Sophus::SE3d T_nr_nl = Sophus::SE3(Eigen::Matrix3d::Identity(), Eigen::Vector3d(-r_l.norm(),0,0) );
+    const Sophus::SE3d T_nr_nl = Sophus::SE3d(Eigen::Matrix3d::Identity(), Eigen::Vector3d(-r_l.norm(),0,0) );
 
     // Homographies which should be applied to left and right images to scan-line rectify them
     const Eigen::Matrix3d Hl_nl = lK * mR_nl.transpose() * lKinv;

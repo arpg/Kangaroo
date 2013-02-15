@@ -43,7 +43,7 @@ protected:
                     fin.ignore(MAX_SPACES,',');
                     fin >> vec(i);
                 }
-                vecT_wp.push_back( Sophus::SE3(SceneGraph::GLCart2T(vec)) );
+                vecT_wp.push_back( Sophus::SE3d(SceneGraph::GLCart2T(vec)) );
                 vecSystemTime.push_back(time_sys);
                 vecDeviceTime.push_back(time_vic);
             }

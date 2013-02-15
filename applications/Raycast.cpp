@@ -1,6 +1,6 @@
 #include <Eigen/Eigen>
 #include <Eigen/Geometry>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>

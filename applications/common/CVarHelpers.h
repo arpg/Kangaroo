@@ -4,7 +4,7 @@
 #include <CVars/CVarVectorIO.h>
 
 #include <Eigen/Core>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 ////////////////////////////////////////////////////////////////////////////
 // Overloading Eigen for CVars

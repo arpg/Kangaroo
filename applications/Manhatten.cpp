@@ -1,6 +1,6 @@
 #include <Eigen/Eigen>
 #include <Eigen/Geometry>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
@@ -124,7 +124,7 @@ int main( int argc, char* argv[] )
                 Eigen::Vector3d x = 1.0 * lu_JTJ.solve( (Eigen::Vector3d)lss.JTy );
 
                 if(opt) {
-                    R = R * Sophus::SO3::exp(x);
+                    R = R * Sophus::SO3d::exp(x);
                 }
             }
         glaxis.SetPose(Sophus::SE3d(R.inverse(),Eigen::Vector3d(0,0,2)).matrix());

@@ -1,5 +1,5 @@
 #include <Eigen/Eigen>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
@@ -287,7 +287,7 @@ int main( int argc, char* argv[] )
                                 // Solve for rotation only
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
-                                T_lp = T_lp * Sophus::SE3d(Sophus::SO3::exp(x), Eigen::Vector3d(0,0,0) );
+                                T_lp = T_lp * Sophus::SE3d(Sophus::SO3d::exp(x), Eigen::Vector3d(0,0,0) );
                             }else{
                                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );

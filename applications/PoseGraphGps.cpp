@@ -1,5 +1,5 @@
 #include <pangolin/pangolin.h>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include <SceneGraph/SceneGraph.h>
 
 #include "common/PoseGraph.h"

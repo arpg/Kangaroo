@@ -313,7 +313,7 @@ int main( int argc, char* argv[] )
         if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
             Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
             Eigen::Matrix3d RDFvicon; RDFvicon << 0,1,0,  0,0,1,   1,0,0;
-            T_cf = Sophus::SE3d(Sophus::SO3(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
+            T_cf = Sophus::SE3d(Sophus::SO3d(RDFvision.transpose() * RDFvicon), Eigen::Vector3d::Zero() );
 //            T_cf = Sophus::SE3d();
             T_wt = (Sophus::SE3d)vicon_T_wf * T_cf.inverse() * tracker.T_gw;
             cout << err(cam, tracker.target, vicon_obs, T_cf, T_wt) << endl;
@@ -363,7 +363,7 @@ int main( int argc, char* argv[] )
             cout << "Vicon to camera (T_cv)" << endl;
 //            const Eigen::Quaterniond q = T_cf.so3().unit_quaternion();
 //            const Eigen::Vector3d t = T_cf.translation();
-//            cout << "Sophus::SE3d(Sophus::SO3(Eigen::Quaterniond(" << q.w() << "," << q.x() << "," << q.y() << "," << q.z() << ")), Eigen::Vector3d(" << t[0] << "," << t[1] << "," << t[2] << ") )" << endl;
+//            cout << "Sophus::SE3d(Sophus::SO3d(Eigen::Quaterniond(" << q.w() << "," << q.x() << "," << q.y() << "," << q.z() << ")), Eigen::Vector3d(" << t[0] << "," << t[1] << "," << t[2] << ") )" << endl;
             cout << "T_cv" << mvl::T2Cart(T_cf.matrix()).transpose() << endl;
         }
 

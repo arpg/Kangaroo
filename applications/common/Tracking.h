@@ -1,7 +1,7 @@
 #pragma once
 
 #include <boost/function.hpp>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 typedef boost::function<void (const Sophus::SE3d& T_wf, double system_time_s, double dev_time_s)>
     TrackingDataCallback;

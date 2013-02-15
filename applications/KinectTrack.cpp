@@ -1,5 +1,5 @@
 #include <Eigen/Eigen>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
@@ -71,7 +71,7 @@ int main( int argc, char* argv[] )
 //    const double baseline = -camera.GetProperty<double>("RGBDepthBaseline", 80) / 1000.0;
 //    Eigen::Matrix3d Krgb;
 //    Krgb << ifl, 0, w/2.0,   0, ifl, h/2.0,  0,0,1;
-//    const Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3(),Eigen::Vector3d(baseline,0,0)).inverse();
+//    const Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3d(),Eigen::Vector3d(baseline,0,0)).inverse();
 //    Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
 
     Image<unsigned short, TargetDevice, Manage> dKinect(w,h);

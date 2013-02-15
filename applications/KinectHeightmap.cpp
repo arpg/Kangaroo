@@ -1,5 +1,5 @@
 #include <Eigen/Eigen>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
@@ -68,8 +68,8 @@ int main( int /*argc*/, char* argv[] )
     // Vicon to Camera
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;
     Eigen::Matrix3d RDFvicon; RDFvicon << -1,0,0,  0,0,-1, 0,-1,0;
-//    Sophus::SE3d T_cv = Sophus::SE3d(Sophus::SO3(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
-    Sophus::SE3d T_cv = Sophus::SE3d(Sophus::SO3(Eigen::Quaterniond(0.705949,0.707893,0.0214006,-0.00803969)), Eigen::Vector3d(0.0579258,0.00239071,-0.31165) );
+//    Sophus::SE3d T_cv = Sophus::SE3d(Sophus::SO3d(Eigen::Quaterniond(0.720051,0.692879,-0.024902,-0.0287347)), Eigen::Vector3d(0.0595373,-0.0247102,-0.310694) );
+    Sophus::SE3d T_cv = Sophus::SE3d(Sophus::SO3d(Eigen::Quaterniond(0.705949,0.707893,0.0214006,-0.00803969)), Eigen::Vector3d(0.0579258,0.00239071,-0.31165) );
 
     // Camera (rgb) to depth
     Eigen::Matrix3d R_dc;

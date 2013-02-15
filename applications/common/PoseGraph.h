@@ -8,7 +8,7 @@
 #include <ceres/rotation.h>
 #include <boost/ptr_container/ptr_vector.hpp>
 
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include "CeresQuatXYZW.h"
 
 double* pt(Sophus::SE3d& T) {
@@ -222,7 +222,7 @@ public:
         return keyframes[a];
     }
 
-    int AddSecondaryCoordinateFrame(Sophus::SE3d T_kz = Sophus::SE3() )
+    int AddSecondaryCoordinateFrame(Sophus::SE3d T_kz = Sophus::SE3d() )
     {
         Keyframe* kf = new Keyframe(T_kz);
         const int id = coord_frames.size();

@@ -137,12 +137,12 @@ static void OptimiseIntrinsicsPoses(
         CamParam::UpdateCam(cam, x.head<PARAMS_K>());
 
         // Update baseline
-        T_rl = T_rl * Sophus::SE3::exp(x.segment<PARAMS_T>(PARAMS_K) );
+        T_rl = T_rl * Sophus::SE3d::exp(x.segment<PARAMS_T>(PARAMS_K) );
 
         // Update poses
         for( size_t kf=0; kf < N; ++kf ) {
             keyframes[kf].T_fw[0] = keyframes[kf].T_fw[0] *
-                Sophus::SE3::exp(x.segment<PARAMS_T>(PARAMS_K + (1+kf)*PARAMS_T));
+                Sophus::SE3d::exp(x.segment<PARAMS_T>(PARAMS_K + (1+kf)*PARAMS_T));
             keyframes[kf].T_fw[1] = T_rl * keyframes[kf].T_fw[0];
         }
 

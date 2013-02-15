@@ -1,5 +1,5 @@
 #include <pangolin/pangolin.h>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include <SceneGraph/SceneGraph.h>
 
 #include "common/PoseGraph.h"
@@ -57,7 +57,7 @@ int main( int /*argc*/, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glGraph.AddChild(&glposegraph);
 
-//    const Sophus::SE3d T_hz(Sophus::SO3(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
+//    const Sophus::SE3d T_hz(Sophus::SO3d(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
 //    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_vis_ro);
     int coord_z = posegraph.AddSecondaryCoordinateFrame(T_ro_vis);
 
