@@ -104,7 +104,7 @@ int main( int argc, char* argv[] )
     GLPoseGraph glposegraph(posegraph);
     glgraph.AddChild(&glposegraph);
 
-    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_vic_vis);
+    int coord_z = posegraph.AddSecondaryCoordinateFrame( Sophus::SE3d(T_vic_vis) );
 
     pangolin::OpenGlRenderState s_cam(
         ProjectionMatrix(640,480,420,420,320,240,0.1,1000),

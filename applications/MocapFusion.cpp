@@ -202,7 +202,7 @@ int main( int argc, char* argv[] )
                     mat(ii,jj) = vals[ii*4 + jj];
                 }
             }
-            T_vicon_ref = mat;
+            T_vicon_ref = Sophus::SE3d(mat);
             std::cout << "Ref plane matrix successfully read" << std::endl;
         }
     }

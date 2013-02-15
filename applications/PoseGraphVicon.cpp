@@ -59,7 +59,7 @@ int main( int /*argc*/, char* argv[] )
 
 //    const Sophus::SE3d T_hz(Sophus::SO3d(0.2,0.1,0.1), Eigen::Vector3d(0.3,0.2,0.1) );
 //    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_vis_ro);
-    int coord_z = posegraph.AddSecondaryCoordinateFrame(T_ro_vis);
+    int coord_z = posegraph.AddSecondaryCoordinateFrame( Sophus::SE3d(T_ro_vis) );
 
     const int num_poses = std::min((unsigned long)1000, std::min(hist_vis_odometry.m_T_on.size(), hist_vicon.m_T_wh.size()));
     hist_vis_odometry.SetNumberToShow(num_poses);
