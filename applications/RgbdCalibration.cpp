@@ -1,10 +1,11 @@
 
 #include <Eigen/Eigen>
-#include <sophus/se3.h>
 
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 #include <pangolin/glvbo.h>
+
+#include <sophus/se3.hpp>
 
 #include <CVars/CVar.h>
 
@@ -101,12 +102,12 @@ inline void BrightnessCorrectionImagePair(
 
 struct KinectRgbdKeyframe
 {
-    KinectRgbdKeyframe(int w, int h, Sophus::SE3 Twi)
+    KinectRgbdKeyframe(int w, int h, Sophus::SE3d Twi)
         : img_d(w,h),img_rgb(w,h), T_wi(Twi)
     {
     }
 
-    Sophus::SE3 T_wi;
+    Sophus::SE3d T_wi;
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img_d;
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img_rgb;
 };
@@ -146,11 +147,11 @@ int main( int argc, char* argv[] )
 
     // Camera (rgb) to depth from KINECT
     Eigen::Vector3d c_d(baseline_m,0,0);
-    Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),c_d).inverse();
+    Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3(),c_d).inverse();
 
     // Camera (rgb) HD camera to depth from Kinect (ie. what we want to find)
-    Sophus::SE3 T_cd2;
-//    Sophus::SE3 T_cd2 = T_cd;
+    Sophus::SE3d T_cd2;
+//    Sophus::SE3d T_cd2 = T_cd;
 
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(image_w,image_h);
@@ -238,7 +239,7 @@ int main( int argc, char* argv[] )
     container[3].SetDrawFunction(boost::ref(adImage));
     container[4].SetDrawFunction(boost::ref(adDepth));
 
-    Sophus::SE3 T_wl;
+    Sophus::SE3d T_wl;
 
     bool            guiGo           = false;
 
@@ -297,7 +298,7 @@ int main( int argc, char* argv[] )
         if(viewonly) {
             const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
-            Sophus::SE3 T_vw(s_cam.GetModelViewMatrix());
+            Sophus::SE3d T_vw(s_cam.GetModelViewMatrix());
             const Gpu::BoundingBox roi(T_vw.inverse().matrix3x4(), image_w, image_h, K, 0, 50);
             Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( roi );
             Gpu::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
@@ -348,7 +349,7 @@ int main( int argc, char* argv[] )
                 }
 
                 if(pose_refinement && frame > 0) {
-                    Sophus::SE3 T_lp;
+                    Sophus::SE3d T_lp;
 
 //                    const int l = show_level;
 //                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
@@ -431,12 +432,12 @@ int main( int argc, char* argv[] )
                     // first keyframe is the reference keyframe
                     for(int ii = 0 ; ii < keyframes.size() ; ii++) {
                         const KinectRgbdKeyframe& keyframe_r = keyframes[ii];
-                        const Sophus::SE3 T_wr = keyframe_r.T_wi;
+                        const Sophus::SE3d T_wr = keyframe_r.T_wi;
                         for(int jj = 0 ; jj < keyframes.size() ; jj++) {
                             if( ii != jj ) {
                             const KinectRgbdKeyframe& keyframe_l = keyframes[jj];
-                            const Sophus::SE3 T_wl = keyframe_l.T_wi;
-                            const Sophus::SE3 T_lr = T_wl.inverse() * T_wr;
+                            const Sophus::SE3d T_wl = keyframe_l.T_wi;
+                            const Sophus::SE3d T_lr = T_wl.inverse() * T_wr;
                             Eigen::Matrix<float,3,4> eigen_fT_cd2 = T_cd2.matrix3x4().cast<float>();
                             Eigen::Matrix<float,3,3> eigen_fK = K.Matrix().cast<float>();
                             Gpu::Mat<float,3,4> fT_cd2 = eigen_fT_cd2;
