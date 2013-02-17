@@ -36,6 +36,69 @@
 using namespace std;
 using namespace pangolin;
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Adjust mean and variance of Image2 brightness to be closer to Image1
+inline void BrightnessCorrectionImagePair(
+        unsigned char *pImageData1,
+        unsigned char *pImageData2,
+        int nImageSize
+    )
+{
+    int i, nSampleStep,nSamples;
+    unsigned char *pData1;
+    unsigned char *pData2;
+
+    // compute mean
+    float mean1 = 0.0;
+    float mean2 = 0.0;
+    float mean12 = 0.0;
+    float mean22 = 0.0;
+
+    nSampleStep = 5;
+    nSamples    = 0;
+    pData1 = pImageData1;
+    pData2 = pImageData2;
+    for(i=0; i<nImageSize; i+=nSampleStep, pData1+=nSampleStep,pData2+=nSampleStep)
+    {
+        //cout << i << " " << nImageSize << endl;
+        mean1  += (float)(*pData1);
+        mean12 += (float)(*pData1) * (float)(*pData1);
+        mean2  += (float)(*pData2);
+        mean22 += (float)(*pData2) * (float)(*pData2);
+        nSamples++;
+    }
+
+    mean1 /= nSamples;
+    mean2 /= nSamples;
+    mean12 /= nSamples;
+    mean22 /= nSamples;
+
+    // compute std
+    float std1 = sqrt(mean12 - mean1*mean1);
+    float std2 = sqrt(mean22 - mean2*mean2);
+
+    // mean diff;
+    float mdiff = mean1 - mean2;
+
+    // std factor
+    float fstd = std1/std2;
+
+    // normalize image
+    float tmp;
+
+    for(i=0, pData2 = pImageData2; i<nImageSize; i++, pData2++)
+    {
+        tmp = floor(((float)(*pData2) + mdiff)*fstd);
+        if(tmp < 0.0)  tmp = 0.0;
+        if(tmp >255.0) tmp = 255.0;
+        *pData2 = (unsigned char)tmp;
+
+    }
+
+
+}
+
+
 struct KinectRgbdKeyframe
 {
     KinectRgbdKeyframe(int w, int h, Sophus::SE3 Twi)
@@ -81,9 +144,14 @@ int main( int argc, char* argv[] )
 
     const Eigen::Vector4d its(1,0,2,3);
 
-    // Camera (rgb) to depth
+    // Camera (rgb) to depth from KINECT
     Eigen::Vector3d c_d(baseline_m,0,0);
     Sophus::SE3 T_cd = Sophus::SE3(Sophus::SO3(),c_d).inverse();
+
+    // Camera (rgb) HD camera to depth from Kinect (ie. what we want to find)
+    Sophus::SE3 T_cd2;
+//    Sophus::SE3 T_cd2 = T_cd;
+
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(image_w,image_h);
     Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> drgb(image_w,image_h);
@@ -109,12 +177,6 @@ int main( int argc, char* argv[] )
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> lss_debug(image_w,image_h);
 
     boost::ptr_vector<KinectRgbdKeyframe> keyframes;
-    Eigen::Matrix4d T_di = Eigen::Matrix4d::Identity();
-//     set at solution
-    //Eigen::Matrix4d T_di = T_cd.inverse().matrix();
-    // Kinect T
-    // 0.0252783  0.00240222 -0.00611408    -0.26625   -0.265614   -0.263682
-    // 0.0232425 0.00899586 0.00497145  -0.435737  -0.441952  -0.452373
 
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
@@ -178,6 +240,9 @@ int main( int argc, char* argv[] )
 
     Sophus::SE3 T_wl;
 
+    bool            guiGo           = false;
+
+
     pangolin::RegisterKeyPressCallback(' ', [&reset,&viewonly]() { reset = true; viewonly=false;} );
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
 //    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
@@ -186,7 +251,10 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback('k', [&save_kf]() { save_kf = true; } );
     pangolin::RegisterKeyPressCallback('c', [&bCalibrate]() { bCalibrate = true; } );
     pangolin::RegisterKeyPressCallback('s', [&bStep]() { bStep = true; } );
+    pangolin::RegisterKeyPressCallback(pangolin::PANGO_SPECIAL + GLUT_KEY_RIGHT, [&guiGo](){ guiGo = true; });
 
+    // calibration error
+    double dError = DBL_MAX;
 
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
@@ -352,50 +420,51 @@ int main( int argc, char* argv[] )
                     std::cout << "Pushing keyframe number " << keyframes.size() << std::endl;
                 }
 
-                if(bCalibrate == true && bStep == true){
-                    bStep = false;
-                    std::cout << "Solving for calibration..." << std::endl;
-                    //run the calibration
-                    //the least squares system used for the optimization
+                if(bCalibrate == true && (bStep == false || (bStep == true && pangolin::Pushed(guiGo) )) && dError > 10.0) {
+                    // run the calibration
+
+                    // reset the least squares system used for the optimization
                     Gpu::LeastSquaresSystem<float,6> lss;
                     lss.SetZero();
-                    //for(int kk = 0 ; kk < 10 ; kk++){
-//                        std::cout << "Preparing iteration " << kk << std::endl;
-                        for(int ii = 0 ; ii < keyframes.size() ; ii++){
-                            for(int jj = 0 ; jj < keyframes.size() ; jj++){
-                                if(ii!= jj){
-                                    const KinectRgbdKeyframe& keyframe_r = keyframes[ii];
-                                    const KinectRgbdKeyframe& keyframe_l = keyframes[jj];
-                                    const Sophus::SE3 T_wr = keyframe_r.T_wi;
-                                    const Sophus::SE3 T_wl = keyframe_l.T_wi;
-                                    const Sophus::SE3 T_lr = T_wl.inverse() * T_wr;
-                                    Eigen::Matrix<float,3,4> eigen_fT_di = T_di.block<3,4>(0,0).cast<float>();
-                                    Eigen::Matrix<float,3,3> eigen_fK = K.Matrix().cast<float>();
-                                    Gpu::Mat<float,3,4> fT_di = eigen_fT_di;
-                                    Gpu::Mat<float,3,3> fK = eigen_fK;
 
 
-                                    // build system
-                                    lss = lss + Gpu::CalibrationRgbdFromDepthESM(keyframe_l.img_rgb,keyframe_r.img_rgb,keyframe_r.img_d,
-                                                                                 fK, fT_di,
-                                                                                 T_lr.matrix3x4(), 10, K.fu, K.fv, K.u0, K.v0, lss_workspace,
-                                                                                 lss_debug,false, 0.3, 30.0 );
-                                }
-                            }
+                    // first keyframe is the reference keyframe
+                    for(int ii = 0 ; ii < keyframes.size() ; ii++) {
+                        const KinectRgbdKeyframe& keyframe_r = keyframes[ii];
+                        const Sophus::SE3 T_wr = keyframe_r.T_wi;
+                        for(int jj = 0 ; jj < keyframes.size() ; jj++) {
+                            if( ii != jj ) {
+                            const KinectRgbdKeyframe& keyframe_l = keyframes[jj];
+                            const Sophus::SE3 T_wl = keyframe_l.T_wi;
+                            const Sophus::SE3 T_lr = T_wl.inverse() * T_wr;
+                            Eigen::Matrix<float,3,4> eigen_fT_cd2 = T_cd2.matrix3x4().cast<float>();
+                            Eigen::Matrix<float,3,3> eigen_fK = K.Matrix().cast<float>();
+                            Gpu::Mat<float,3,4> fT_cd2 = eigen_fT_cd2;
+                            Gpu::Mat<float,3,3> fK = eigen_fK;
+
+
+                            // build system
+                            lss = lss + Gpu::CalibrationRgbdFromDepthESM(keyframe_l.img_rgb,keyframe_r.img_rgb,keyframe_r.img_d,
+                                                                         fK, fT_cd2,
+                                                                         T_lr.matrix3x4(), 10, K.fu, K.fv, K.u0, K.v0, lss_workspace,
+                                                                         lss_debug, true, 0.3, 30.0 );
                         }
-
-
-                        //solve the system
-                        Eigen::Matrix<double,6,6>   LHS = lss.JTJ;
-                        Eigen::Vector6d             RHS = lss.JTy;
-                        Eigen::Vector6d             X;
-
-                        Eigen::FullPivLU<Eigen::Matrix<double,6,6> >    lu_JTJ(LHS);
-                        X = - (lu_JTJ.solve(RHS));
-                        T_di = T_di * Sophus::SE3::exp(X).matrix();
-                        std::cout << "SQRE " << lss.sqErr/lss.obs << "[" << lss.obs << "] with T_di: " << Sophus::SE3(T_di).log().transpose() << std::endl;
+                        }
                     }
-                //}
+
+
+
+                    //solve the system
+                    Eigen::Matrix<double,6,6>   LHS = lss.JTJ;
+                    Eigen::Vector6d             RHS = lss.JTy;
+                    Eigen::Vector6d             X;
+
+                    Eigen::FullPivLU<Eigen::Matrix<double,6,6> >    lu_JTJ(LHS);
+                    X = - (lu_JTJ.solve(RHS));
+                    T_cd2 = T_cd2 * Sophus::SE3( Sophus::SE3::exp(X) );
+                    dError = lss.sqErr/lss.obs;
+                    std::cout << "SQRE " << dError << "[" << lss.obs << "] with T_cd: " << T_cd2.log().transpose() << std::endl;
+                }
             }
 
         }
