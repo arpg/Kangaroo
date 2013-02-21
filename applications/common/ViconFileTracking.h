@@ -9,16 +9,26 @@ class ViconFileTracking
     : public Tracking
 {
 public:
+    ViconFileTracking()
+        : index(0)
+    {
+    }
+
     ViconFileTracking( std::string objectName, std::string baseDir)
         : index(0)
     {
-        ReadViconFile(baseDir + "/vicon.txt");
-        StartThread();
+        Init(objectName, baseDir);
     }
 
     ~ViconFileTracking()
     {
         StopThread();
+    }
+    
+    void Init(std::string objectName, std::string baseDir)
+    {
+        ReadViconFile(baseDir + "/vicon.txt");
+        StartThread();        
     }
     
 protected:
