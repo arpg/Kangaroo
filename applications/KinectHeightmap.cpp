@@ -129,6 +129,7 @@ int main( int /*argc*/, char* argv[] )
     GlBufferCudaPtr cbo(GlArrayBuffer, w*h,GL_UNSIGNED_BYTE,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
 
     // Create Smart viewports for each camera image that preserve aspect
+    container.SetLayout(pangolin::LayoutEqual);
     const int N = 3;
     for(int i=0; i<N; ++i ) {
         container.AddDisplay(CreateDisplay());
@@ -186,7 +187,7 @@ int main( int /*argc*/, char* argv[] )
     bool tracking_good = true;
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
-    {        
+    {
         const bool go = frame==0 || run || Pushed(step);
 
         if(go) {
@@ -229,7 +230,7 @@ int main( int /*argc*/, char* argv[] )
                 if(pose_update) {
                     T_lr = T_lr * Sophus::SE3d::exp(x.segment<6>(6));
                 }
-                cout << lss.sqErr / lss.obs << endl;
+                cout << sqrt(lss.sqErr/lss.obs) << endl;
                 texdebug << dDebug;
             }
 

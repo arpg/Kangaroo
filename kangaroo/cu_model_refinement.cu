@@ -231,7 +231,7 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
     // check if distance from depth camera is valid
     if(isfinite(Pr4.z) && Pr4.z > fMinDepth && Pr4.z < fMaxDepth) {
         // check if projected points fall in bounds
-        if( dImgl.InBounds(pl(0), pl(1), 2) && dImgl.InBounds(pr(0), pr(1), 2) ) {
+        if( dImgl.InBounds(pl(0), pl(1), 2) && dImgr.InBounds(pr(0), pr(1), 2) ) {
 
             float Il = dImgl.template GetBilinear<float>(pl(0), pl(1));
             float Ir = dImgr.template GetBilinear<float>(pr(0), pr(1));
@@ -308,14 +308,14 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
                     (Jr(5) + Jl(5))/2
                 };
 
-                const float w = LSReweightTukey(y,c);
+                const float w = 1; // LSReweightTukey(y,c);
                 lss.JTJ = OuterProduct(J,w);
                 lss.JTy = mul_aTb(J, y*w);
                 lss.obs = 1;
                 lss.sqErr = y*y;
 
                 const float debug = (abs(y) + 128) / 255.0f;
-                dDebug(u,v) = make_float4(debug,0,1,1);
+                dDebug(u,v) = make_float4(debug,0,w,1);
             }
         } else {
             // green are points that do not fall in cameras
@@ -479,7 +479,7 @@ __global__ void KernCalibrationRgbdFromDepthESM(
     Pr4.y = Pr4.z * (v-v0) / fv;
     Pr4.w = 1;
 
-    BuildCalibrationRgbdFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, K,T_cd,T_lr,c,lss.ZeroThisObs (),dDebug,bDiscardMaxMin,fMinDepth,fMaxDepth);
+    BuildCalibrationRgbdFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, K,T_cd,T_lr,c,lss.ZeroThisObs(),dDebug,bDiscardMaxMin,fMinDepth,fMaxDepth);
 
     lss.ReducePutBlock(dSum);
 }

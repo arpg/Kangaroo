@@ -38,64 +38,59 @@ using namespace std;
 using namespace pangolin;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Adjust mean and variance of Image2 brightness to be closer to Image1
+// Adjust mean and variance of Image1 brightness to be closer to Image2
 inline void BrightnessCorrectionImagePair(
-        unsigned char *pImageData1,
-        unsigned char *pImageData2,
+        unsigned char *pData1,
+        unsigned char *pData2,
         int nImageSize
-    )
+        )
 {
-    int i, nSampleStep,nSamples;
-    unsigned char *pData1;
-    unsigned char *pData2;
+    unsigned char*  pData1_tmp = pData1;
+    const int       nSampleStep = 1;
+    int             nSamples    = 0;
 
-    // compute mean
-    float mean1 = 0.0;
-    float mean2 = 0.0;
-    float mean12 = 0.0;
-    float mean22 = 0.0;
+     // compute mean
+    float fMean1  = 0.0;
+    float fMean2  = 0.0;
+    float fMean12 = 0.0;
+    float fMean22 = 0.0;
 
-    nSampleStep = 5;
-    nSamples    = 0;
-    pData1 = pImageData1;
-    pData2 = pImageData2;
-    for(i=0; i<nImageSize; i+=nSampleStep, pData1+=nSampleStep,pData2+=nSampleStep)
-    {
-        //cout << i << " " << nImageSize << endl;
-        mean1  += (float)(*pData1);
-        mean12 += (float)(*pData1) * (float)(*pData1);
-        mean2  += (float)(*pData2);
-        mean22 += (float)(*pData2) * (float)(*pData2);
+    for(int ii=0; ii<nImageSize; ii+=nSampleStep, pData1+=nSampleStep,pData2+=nSampleStep) {
+        fMean1  += (*pData1);
+        fMean12 += (*pData1) * (*pData1);
+        fMean2  += (*pData2);
+        fMean22 += (*pData2) * (*pData2);
         nSamples++;
     }
 
-    mean1 /= nSamples;
-    mean2 /= nSamples;
-    mean12 /= nSamples;
-    mean22 /= nSamples;
+    fMean1  /= nSamples;
+    fMean2  /= nSamples;
+    fMean12 /= nSamples;
+    fMean22 /= nSamples;
 
     // compute std
-    float std1 = sqrt(mean12 - mean1*mean1);
-    float std2 = sqrt(mean22 - mean2*mean2);
+    float fStd1 = sqrt(fMean12 - fMean1*fMean1);
+    float fStd2 = sqrt(fMean22 - fMean2*fMean2);
 
     // mean diff;
-    float mdiff = mean1 - mean2;
-
+    //float mdiff = mean1 - mean2;
     // std factor
-    float fstd = std1/std2;
-
+    float fRatio = fStd2/fStd1;
     // normalize image
     float tmp;
+    // reset pointer
+    pData1 = pData1_tmp;
 
-    for(i=0, pData2 = pImageData2; i<nImageSize; i++, pData2++)
-    {
-        tmp = floor(((float)(*pData2) + mdiff)*fstd);
-        if(tmp < 0.0)  tmp = 0.0;
-        if(tmp >255.0) tmp = 255.0;
-        *pData2 = (unsigned char)tmp;
+    int nMean1 = (int)fMean1;
+    int nMean2 = (int)fMean2;
 
+    for(int ii=0; ii < nImageSize; ++ii) {
+
+        tmp = (float)( pData1[ii] - nMean1 )*fRatio + nMean2;
+        if(tmp < 0)  tmp = 0;
+        if(tmp > 255) tmp = 255;
+        pData1[ii] = (unsigned char)tmp;
     }
-
 
 }
 
@@ -150,8 +145,9 @@ int main( int argc, char* argv[] )
     Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3(),c_d).inverse();
 
     // Camera (rgb) HD camera to depth from Kinect (ie. what we want to find)
-    Sophus::SE3d T_cd2;
-//    Sophus::SE3d T_cd2 = T_cd;
+//    Sophus::SE3d T_cd2;
+    Sophus::SE3d T_cd2 = T_cd;
+    std::cout << "True T_cd: " << std::endl << T_cd.matrix() << std::endl;
 
 
     Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(image_w,image_h);
@@ -164,6 +160,9 @@ int main( int argc, char* argv[] )
     Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  dDepth(image_w,image_h);
     Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage>  dDebug(image_w,image_h);
     Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dScratch(image_w*sizeof(Gpu::LeastSquaresSystem<float,12>),image_h);
+    Gpu::Image< unsigned char, Gpu::TargetDevice, Gpu::Manage >     d_uTmp(image_w, image_h);
+    Gpu::Image< unsigned char, Gpu::TargetHost, Gpu::Manage >       h_uTmp1(image_w, image_h);
+    Gpu::Image< unsigned char, Gpu::TargetHost, Gpu::Manage >       h_uTmp2(image_w, image_h);
 
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_i(image_w,image_h);
     Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_d(image_w,image_h);
@@ -219,6 +218,8 @@ int main( int argc, char* argv[] )
     Var<float> rgb_fl("ui.RGB focal length", 535.7,400,600);
     Var<float> max_rmse("ui.Max RMSE",0.10,0,0.5);
     Var<float> rmse("ui.RMSE",0);
+
+    pangolin::Var<unsigned int>     ui_nBlur("ui.Blur",1,0,5);
     Var<bool> bCalibrate("ui.Calibrate",0);
     Var<bool> bStep("ui.Step",0);
 
@@ -229,15 +230,17 @@ int main( int argc, char* argv[] )
     ActivateDrawImage<float> adDepth( dDepth, GL_LUMINANCE32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( lss_debug, GL_RGBA32F_ARB, false, true);
 
+    GlTexture texrgb(image_w,image_h,GL_RGB8, false);
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
-    SetupContainer(container, 5, (float)image_w/image_h);
+    SetupContainer(container, 6, (float)image_w/image_h);
     container[0].SetDrawFunction(boost::ref(adrayimg))
                 .SetHandler(&rayhandler);
-    container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
+    container[1].SetDrawFunction(ActivateDrawTexture(texrgb,true));
+    container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
-    container[2].SetDrawFunction(boost::ref(addebug));
-    container[3].SetDrawFunction(boost::ref(adImage));
-    container[4].SetDrawFunction(boost::ref(adDepth));
+    container[3].SetDrawFunction(boost::ref(addebug));
+    container[4].SetDrawFunction(boost::ref(adImage));
+    container[5].SetDrawFunction(boost::ref(adDepth));
 
     Sophus::SE3d T_wl;
 
@@ -247,11 +250,12 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback(' ', [&reset,&viewonly]() { reset = true; viewonly=false;} );
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
 //    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
-    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {Gpu::SaveMesh("mesh",vol,colorVol); } );
+//    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {Gpu::SaveMesh("mesh",vol,colorVol); } );
     //this will capture a keyframe
     pangolin::RegisterKeyPressCallback('k', [&save_kf]() { save_kf = true; } );
     pangolin::RegisterKeyPressCallback('c', [&bCalibrate]() { bCalibrate = true; } );
-    pangolin::RegisterKeyPressCallback('s', [&bStep]() { bStep = true; } );
+    pangolin::RegisterKeyPressCallback('s', [&bStep]() { bStep = !bStep; } );
+    pangolin::RegisterKeyPressCallback('r', [&T_cd2,&T_cd]() { T_cd2 = T_cd; } );
     pangolin::RegisterKeyPressCallback(pangolin::PANGO_SPECIAL + GLUT_KEY_RIGHT, [&guiGo](){ guiGo = true; });
 
     // calibration error
@@ -416,12 +420,17 @@ int main( int argc, char* argv[] )
                     KinectRgbdKeyframe* kf = new KinectRgbdKeyframe(image_w,image_h,T_wl);
                     drgb.MemcpyFromHost(img[0].Image.data);
                     Gpu::ConvertImage<unsigned char,uchar3>(kf->img_rgb, drgb);
+
+                    for( int ii = 0; ii < ui_nBlur; ++ii ) {
+                        Gpu::Blur( kf->img_rgb, d_uTmp );
+                    }
+
                     kf->img_d.CopyFrom(ray_d[0]);
                     keyframes.push_back(kf);
                     std::cout << "Pushing keyframe number " << keyframes.size() << std::endl;
                 }
 
-                if(bCalibrate == true && (bStep == false || (bStep == true && pangolin::Pushed(guiGo) )) && dError > 10.0) {
+                if(bCalibrate == true && (bStep == false || (bStep == true && pangolin::Pushed(guiGo) )) && dError > 1.0) {
                     // run the calibration
 
                     // reset the least squares system used for the optimization
@@ -430,12 +439,17 @@ int main( int argc, char* argv[] )
 
 
                     // first keyframe is the reference keyframe
-                    for(int ii = 0 ; ii < keyframes.size() ; ii++) {
+                    const unsigned int nKeyframes = keyframes.size();
+                    for(int ii = 0 ; ii < nKeyframes-1 ; ii++) {
                         const KinectRgbdKeyframe& keyframe_r = keyframes[ii];
                         const Sophus::SE3d T_wr = keyframe_r.T_wi;
-                        for(int jj = 0 ; jj < keyframes.size() ; jj++) {
-                            if( ii != jj ) {
-                            const KinectRgbdKeyframe& keyframe_l = keyframes[jj];
+                        for(int jj = ii+1 ; jj < nKeyframes ; jj++) {
+//                            if( ii != jj ) {
+                            KinectRgbdKeyframe& keyframe_l = keyframes[jj];
+                            h_uTmp1.CopyFrom( keyframe_r.img_rgb );
+                            h_uTmp2.CopyFrom( keyframe_l.img_rgb );
+                            BrightnessCorrectionImagePair( h_uTmp2.ptr, h_uTmp1.ptr, image_w * image_h );
+                            keyframe_l.img_rgb.CopyFrom( h_uTmp2 );
                             const Sophus::SE3d T_wl = keyframe_l.T_wi;
                             const Sophus::SE3d T_lr = T_wl.inverse() * T_wr;
                             Eigen::Matrix<float,3,4> eigen_fT_cd2 = T_cd2.matrix3x4().cast<float>();
@@ -447,9 +461,9 @@ int main( int argc, char* argv[] )
                             // build system
                             lss = lss + Gpu::CalibrationRgbdFromDepthESM(keyframe_l.img_rgb,keyframe_r.img_rgb,keyframe_r.img_d,
                                                                          fK, fT_cd2,
-                                                                         T_lr.matrix3x4(), 10, K.fu, K.fv, K.u0, K.v0, lss_workspace,
-                                                                         lss_debug, true, 0.3, 30.0 );
-                        }
+                                                                         T_lr.matrix3x4(), 50.0, K.fu, K.fv, K.u0, K.v0, lss_workspace,
+                                                                         lss_debug, false, 0.3, 30.0 );
+//                        }
                         }
                     }
 
@@ -463,8 +477,8 @@ int main( int argc, char* argv[] )
                     Eigen::FullPivLU<Eigen::Matrix<double,6,6> >    lu_JTJ(LHS);
                     X = - (lu_JTJ.solve(RHS));
                     T_cd2 = T_cd2 * Sophus::SE3( Sophus::SE3::exp(X) );
-                    dError = lss.sqErr/lss.obs;
-                    std::cout << "SQRE " << dError << "[" << lss.obs << "] with T_cd: " << T_cd2.log().transpose() << std::endl;
+                    dError = sqrt(lss.sqErr/lss.obs);
+                    std::cout << "RMSE " << dError << "[" << lss.obs << "] with T_cd: " << T_cd2.log().transpose() << std::endl;
                 }
             }
 
@@ -499,6 +513,7 @@ int main( int argc, char* argv[] )
             nppiDivC_32f_C1IR( fMaxDepth, dDepth.ptr, dDepth.pitch, dDepth.Size() );
             adDepth.SetImage( dDepth );
         }
+        texrgb.Upload(img[0].Image.data,GL_RGB, GL_UNSIGNED_BYTE);
         addebug.SetImage( lss_debug );
         adrayimg.SetLevel(viewonly? 0 : show_level);
 
