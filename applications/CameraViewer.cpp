@@ -86,6 +86,8 @@ int main( int argc, char* argv[] )
             if(frame%30 == 0) {
                 cout << "FPS: " << frame / timer.Elapsed_s() << "\r";
                 cout.flush();
+                frame = 0;
+                timer.Reset();
             }
         }
 

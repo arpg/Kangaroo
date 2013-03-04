@@ -10,12 +10,10 @@ class ViconFileTracking
 {
 public:
     ViconFileTracking()
-        : index(0)
     {
     }
 
     ViconFileTracking( std::string objectName, std::string baseDir)
-        : index(0)
     {
         Init(objectName, baseDir);
     }
@@ -65,6 +63,8 @@ protected:
     }
     
     void EventLoop() {        
+        size_t index = 0;
+        
         while(m_run && index < vecT_wp.size() ) {
             if(index==0) {
                 VirtualDevice::PushTime(vecSystemTime[index]);
@@ -90,7 +90,6 @@ protected:
         m_event_thread.join();
     }
 
-    size_t index;
     std::vector<Sophus::SE3d> vecT_wp;
     std::vector<double> vecSystemTime;
     std::vector<double> vecDeviceTime;

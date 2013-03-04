@@ -1,9 +1,5 @@
 #pragma once
 
-// Hack to use gcc4.7 with cuda.
-#undef _GLIBCXX_ATOMIC_BUILTINS
-#undef _GLIBCXX_USE_INT128
-
 #include <cuda_runtime.h>
 
 #include "Image.h"

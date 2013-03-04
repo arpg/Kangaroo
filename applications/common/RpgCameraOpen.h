@@ -24,7 +24,7 @@ inline void OpenRpgCamera(CameraDevice& camera, int argc, char* argv[], int numC
     GetPot clArgs( argc, argv );
     rpg::ParseCamArgs( camera, clArgs );
     camera.SetProperty("NumChannels",   numChannels );
-    camera.SetProperty("ForceGreyscale", forceGreyscale );
+    camera.SetProperty("ForceGreyscale", forceGreyscale || camera.GetProperty<bool>( "ForceGreyscale",false) );
 
     std::string     sDeviceDriver       = clArgs.follow( "FileReader", 1, "-idev" );
 
