@@ -199,7 +199,7 @@ public:
             // Track
             for(int i=0; i<2; ++i) {
 //                tracker[i]->ProcessFrame(camParams,img[i].Image.data);
-                trackerThreads[i] = boost::thread(boost::bind(&Tracker::ProcessFrame, tracker[i], camParams,img[i].Image.data) );
+                trackerThreads[i] = boost::thread(boost::bind(&Tracker::ProcessFrame, tracker[i], boost::ref(trackerParams), camParams,img[i].Image.data) );
             }
             for(int i=0; i<2; ++i) {
                 trackerThreads[i].join();
@@ -280,6 +280,7 @@ public:
         optThread.join();
     }
 
+    TrackerParams trackerParams;
     CameraDevice camera;
 
     std::vector<rpg::ImageWrapper> img;
