@@ -23,7 +23,7 @@ public:
         StopThread();
     }
     
-    void Init(std::string objectName, std::string baseDir)
+    void Init(std::string /*objectName*/, std::string baseDir)
     {
         ReadViconFile(baseDir + "/vicon.txt");
         StartThread();        

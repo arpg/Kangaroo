@@ -112,7 +112,9 @@ protected:
     static void VRPN_CALLBACK workspace_callback(void* userData, const vrpn_TRACKERWORKSPACECB tData )
     {
         ViconTracking* self = reinterpret_cast<ViconTracking*>(userData);
-        std::cout << "Workspace event!" << std::endl;        
+        std::cout << "Workspace event:" << std::endl;        
+        std::cout << "min: " << tData.workspace_min[0] << "," << tData.workspace_min[1] << "," << tData.workspace_min[2] << std::endl;
+        std::cout << "max: " << tData.workspace_max[0] << "," << tData.workspace_max[1] << "," << tData.workspace_max[2] << std::endl;
     }
 
     void EventLoop() {

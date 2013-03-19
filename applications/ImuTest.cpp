@@ -24,7 +24,7 @@ struct Application
         imu.SetProperty("GetAccelerometer", true);
         imu.SetProperty("HzAHRS", 1000);
 
-        if( !imu.InitDriver(clArgs.follow( "IMULog", "-idev" )) ) {
+        if( !imu.InitDriver(clArgs.follow( "IMULog", "-imudev" )) ) {
             exit(-1);
         }
         
