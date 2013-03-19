@@ -40,10 +40,19 @@ namespace Gpu
 
 struct CudaException : public std::exception
 {
-    CudaException(const std::string& what) : mWhat(what) { }
+    CudaException(const std::string& what, cudaError err = cudaSuccess) : mWhat(what), mErr(err) { }
     virtual ~CudaException() throw() {}
-    virtual const char* what() const throw() { return mWhat.c_str(); }
+    virtual const char* what() const throw() {
+        std::stringstream ss;
+        ss << "CudaException: " << mWhat << std::endl;
+        if(mErr != cudaSuccess) {
+            ss << "cudaError code: " << cudaGetErrorString(mErr);
+            ss << " (" << mErr << ")" << std::endl;
+        }
+        return ss.str().c_str();
+    }
     std::string mWhat;
+    cudaError mErr;
 };
 
 struct TargetHost
@@ -74,8 +83,7 @@ struct TargetDevice
     {
         const cudaError err = cudaMallocPitch(devPtr,pitch,w*sizeof(T),h);
         if( err != cudaSuccess ) {
-            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
-            throw CudaException("Unable to cudaMallocPitch");
+            throw CudaException("Unable to cudaMallocPitch", err);
         }
     }
 
@@ -84,8 +92,7 @@ struct TargetDevice
     {
         const cudaError err = cudaMallocPitch(devPtr,pitch,w*sizeof(T),h*d);
         if( err != cudaSuccess ) {
-            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
-            throw CudaException("Unable to cudaMallocPitch");
+            throw CudaException("Unable to cudaMallocPitch", err);
         }
         *img_pitch = *pitch * h;
     }
@@ -304,8 +311,7 @@ struct Image {
     {
         const cudaError err = cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
         if( err != cudaSuccess ) {
-            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
-            throw CudaException("Unable to cudaMemcpy2D in MemcpyFromHost");
+            throw CudaException("Unable to cudaMemcpy2D in MemcpyFromHost", err);
         }
     }
 
@@ -322,8 +328,7 @@ struct Image {
     {
         const cudaError err = cudaMemcpy2D( hptr, hpitch, (void*)ptr, pitch, w*sizeof(T), h, cudaMemcpyDeviceToHost );
         if( err != cudaSuccess ) {
-            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
-            throw CudaException("Unable to cudaMemcpy2D in MemcpyToHost");
+            throw CudaException("Unable to cudaMemcpy2D in MemcpyToHost", err);
         }
     }
 
