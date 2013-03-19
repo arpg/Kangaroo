@@ -70,15 +70,21 @@ struct TargetHost
 struct TargetDevice
 {
     template<typename T> inline static
-    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t w, size_t h){
-        if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h) != cudaSuccess ) {
+    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t w, size_t h)
+    {
+        const cudaError err = cudaMallocPitch(devPtr,pitch,w*sizeof(T),h);
+        if( err != cudaSuccess ) {
+            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
             throw CudaException("Unable to cudaMallocPitch");
         }
     }
 
     template<typename T> inline static
-    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
-        if( cudaMallocPitch(devPtr,pitch,w*sizeof(T),h*d) != cudaSuccess ) {
+    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d)
+    {
+        const cudaError err = cudaMallocPitch(devPtr,pitch,w*sizeof(T),h*d);
+        if( err != cudaSuccess ) {
+            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
             throw CudaException("Unable to cudaMallocPitch");
         }
         *img_pitch = *pitch * h;
@@ -296,7 +302,11 @@ struct Image {
     inline __host__
     void MemcpyFromHost(DT* hptr, size_t hpitch )
     {
-        cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
+        const cudaError err = cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
+        if( err != cudaSuccess ) {
+            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
+            throw CudaException("Unable to cudaMemcpy2D in MemcpyFromHost");
+        }
     }
 
     template <typename DT>
@@ -310,7 +320,11 @@ struct Image {
     inline __host__
     void MemcpyToHost(DT* hptr, size_t hpitch )
     {
-        cudaMemcpy2D( hptr, hpitch, (void*)ptr, pitch, w*sizeof(T), h, cudaMemcpyDeviceToHost );
+        const cudaError err = cudaMemcpy2D( hptr, hpitch, (void*)ptr, pitch, w*sizeof(T), h, cudaMemcpyDeviceToHost );
+        if( err != cudaSuccess ) {
+            fprintf( stderr, "cudaError: exception thrown with error code %d\n", err );
+            throw CudaException("Unable to cudaMemcpy2D in MemcpyToHost");
+        }
     }
 
     template <typename DT>
