@@ -104,8 +104,8 @@ void BuildPoseRefinementFromDepthmapSystemESM(
 ) {
     // 3d point from reference depth camera
     Mat<float,4> Pr_d;
-    Pr_d(0) = depth * (u-Kd(0,2)) / Kd(0,0);
-    Pr_d(1) = depth * (v-Kd(1,2)) / Kd(1,1);
+    Pr_d(0) = depth * (u - Kd(0,2)) / Kd(0,0);
+    Pr_d(1) = depth * (v - Kd(1,2)) / Kd(1,1);
     Pr_d(2) = depth;
     Pr_d(3) = 1;
 
@@ -142,12 +142,14 @@ void BuildPoseRefinementFromDepthmapSystemESM(
             if( bDiscardMaxMin && ( Il == 0 || Il == 255 || Ir == 0 || Ir == 255 ) ) {
                 dDebug(u, v) = make_float4(1, 1, 0, 1);
             } else {
-                //image error
+
+                // image error
                 const float y = Il - Ir;
 
-                //calcualte image derivatives
+                //----- Forward Compositional Approach
+
+                //calcualte image derivative
                 const Mat<float,1,2> dIl = dImgl.template GetCentralDiff<float>(pl(0), pl(1));
-                const Mat<float,1,2> dIr = dImgl.template GetCentralDiff<float>(pr(0), pr(1));
 
                 //derivative of projection (L) and dehomogenization
                 const Mat<float,2,3> dPl_by_dpl = {
@@ -155,14 +157,7 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                   0, 1.0/KPl(2), -KPl(1)/(KPl(2)*KPl(2))
                 };
 
-                //derivative of projection (L) and dehomogenization for inverse decompositional
-                const Mat<float,2,3> dPr = {
-                  1.0/KPr(2), 0, -KPr(0)/(KPr(2)*KPr(2)),
-                  0, 1.0/KPr(2), -KPr(1)/(KPr(2)*KPr(2))
-                };
-
                 const Mat<float,1,4> dIldPlKgTlr = dIl * dPl_by_dpl * KgTlr;
-                const Mat<float,1,3> dIrdPr = dIr * dPr;
 
                 // Sparse Jl = dIldPlKT_lr * gen_i * Pr
                 const Mat<float,1,6> Jl = {
@@ -174,18 +169,32 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                     -dIldPlKgTlr(0)*Pr_g(1) + dIldPlKgTlr(1)*Pr_g(0)
                 };
 
+
+
+                //----- Inverse Compositional Approach
+
+                const Mat<float,1,2> dIr = dImgl.template GetCentralDiff<float>(pr(0), pr(1));
+
+                //derivative of projection (L) and dehomogenization for inverse decompositional
+                const Mat<float,2,3> dPr = {
+                  1.0/KPr(2), 0, -KPr(0)/(KPr(2)*KPr(2)),
+                  0, 1.0/KPr(2), -KPr(1)/(KPr(2)*KPr(2))
+                };
+
+                const Mat<float,1,3> dIrdPrKg = dIr * dPr * Kg;
+
                 // Sparse Jr = dIrdPrK * gen_i * Pr
                 const Mat<float,1,6> Jr = {
-                    dIrdPr(0),
-                    dIrdPr(1),
-                    dIrdPr(2),
-                    -dIrdPr(1)*Pr_g(2) + dIrdPr(2)*Pr_g(1),
-                    +dIrdPr(0)*Pr_g(2) - dIrdPr(2)*Pr_g(0),
-                    -dIrdPr(0)*Pr_g(1) + dIrdPr(1)*Pr_g(0)
+                    dIrdPrKg(0),
+                    dIrdPrKg(1),
+                    dIrdPrKg(2),
+                    -dIrdPrKg(1)*Pr_g(2) + dIrdPrKg(2)*Pr_g(1),
+                    +dIrdPrKg(0)*Pr_g(2) - dIrdPrKg(2)*Pr_g(0),
+                    -dIrdPrKg(0)*Pr_g(1) + dIrdPrKg(1)*Pr_g(0)
                 };
 
 
-                // ESM Jacobian
+                //----- ESM Jacobian
                 const Mat<float,1,6> J = {
                     (Jr(0) + Jl(0))/2,
                     (Jr(1) + Jl(1))/2,
@@ -195,23 +204,20 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                     (Jr(5) + Jl(5))/2
                 };
 
-                const float w = LSReweightTukey(y,c);
-                lss.JTJ = OuterProduct(Jl,w);
-                lss.JTy = mul_aTb(Jl, y*w);
+                const float w = LSReweightTukey(y, c);
+                lss.JTJ = OuterProduct(J, w);
+                lss.JTy = mul_aTb(J, y*w);
                 lss.obs = 1;
-                lss.sqErr = y*y;
+                lss.sqErr = y * y;
 
-                const float debug = (abs(y) + 128) / 255.0f;
-                dDebug(u,v) = make_float4(debug,0,w,1);
-        //        dDebug(u,v) = make_float4(debug,debug,debug,1);
-        //        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
-        //        dDebug(u,v) = make_float4(1.0/Pr4.z,1.0/Pr4.z,1.0/Pr4.z,1);
+                const float debug = ( abs(y) + 128 ) / 255.0f;
+                dDebug(u,v) = make_float4(debug, 0, w, 1);
             }
-        }else{
-            dDebug(u,v) = make_float4(0,1,0,1);
+        } else {
+            dDebug(u,v) = make_float4(0, 1, 0, 1);
         }
     }else{
-        dDebug(u,v) = make_float4(0,0,0,1);
+        dDebug(u,v) = make_float4(0, 0, 0, 1);
     }
 }
 
