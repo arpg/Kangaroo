@@ -95,33 +95,52 @@ void BuildPoseRefinementFromDepthmapSystem(
 template<typename Ti>
 __device__ inline
 void BuildPoseRefinementFromDepthmapSystemESM(
-    const unsigned int u,  const unsigned int v, const float4 Pr4,
+    const unsigned int u,  const unsigned int v, const float depth,
     const Image<Ti>& dImgl, const Image<Ti>& dImgr,
-    const float fu, const float fv, const float u0, const float v0,
-    const Mat<float,3,4>& KT_lr, float c,
-    LeastSquaresSystem<float,6>& lss, Image<float4> dDebug, const bool bDiscardMaxMin,
-    const float fMinDepth, const float fMaxDepth
+    const Mat<float,3,3>& Kg, const Mat<float,3,3>& Kd, const Mat<float,4,4>& Tgd,
+    const Mat<float,4,4>& Tlr, const Mat<float,3,4>& KgTlr,
+    LeastSquaresSystem<float,6>& lss, Image<float4> dDebug,
+    const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
 ) {
-    const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
-    Mat<float,3> KPr;
+    // 3d point from reference depth camera
+    Mat<float,4> Pr_d;
+    Pr_d(0) = depth * (u-Kd(0,2)) / Kd(0,0);
+    Pr_d(1) = depth * (v-Kd(1,2)) / Kd(1,1);
+    Pr_d(2) = depth;
+    Pr_d(3) = 1;
 
-    KPr(0) = fu*Pr(0) + u0*Pr(2);
-    KPr(1) = fv*Pr(1) + v0*Pr(2);
-    KPr(2) = Pr(2);
+    // 3d point from reference grey camera
+    Mat<float,4> Pr_g = Tgd * Pr_d;
+
+    // projected point of reference grey camera
+    Mat<float,3> KPr;
+    KPr(0) = Kg(0,0)*Pr_g(0) + Kg(0,2)*Pr_g(2);
+    KPr(1) = Kg(1,1)*Pr_g(1) + Kg(1,2)*Pr_g(2);
+    KPr(2) = Pr_g(2);
+
+    // de-homogenized point in reference grey camera
     const Mat<float,2> pr = {KPr(0)/KPr(2), KPr(1)/KPr(2)};
 
-    const Mat<float,3> KPl = KT_lr * Pr;
+    // 3d point in live grey camera
+    const Mat<float,4> Pl = Tlr * Pr_g;
+
+    // projected point of live grey camera
+    Mat<float,3> KPl;
+    KPl(0) = Kg(0,0)*Pl(0) + Kg(0,2)*Pl(2);
+    KPl(1) = Kg(1,1)*Pl(1) + Kg(1,2)*Pl(2);
+    KPl(2) = Pl(2);
+
+    // de-homogenized point in live grey camera
     const Mat<float,2> pl = {KPl(0)/KPl(2), KPl(1)/KPl(2)};
 
-    if(isfinite(Pr4.z) && Pr4.z > fMinDepth && Pr4.z < fMaxDepth) {
+    if(isfinite(depth) && depth > fMinDepth && depth < fMaxDepth) {
         if( dImgr.InBounds(pr(0), pr(1), 2) &&  dImgl.InBounds(pl(0), pl(1), 2) ) {
 
             float Il = dImgl.template GetBilinear<float>(pl(0), pl(1));
             float Ir = dImgr.template GetBilinear<float>(pr(0), pr(1));
-//            float Ir = dImgr(u,v);
 
             if( bDiscardMaxMin && ( Il == 0 || Il == 255 || Ir == 0 || Ir == 255 ) ) {
-                dDebug(u,v) = make_float4(1,1,0,1);
+                dDebug(u, v) = make_float4(1, 1, 0, 1);
             } else {
                 //image error
                 const float y = Il - Ir;
@@ -129,7 +148,6 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                 //calcualte image derivatives
                 const Mat<float,1,2> dIl = dImgl.template GetCentralDiff<float>(pl(0), pl(1));
                 const Mat<float,1,2> dIr = dImgl.template GetCentralDiff<float>(pr(0), pr(1));
-//                const Mat<float,1,2> dIr = dImgr.template GetCentralDiff<float>((float)u, (float)v);
 
                 //derivative of projection (L) and dehomogenization
                 const Mat<float,2,3> dPl_by_dpl = {
@@ -143,17 +161,17 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                   0, 1.0/KPr(2), -KPr(1)/(KPr(2)*KPr(2))
                 };
 
-                const Mat<float,1,4> dIldPlKT_lr = dIl * dPl_by_dpl * KT_lr;
+                const Mat<float,1,4> dIldPlKgTlr = dIl * dPl_by_dpl * KgTlr;
                 const Mat<float,1,3> dIrdPr = dIr * dPr;
 
                 // Sparse Jl = dIldPlKT_lr * gen_i * Pr
                 const Mat<float,1,6> Jl = {
-                    dIldPlKT_lr(0),
-                    dIldPlKT_lr(1),
-                    dIldPlKT_lr(2),
-                    -dIldPlKT_lr(1)*Pr(2) + dIldPlKT_lr(2)*Pr(1),
-                    +dIldPlKT_lr(0)*Pr(2) - dIldPlKT_lr(2)*Pr(0),
-                    -dIldPlKT_lr(0)*Pr(1) + dIldPlKT_lr(1)*Pr(0)
+                    dIldPlKgTlr(0),
+                    dIldPlKgTlr(1),
+                    dIldPlKgTlr(2),
+                    -dIldPlKgTlr(1)*Pr_g(2) + dIldPlKgTlr(2)*Pr_g(1),
+                    +dIldPlKgTlr(0)*Pr_g(2) - dIldPlKgTlr(2)*Pr_g(0),
+                    -dIldPlKgTlr(0)*Pr_g(1) + dIldPlKgTlr(1)*Pr_g(0)
                 };
 
                 // Sparse Jr = dIrdPrK * gen_i * Pr
@@ -161,9 +179,9 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                     dIrdPr(0),
                     dIrdPr(1),
                     dIrdPr(2),
-                    -dIrdPr(1)*Pr(2) + dIrdPr(2)*Pr(1),
-                    +dIrdPr(0)*Pr(2) - dIrdPr(2)*Pr(0),
-                    -dIrdPr(0)*Pr(1) + dIrdPr(1)*Pr(0)
+                    -dIrdPr(1)*Pr_g(2) + dIrdPr(2)*Pr_g(1),
+                    +dIrdPr(0)*Pr_g(2) - dIrdPr(2)*Pr_g(0),
+                    -dIrdPr(0)*Pr_g(1) + dIrdPr(1)*Pr_g(0)
                 };
 
 
@@ -178,8 +196,8 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                 };
 
                 const float w = LSReweightTukey(y,c);
-                lss.JTJ = OuterProduct(J,w);
-                lss.JTy = mul_aTb(J, y*w);
+                lss.JTJ = OuterProduct(Jl,w);
+                lss.JTy = mul_aTb(Jl, y*w);
                 lss.obs = 1;
                 lss.sqErr = y*y;
 
@@ -394,36 +412,38 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
 
 template<typename Ti>
 __global__ void KernPoseRefinementFromDisparityESM(
-    const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDispr,
-    const Mat<float,3,4> KT_lr, float c,
-    float baseline, float fu, float fv, float u0, float v0,
+    const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDispr, const float baseline,
+    const Mat<float,3,3> Kg, const Mat<float,3,3> Kd, const Mat<float,4,4> Tgd,
+    const Mat<float,4,4> Tlr, const Mat<float,3,4> KgTlr,
     Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
-    const bool bDiscardMaxMin
+    const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
 ){
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     __shared__ SumLeastSquaresSystem<float,6,16,16> lss;
 
-    const float4 Pr4 = DepthFromDisparity(u,v,dDispr(u,v), baseline, fu, fv, u0, v0 );
-    BuildPoseRefinementFromDepthmapSystemESM(u,v,Pr4,dImgl,dImgr,fu, fv, u0, v0, KT_lr,c,lss.ZeroThisObs (),dDebug,bDiscardMaxMin,0,100000);
+    const float4 Pr4 = DepthFromDisparity(u, v, dDispr(u,v), baseline, Kd(0,0), Kd(1,1), Kd(0,2), Kd(1,2) );
+
+    BuildPoseRefinementFromDepthmapSystemESM( u, v, Pr4.z, dImgl, dImgr, Kg, Kd, Tgd, Tlr, KgTlr, lss.ZeroThisObs(), dDebug, c, bDiscardMaxMin, fMinDepth, fMaxDepth );
 
     lss.ReducePutBlock(dSum);
 }
 
 LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
-    const Image<unsigned char> dImgl,
-    const Image<unsigned char> dImgr, const Image<float> dDispr,
-    const Mat<float,3,4> KT_lr, float c,
-    float baseline, float fu, float fv, float u0, float v0,
-    Image<unsigned char> dWorkspace, Image<float4> dDebug,
-    const bool bDiscardMaxMin
+        const Image<unsigned char> dImgl,
+        const Image<unsigned char> dImgr,
+        const Image<float> dDispr, const float baseline,
+        const Mat<float,3,3> Kg, const Mat<float,3,3> Kd, const Mat<float,4,4> Tgd,
+        const Mat<float,4,4> Tlr, const Mat<float,3,4> KgTlr,
+        Image<unsigned char> dWorkspace, Image<float4> dDebug,
+        const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
 ){
     dim3 blockDim, gridDim;
     InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
-    KernPoseRefinementFromDisparityESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, KT_lr, c, baseline, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin );
+    KernPoseRefinementFromDisparityESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDispr, baseline, Kg, Kd, Tgd, Tlr, KgTlr, lss.LeastSquareImage(), dDebug, c, bDiscardMaxMin, fMinDepth, fMaxDepth );
     return lss.FinalSystem();
 }
 
@@ -431,33 +451,38 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
 template<typename Ti>
 __global__ void KernPoseRefinementFromDepthESM(
     const Image<Ti> dImgl, const Image<Ti> dImgr, const Image<float> dDepth,
-    const Mat<float,3,4> Tcd, const Mat<float,3,4> KT_lr, float c,
-    float fu, float fv, float u0, float v0,
+    const Mat<float,3,3> Kg, const Mat<float,3,3> Kd, const Mat<float,4,4> Tgd,
+    const Mat<float,4,4> Tlr, const Mat<float,3,4> KgTlr,
     Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
-    const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
-){
+    const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
+) {
     const unsigned int u = blockIdx.x*blockDim.x + threadIdx.x;
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     __shared__ SumLeastSquaresSystem<float,6,16,16> lss;
 
-    float4 Pr4_d, Pr4_c;
+    float depth = dDepth(u,v);
 
-    // 3d point from depth camera
-    Pr4_d.z = dDepth(u,v);
-    Pr4_d.x = Pr4_d.z * (u-u0) / fu;
-    Pr4_d.y = Pr4_d.z * (v-v0) / fv;
-    Pr4_d.w = 1;
-
-    // 3d point from color camera
-    Pr4_c.x = Tcd(0,3) + Tcd(0,0)*Pr4_d.x + Tcd(0,1)*Pr4_d.y + Tcd(0,2)*Pr4_d.z;
-    Pr4_c.y = Tcd(1,3) + Tcd(1,0)*Pr4_d.x + Tcd(1,1)*Pr4_d.y + Tcd(1,2)*Pr4_d.z;
-    Pr4_c.z = Tcd(2,3) + Tcd(2,0)*Pr4_d.x + Tcd(2,1)*Pr4_d.y + Tcd(2,2)*Pr4_d.z;
-    Pr4_c.w = 1;
-
-    BuildPoseRefinementFromDepthmapSystemESM(u,v,Pr4_c,dImgl,dImgr,fu, fv, u0, v0, KT_lr,c,lss.ZeroThisObs (),dDebug,bDiscardMaxMin,fMinDepth,fMaxDepth);
+    BuildPoseRefinementFromDepthmapSystemESM( u, v, depth, dImgl, dImgr, Kg, Kd, Tgd, Tlr, KgTlr, lss.ZeroThisObs(), dDebug, c, bDiscardMaxMin, fMinDepth, fMaxDepth );
 
     lss.ReducePutBlock(dSum);
+}
+
+LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
+    const Image<unsigned char> dImgl,
+    const Image<unsigned char> dImgr,
+    const Image<float> dDepth,
+    const Mat<float,3,3> Kg, const Mat<float,3,3> Kd, const Mat<float,4,4> Tgd,
+    const Mat<float,4,4> Tlr, const Mat<float,3,4> KgTlr,
+    Image<unsigned char> dWorkspace, Image<float4> dDebug,
+    const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
+){
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
+
+    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
+    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDepth, Kg, Kd, Tgd, Tlr, KgTlr, lss.LeastSquareImage(), dDebug, c, bDiscardMaxMin, fMinDepth, fMaxDepth );
+    return lss.FinalSystem();
 }
 
 template<typename Ti>
@@ -497,22 +522,6 @@ LeastSquaresSystem<float,6> CalibrationRgbdFromDepthESM(
 
     HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
     KernCalibrationRgbdFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDepth, K,T_cd,T_lr, c, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin, fMinDepth, fMaxDepth );
-    return lss.FinalSystem();
-}
-
-LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
-    const Image<unsigned char> dImgl,
-    const Image<unsigned char> dImgr, const Image<float> dDepth,
-    const Mat<float,3,4> Tcd, const Mat<float,3,4> KT_lr, float c,
-    float fu, float fv, float u0, float v0,
-    Image<unsigned char> dWorkspace, Image<float4> dDebug,
-    const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
-){
-    dim3 blockDim, gridDim;
-    InitDimFromOutputImage(blockDim, gridDim, dImgr, 16, 16);
-
-    HostSumLeastSquaresSystem<float,6> lss(dWorkspace, blockDim, gridDim);
-    KernPoseRefinementFromDepthESM<unsigned char><<<gridDim,blockDim>>>(dImgl, dImgr, dDepth, Tcd, KT_lr, c, fu, fv, u0, v0, lss.LeastSquareImage(), dDebug, bDiscardMaxMin, fMinDepth, fMaxDepth );
     return lss.FinalSystem();
 }
 

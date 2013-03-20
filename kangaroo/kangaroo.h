@@ -177,21 +177,22 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
 );
 
 LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
-        const Image<unsigned char> dImgl,
-        const Image<unsigned char> dImgr, const Image<float> dDispr,
-        const Mat<float,3,4> KT_lr, float c,
-        float baseline, float fu, float fv, float u0, float v0,
-        Image<unsigned char> dWorkspace, Image<float4> dDebug,
-        const bool bDiscardMaxMin = false
+        const Image<unsigned char> dImgl, const Image<unsigned char> dImgr,
+        const Image<float> dDisp, const float baseline,
+        const Mat<float,3,3> Kg, const Mat<float,3,3> Kd, const Mat<float,4,4> Tgd,
+        const Mat<float,4,4> Tlr, const Mat<float,3,4> KgTlr,
+        Image<LeastSquaresSystem<float,6> > dSum, Image<float4> dDebug,
+        const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
         );
 
 LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
-    const Image<unsigned char> dImgl,
-    const Image<unsigned char> dImgr, const Image<float> dDispr,
-    const Mat<float,3,4> Tcd, const Mat<float,3,4> KT_lr, float c,
-    float fu, float fv, float u0, float v0,
-    Image<unsigned char> dWorkspace, Image<float4> dDebug,
-    const bool bDiscardMaxMin = false, const float fMinDepth = 0, const float fMaxDepth = 100
+        const Image<unsigned char> dImgl,
+        const Image<unsigned char> dImgr,
+        const Image<float> dDepth,
+        const Mat<float,3,3> Kg, const Mat<float,3,3> Kd, const Mat<float,4,4> Tgd,
+        const Mat<float,4,4> Tlr, const Mat<float,3,4> KgTlr,
+        Image<unsigned char> dWorkspace, Image<float4> dDebug,
+        const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
     );
 
 LeastSquaresSystem<float,6> CalibrationRgbdFromDepthESM(
