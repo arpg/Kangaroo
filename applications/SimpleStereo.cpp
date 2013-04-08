@@ -28,7 +28,7 @@
 #include <kangaroo/variational.h>
 
 
-const int MAXD = 80;
+const int MAXD = 60;
 
 using namespace std;
 using namespace pangolin;
@@ -64,8 +64,8 @@ int main( int argc, char* argv[] )
 
     // Load Camera intrinsics from file
     CameraModelPyramid cam[] = {
-        video.GetProperty("DataSourceDir") + "/lcmod.xml",
-        video.GetProperty("DataSourceDir") + "/rcmod.xml"
+        video.GetProperty("DataSourceDir") + "/hlcmod.xml",
+        video.GetProperty("DataSourceDir") + "/hrcmod.xml"
     };
 
     for(int i=0; i<2; ++i ) {
@@ -104,8 +104,8 @@ int main( int argc, char* argv[] )
 
     if(cam[0].Type() == MVL_CAMERA_WARPED)
     {
-        k1 = cam[0].GetModel()->warped.kappa1;
-        k2 = cam[0].GetModel()->warped.kappa2;
+//        k1 = cam[0].GetModel()->warped.kappa1;
+//        k2 = cam[0].GetModel()->warped.kappa2;
     }
 
     const bool rectify = (k1!=0 || k2!=0); // || camModel[0].GetPose().block<3,3>(0,0)
@@ -144,6 +144,7 @@ int main( int argc, char* argv[] )
     Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
 
     Image<float,TargetDevice, Manage>& imgd = disp[0];
+    Image<float,TargetDevice, Manage> depthmap(lw,lh);
     Image<float,TargetDevice, Manage> imga(lw,lh);
     Image<float2,TargetDevice, Manage> imgq(lw,lh);
     Image<float,TargetDevice, Manage> imgw(lw,lh);
@@ -206,6 +207,7 @@ int main( int argc, char* argv[] )
 
     Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 
+    Var<bool> save_depthmaps("ui.save_depthmaps", false, true);
 
     int jump_frames = 0;
 
@@ -329,7 +331,8 @@ int main( int argc, char* argv[] )
             imgq.Memset(0);
         }
 
-        if(do_dtam && theta > 1E-3)
+        const double min_theta = 1E-1;
+        if(do_dtam && theta > min_theta)
         {
             for(int i=0; i<5; ++i ) {
                 // Auxillary exhaustive search
@@ -343,6 +346,31 @@ int main( int argc, char* argv[] )
 
                 theta= theta * (1-beta*n);
                 ++n;
+            }
+            if( theta <= min_theta && save_depthmaps ) {
+                cv::Mat dmap = cv::Mat( lh, lw, CV_32FC1 );
+                // convert disparity to depth
+                Gpu::Disp2Depth(imgd, depthmap, K0(0,0), baseline );
+                depthmap.MemcpyToHost( dmap.data );
+
+                // save disp image
+                char            Index[10];
+                sprintf( Index, "%05d", frame );
+                std::string FileName = "SDepth-";
+                std::string DepthFile;
+                DepthFile = FileName + Index + ".pdm";
+                std::cout << "File: " << DepthFile << std::endl;
+                ofstream pDFile( DepthFile.c_str(), ios::out | ios::binary );
+                pDFile << "P7" << std::endl;
+                pDFile << dmap.cols << " " << dmap.rows << std::endl;
+                unsigned int Size = dmap.elemSize1() * dmap.rows * dmap.cols;
+                pDFile << 4294967295 << std::endl;
+                pDFile.write( (const char*)dmap.data, Size );
+                pDFile.close();
+
+                 // reset
+                step = true;
+                dtam_reset = true;
             }
         }
 
