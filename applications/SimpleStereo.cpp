@@ -31,13 +31,12 @@
 const int MAXD = 60;
 
 using namespace std;
-using namespace pangolin;
 using namespace Gpu;
 
 int main( int argc, char* argv[] )
 {
     // Initialise window
-    View& container = SetupPangoGLWithCuda(1024, 768);
+    pangolin::View& container = SetupPangoGLWithCuda(1024, 768);
     size_t cu_mem_start, cu_mem_end, cu_mem_total;
     cudaMemGetInfo( &cu_mem_start, &cu_mem_total );
     glClearColor(1,1,1,0);
@@ -121,13 +120,13 @@ int main( int argc, char* argv[] )
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
-        ProjectionMatrixRDF_TopLeft(w,h,K0(0,0),K0(1,1),K0(0,2),K0(1,2),0.1,10000),
-        IdentityMatrix(GlModelViewStack)
+        pangolin::ProjectionMatrixRDF_TopLeft(w,h,K0(0,0),K0(1,1),K0(0,2),K0(1,2),0.1,10000),
+        pangolin::IdentityMatrix(pangolin::GlModelViewStack)
     );
 
-    GlBufferCudaPtr vbo(GlArrayBuffer, lw*lh,GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBufferCudaPtr cbo(GlArrayBuffer, lw*lh,GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
-    GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
+    pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, lw*lh,GL_FLOAT, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    pangolin::GlBufferCudaPtr cbo(pangolin::GlArrayBuffer, lw*lh,GL_UNSIGNED_BYTE, 4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
+    pangolin::GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
 
     // Allocate Camera Images on device for processing
     Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
@@ -163,69 +162,69 @@ int main( int argc, char* argv[] )
     cudaMemGetInfo( &cu_mem_end, &cu_mem_total );
     cout << "CuTotal: " << cu_mem_total/(1024*1024) << ", Available: " << cu_mem_end/(1024*1024) << ", Used: " << (cu_mem_start-cu_mem_end)/(1024*1024) << endl;
 
-    Var<bool> step("ui.step", false, false);
-    Var<bool> run("ui.run", false, true);
-    Var<bool> lockToCam("ui.Lock to cam", false, true);
-    Var<int> show_slice("ui.show slice",MAXD/2, 0, MAXD-1);
+    pangolin::Var<bool> step("ui.step", false, false);
+    pangolin::Var<bool> run("ui.run", false, true);
+    pangolin::Var<bool> lockToCam("ui.Lock to cam", false, true);
+    pangolin::Var<int> show_slice("ui.show slice",MAXD/2, 0, MAXD-1);
 
-    Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
-    Var<bool> subpix("ui.subpix", true, true);
+    pangolin::Var<int> maxdisp("ui.maxdisp",MAXD, 0, MAXD);
+    pangolin::Var<bool> subpix("ui.subpix", true, true);
 
-    Var<bool> use_census("ui.use census", true, true);
-    Var<int> avg_rad("ui.avg_rad",0, 0, 100);
+    pangolin::Var<bool> use_census("ui.use census", true, true);
+    pangolin::Var<int> avg_rad("ui.avg_rad",0, 0, 100);
 
-    Var<bool> do_dtam("ui.do dtam", false, true);
-    Var<bool> dtam_reset("ui.reset", false, false);
+    pangolin::Var<bool> do_dtam("ui.do dtam", false, true);
+    pangolin::Var<bool> dtam_reset("ui.reset", false, false);
 
-    Var<float> g_alpha("ui.g alpha", 14, 0,4);
-    Var<float> g_beta("ui.g beta", 2.5, 0,2);
+    pangolin::Var<float> g_alpha("ui.g alpha", 14, 0,4);
+    pangolin::Var<float> g_beta("ui.g beta", 2.5, 0,2);
 
 
-    Var<float> theta("ui.theta", 100, 0,100);
-    Var<float> lambda("ui.lambda", 20, 0,20);
-    Var<float> sigma_q("ui.sigma q", 0.7, 0, 1);
-    Var<float> sigma_d("ui.sigma d", 0.7, 0, 1);
-    Var<float> huber_alpha("ui.huber alpha", 0.002, 0, 0.01);
-    Var<float> beta("ui.beta", 0.00001, 0, 0.01);
+    pangolin::Var<float> theta("ui.theta", 100, 0,100);
+    pangolin::Var<float> lambda("ui.lambda", 20, 0,20);
+    pangolin::Var<float> sigma_q("ui.sigma q", 0.7, 0, 1);
+    pangolin::Var<float> sigma_d("ui.sigma d", 0.7, 0, 1);
+    pangolin::Var<float> huber_alpha("ui.huber alpha", 0.002, 0, 0.01);
+    pangolin::Var<float> beta("ui.beta", 0.00001, 0, 0.01);
 
-    Var<float> alpha("ui.alpha", 0.9, 0,1);
-    Var<float> r1("ui.r1", 100, 0,0.01);
-    Var<float> r2("ui.r2", 100, 0,0.01);
+    pangolin::Var<float> alpha("ui.alpha", 0.9, 0,1);
+    pangolin::Var<float> r1("ui.r1", 100, 0,0.01);
+    pangolin::Var<float> r2("ui.r2", 100, 0,0.01);
 
-    Var<bool> filter("ui.filter", false, true);
-    Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
-    Var<int> rad("ui.radius",9, 1, 20);
+    pangolin::Var<bool> filter("ui.filter", false, true);
+    pangolin::Var<float> eps("ui.eps",0.01*0.01, 0, 0.01);
+    pangolin::Var<int> rad("ui.radius",9, 1, 20);
 
-    Var<bool> leftrightcheck("ui.left-right check", false, true);
-    Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
+    pangolin::Var<bool> leftrightcheck("ui.left-right check", false, true);
+    pangolin::Var<float> maxdispdiff("ui.maxdispdiff",1, 0, 5);
 
-    Var<int> domedits("ui.median its",1, 1, 10);
-    Var<bool> domed9x9("ui.median 9x9", false, true);
-    Var<bool> domed7x7("ui.median 7x7", false, true);
-    Var<bool> domed5x5("ui.median 5x5", false, true);
-    Var<int> medi("ui.medi",12, 0, 24);
+    pangolin::Var<int> domedits("ui.median its",1, 1, 10);
+    pangolin::Var<bool> domed9x9("ui.median 9x9", false, true);
+    pangolin::Var<bool> domed7x7("ui.median 7x7", false, true);
+    pangolin::Var<bool> domed5x5("ui.median 5x5", false, true);
+    pangolin::Var<int> medi("ui.medi",12, 0, 24);
 
-    Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
+    pangolin::Var<float> filtgradthresh("ui.filt grad thresh", 0, 0, 20);
 
-    Var<bool> save_depthmaps("ui.save_depthmaps", false, true);
+    pangolin::Var<bool> save_depthmaps("ui.save_depthmaps", false, true);
 
     int jump_frames = 0;
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
-    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback(pangolin::PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
     pangolin::RegisterKeyPressCallback(']', [&jump_frames](){jump_frames=100;} );
     pangolin::RegisterKeyPressCallback('}', [&jump_frames](){jump_frames=1000;} );
 
-    Handler2dImageSelect handler2d(lw,lh,level);
+    pangolin::Handler2dImageSelect handler2d(lw,lh,level);
 //    ActivateDrawPyramid<unsigned char,max_levels> adleft(img_pyr[0],GL_LUMINANCE8, false, true);
 //    ActivateDrawPyramid<unsigned char,max_levels> adright(img_pyr[1],GL_LUMINANCE8, false, true);
-    ActivateDrawImage<float> adleft(img[0],GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> adright(img[1],GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> adisp(disp[0],GL_LUMINANCE32F_ARB, false, true);
-    ActivateDrawImage<float> adw(imgw,GL_LUMINANCE32F_ARB, false, true);
+    pangolin::ActivateDrawImage<float> adleft(img[0],GL_LUMINANCE32F_ARB, false, true);
+    pangolin::ActivateDrawImage<float> adright(img[1],GL_LUMINANCE32F_ARB, false, true);
+    pangolin::ActivateDrawImage<float> adisp(disp[0],GL_LUMINANCE32F_ARB, false, true);
+    pangolin::ActivateDrawImage<float> adw(imgw,GL_LUMINANCE32F_ARB, false, true);
 //    ActivateDrawImage<float> adCrossSection(dCrossSection,GL_RGBA_FLOAT32_APPLE, false, true);
-    ActivateDrawImage<float> adVol(vol[0].ImageXY(show_slice),GL_LUMINANCE32F_ARB, false, true);
+    pangolin::ActivateDrawImage<float> adVol(vol[0].ImageXY(show_slice),GL_LUMINANCE32F_ARB, false, true);
 
     SceneGraph::GLSceneGraph graph;
     SceneGraph::GLVbo glvbo(&vbo,&ibo,&cbo);
@@ -237,7 +236,7 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(boost::ref(adisp)).SetHandler(&handler2d);
     container[3].SetDrawFunction(boost::ref(adVol)).SetHandler(&handler2d);
     container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
-                .SetHandler( new Handler3D(s_cam, AxisNone) );
+                .SetHandler( new pangolin::Handler3D(s_cam, pangolin::AxisNone) );
     container[5].SetDrawFunction(boost::ref(adw)).SetHandler(&handler2d);
 
     for(unsigned long frame=0; !pangolin::ShouldQuit();)
@@ -374,7 +373,7 @@ int main( int argc, char* argv[] )
             }
         }
 
-        go |= GuiVarHasChanged();
+        go |= pangolin::GuiVarHasChanged();
 //        if(go) {
 //            if(subpix) {
 //                CostVolMinimumSubpix(disp[0],vol[0], maxdisp,-1);
@@ -414,14 +413,14 @@ int main( int argc, char* argv[] )
             {
                 // Copy point cloud into VBO
                 {
-                    CudaScopedMappedPtr var(vbo);
+                    pangolin::CudaScopedMappedPtr var(vbo);
                     Gpu::Image<float4> dVbo((float4*)*var,lw,lh);
                     dVbo.CopyFrom(d3d);
                 }
 
                 // Generate CBO
                 {
-                    CudaScopedMappedPtr var(cbo);
+                    pangolin::CudaScopedMappedPtr var(cbo);
                     Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
                     ConvertImage<uchar4,unsigned char>(dCbo, img_pyr[0][level]);
                 }
