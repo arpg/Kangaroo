@@ -2,8 +2,10 @@
 
 #include <Eigen/Eigen>
 
+#include <calibu/cam/CameraModel>
 #include "CamParam.h"
 #include "LeastSquaresBlockHelpers.h"
+#include <sophus/se3.hpp>
 
 struct StereoKeyframe
 {
@@ -46,7 +48,7 @@ static void OptimiseIntrinsicsPoses(
     // keyframes.size might increase asynchronously, so save
     const int N = keyframes.size();
 
-    typedef CamParamMatlab<MatlabCamera> CamParam;
+    typedef CamParamMatlab<calibu::CameraModel<calibu::Poly> > CamParam;
     const int PARAMS_K = CamParam::PARAMS;
     const int PARAMS_T = 6;
     const int PARAMS_TOTAL = PARAMS_K + (1+N)* PARAMS_T;

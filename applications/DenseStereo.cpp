@@ -11,9 +11,6 @@
 #include <SceneGraph/GLVbo.h>
 #include "common/GLCameraHistory.h"
 
-#include <fiducials/drawing.h>
-#include <fiducials/camera.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
 #include "common/ScanlineRectify.h"
@@ -47,21 +44,21 @@ int main( int argc, char* argv[] )
     // Open video device
     CameraDevice video = OpenRpgCamera(argc,argv,2,true);
 
-    // Capture first image
-    std::vector<rpg::ImageWrapper> images;
-    video.Capture(images);
+    // Capture first Image
+    std::vector<rpg::ImageWrapper> Images;
+    video.Capture(Images);
 
     // native width and height (from camera)
-    const unsigned int nw = images[0].width();
-    const unsigned int nh = images[0].height();
+    const unsigned int nw = Images[0].width();
+    const unsigned int nh = Images[0].height();
 
-    // Downsample this image to process less pixels
+    // Downsample this Image to process less pixels
     const int max_levels = 6;
     const int level = GetLevelFromMaxPixels( nw, nh, 2*640*480 );
 //    const int level = 4;
     assert(level <= max_levels);
 
-    // Find centered image crop which aligns to 16 pixels at given level
+    // Find centered Image crop which aligns to 16 pixels at given level
     const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16 << level,16 << level);
 
     // Load Camera intrinsics from file
@@ -71,10 +68,10 @@ int main( int argc, char* argv[] )
     };
 
     for(int i=0; i<2; ++i ) {
-        // Adjust to match camera image dimensions
+        // Adjust to match camera Image dimensions
         CamModelScaleToDimensions(cam[i], nw, nh );
 
-        // Adjust to match cropped aligned image
+        // Adjust to match cropped aligned Image
         CamModelCropToRegionOfInterest(cam[i], roi);
 
         cam[i].PopulatePyramid(max_levels);
@@ -112,11 +109,11 @@ int main( int argc, char* argv[] )
 
     const bool rectify = (k1!=0 || k2!=0); // || camModel[0].GetPose().block<3,3>(0,0)
     if(!rectify) {
-        cout << "Using pre-rectified images" << endl;
+        cout << "Using pre-rectified Images" << endl;
     }
 
-    // Check we received at least two images
-    if(images.size() < 2) {
+    // Check we received at least two Images
+    if(Images.size() < 2) {
         std::cerr << "Failed to capture first stereo pair from camera" << std::endl;
         return -1;
     }
@@ -151,34 +148,34 @@ int main( int argc, char* argv[] )
     GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
 
     // Allocate Camera Images on device for processing
-    Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
-    Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
+    Gpu::Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
+    Gpu::Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
 
-    Image<unsigned char, TargetDevice, Manage> upload(w,h);
+    Gpu::Image<unsigned char, TargetDevice, Manage> upload(w,h);
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
 
-    Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
+    Gpu::Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
     Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{lw,lh,MAXD}};
-    Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
-    Image<float, TargetDevice, Manage> meanI(lw,lh);
-    Image<float, TargetDevice, Manage> varI(lw,lh);
-    Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
+    Gpu::Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
+    Gpu::Image<float, TargetDevice, Manage> meanI(lw,lh);
+    Gpu::Image<float, TargetDevice, Manage> varI(lw,lh);
+    Gpu::Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
 
-    Image<float4, TargetDevice, Manage>  d3d(lw,lh);
-    Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
-    Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
-    Image<float, TargetDevice, Manage>  Err(lw,lh);
+    Gpu::Image<float4, TargetDevice, Manage>  d3d(lw,lh);
+    Gpu::Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
+    Gpu::Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
+    Gpu::Image<float, TargetDevice, Manage>  Err(lw,lh);
 
     typedef ulong4 census_t;
-    Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
+    Gpu::Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
-    Image<unsigned char, TargetHost, Manage> hImg[] = {{lw,lh},{lw,lh}};
-    Image<float, TargetHost, Manage> hDisp(lw,lh);
+    Gpu::Image<unsigned char, TargetHost, Manage> hImg[] = {{lw,lh},{lw,lh}};
+    Gpu::Image<float, TargetHost, Manage> hDisp(lw,lh);
 
 #ifdef COSTVOL_TIME
     Sophus::SE3d T_wv;
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,MAXD);
-    Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
+    Gpu::Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 #endif
 
 #ifdef HM_FUSION
@@ -346,11 +343,11 @@ int main( int argc, char* argv[] )
         const bool go = frame==0 || jump_frames > 0 || run || Pushed(step);
 
         for(; jump_frames > 0; jump_frames--) {
-            video.Capture(images);
+            video.Capture(Images);
         }
 
         if(go) {
-            if(frame>0) video.Capture(images);
+            if(frame>0) video.Capture(Images);
 
             if(frame < gtPoseT_wh.size()) {
                 T_wc = gtPoseT_wh[frame];
@@ -359,9 +356,9 @@ int main( int argc, char* argv[] )
             frame++;
 
             /////////////////////////////////////////////////////////////
-            // Upload images to device (Warp / Decimate if necessery)
+            // Upload Images to device (Warp / Decimate if necessery)
             for(int i=0; i<2; ++i ) {
-                hCamImg[i].ptr = images[i].Image.data;
+                hCamImg[i].ptr = Images[i].Image.data;
 
                 if(rectify) {
                     upload.CopyFrom(hCamImg[i].SubImage(roi));
@@ -396,12 +393,12 @@ int main( int argc, char* argv[] )
                 // Filter Cost volume
                 for(int v=0; v<(leftrightcheck?2:1); ++v)
                 {
-                    Image<float, TargetDevice, Manage>& I = img[v];
+                    Gpu::Image<float, TargetDevice, Manage>& I = img[v];
                     ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
 
                     for(int d=0; d<maxdisp; ++d)
                     {
-                        Image<float> P = vol[v].ImageXY(d);
+                        Gpu::Image<float> P = vol[v].ImageXY(d);
                         ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
                         GuidedFilter(P,temp[0],varI,temp[1],meanI,I,Scratch,temp[2],temp[3],temp[4],rad,eps);
                     }
@@ -412,11 +409,11 @@ int main( int argc, char* argv[] )
                 // Filter Cost volume
                 for(int v=0; v<(leftrightcheck?2:1); ++v)
                 {
-                    Image<float, TargetDevice, Manage>& I = img[v];
+                    Gpu::Image<float, TargetDevice, Manage>& I = img[v];
 
                     for(int d=0; d<maxdisp; ++d)
                     {
-                        Image<float> P = vol[v].ImageXY(d);
+                        Gpu::Image<float> P = vol[v].ImageXY(d);
                         temp[0].CopyFrom(P);
                         BilateralFilter<float,float,float>(P,temp[0],I,gs,gr,gc,bilateralWinSize);
                     }
@@ -494,7 +491,7 @@ int main( int argc, char* argv[] )
 
                 if(rectify)
                 {
-                    // Save rectified images
+                    // Save rectified Images
                     hImg[0].CopyFrom(img_pyr[0][0]);
                     SavePXM<unsigned char>((std::string)"disp/left-" + Index + ".pgm", hImg[0], "P5");
                     hImg[1].CopyFrom(img_pyr[1][0]);
@@ -502,7 +499,7 @@ int main( int argc, char* argv[] )
                 }
             }
 
-            // Generate point cloud from disparity image
+            // Generate point cloud from disparity Image
             DisparityImageToVbo(d3d, disp[0], baseline, Kl(0,0), Kl(1,1), Kl(0,2), Kl(1,2) );
 
 #ifdef PLANE_FIT
@@ -583,7 +580,7 @@ int main( int argc, char* argv[] )
             // Start recording next frame
             frame = 0;
             video.InitDriver("FileReader");
-            video.Capture(images);
+            video.Capture(Images);
             save_dm = true;
         }
 

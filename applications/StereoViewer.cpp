@@ -53,8 +53,8 @@ int main( int argc, char* argv[] )
     GlTextureCudaArray texrgb(w,h,GL_RGBA8);
 
     // Allocate Camera Images on device for processing
-    Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
-    Image<uchar4, TargetDevice, Manage> d3d(w,h);
+    Gpu::Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
+    Gpu::Image<uchar4, TargetDevice, Manage> d3d(w,h);
 
     int shift = 0;
     bool run = true;
@@ -74,7 +74,7 @@ int main( int argc, char* argv[] )
 
             // Upload images to device
             for(int i=0; i<2; ++i ) {
-                dCamImg[i].CopyFrom( Image<unsigned char,TargetHost>(img[i].Image.data,w,h) );
+                dCamImg[i].CopyFrom( Gpu::Image<unsigned char,TargetHost>(img[i].Image.data,w,h) );
             }
         }
 

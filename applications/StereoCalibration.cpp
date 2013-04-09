@@ -6,9 +6,6 @@
 
 #include <RPG/Devices/Camera/CameraDevice.h>
 
-#include <fiducials/tracker.h>
-#include <fiducials/drawing.h>
-
 #include <pangolin/pangolin.h>
 
 #include "common/RpgCameraOpen.h"

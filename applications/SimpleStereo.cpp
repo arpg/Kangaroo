@@ -11,9 +11,6 @@
 #include <SceneGraph/GLVbo.h>
 #include "common/GLCameraHistory.h"
 
-#include <fiducials/drawing.h>
-#include <fiducials/camera.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
 #include "common/ScanlineRectify.h"
@@ -63,8 +60,8 @@ int main( int argc, char* argv[] )
 
     // Load Camera intrinsics from file
     CameraModelPyramid cam[] = {
-        video.GetProperty("DataSourceDir") + "/hlcmod.xml",
-        video.GetProperty("DataSourceDir") + "/hrcmod.xml"
+        video.GetProperty("DataSourceDir") + "/lcmod.xml",
+        video.GetProperty("DataSourceDir") + "/rcmod.xml"
     };
 
     for(int i=0; i<2; ++i ) {
