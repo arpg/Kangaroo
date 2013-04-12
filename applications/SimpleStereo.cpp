@@ -90,6 +90,9 @@ int main( int argc, char* argv[] )
     cout << "Processing dimensions: " << lw << "x" << lh << endl;
     cout << "Offset: " << roi.x << "x" << roi.y << endl;
 
+    // print selected camera model
+    std::cout << "Camera Model used: " << std::endl << cam[0].K(level) << std::endl;
+
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
     Eigen::Matrix4d T_vis_ro = Eigen::Matrix4d::Identity();
@@ -158,6 +161,7 @@ int main( int argc, char* argv[] )
     Sophus::SE3d T_rl = T_rl_orig;
 
     const double baseline = T_rl.translation().norm();
+    std::cout << "Baseline: " << baseline << std::endl;
 
     cudaMemGetInfo( &cu_mem_end, &cu_mem_total );
     cout << "CuTotal: " << cu_mem_total/(1024*1024) << ", Available: " << cu_mem_end/(1024*1024) << ", Used: " << (cu_mem_start-cu_mem_end)/(1024*1024) << endl;
@@ -330,7 +334,7 @@ int main( int argc, char* argv[] )
             imgq.Memset(0);
         }
 
-        const double min_theta = 1E-1;
+        const double min_theta = 1E-0;
         if(do_dtam && theta > min_theta)
         {
             for(int i=0; i<5; ++i ) {
@@ -349,16 +353,16 @@ int main( int argc, char* argv[] )
             if( theta <= min_theta && save_depthmaps ) {
                 cv::Mat dmap = cv::Mat( lh, lw, CV_32FC1 );
                 // convert disparity to depth
-                Gpu::Disp2Depth(imgd, depthmap, K0(0,0), baseline );
+                Gpu::Disp2Depth(imgd, depthmap, Kl(0,0), baseline );
                 depthmap.MemcpyToHost( dmap.data );
 
-                // save disp image
+                // save depth image
                 char            Index[10];
                 sprintf( Index, "%05d", frame );
-                std::string FileName = "SDepth-";
+                std::string DepthPrefix = "SDepth-";
                 std::string DepthFile;
-                DepthFile = FileName + Index + ".pdm";
-                std::cout << "File: " << DepthFile << std::endl;
+                DepthFile = DepthPrefix + Index + ".pdm";
+                std::cout << "Depth File: " << DepthFile << std::endl;
                 ofstream pDFile( DepthFile.c_str(), ios::out | ios::binary );
                 pDFile << "P7" << std::endl;
                 pDFile << dmap.cols << " " << dmap.rows << std::endl;
@@ -366,6 +370,15 @@ int main( int argc, char* argv[] )
                 pDFile << 4294967295 << std::endl;
                 pDFile.write( (const char*)dmap.data, Size );
                 pDFile.close();
+
+                // save grey image
+                std::string GreyPrefix = "Left-";
+                std::string GreyFile;
+                GreyFile = GreyPrefix + Index + ".pgm";
+                std::cout << "Grey File: " << GreyFile << std::endl;
+                cv::Mat gimg = cv::Mat( lh, lw, CV_8UC1 );
+                img_pyr[0][level].MemcpyToHost( gimg.data );
+                cv::imwrite( GreyFile, gimg );
 
                  // reset
                 step = true;

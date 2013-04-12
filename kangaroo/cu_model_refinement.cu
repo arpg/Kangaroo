@@ -173,6 +173,7 @@ void BuildPoseRefinementFromDepthmapSystemESM(
 
                 //----- Inverse Compositional Approach
 
+                /*
                 const Mat<float,1,2> dIr = dImgl.template GetCentralDiff<float>(pr(0), pr(1));
 
                 //derivative of projection (L) and dehomogenization for inverse decompositional
@@ -203,10 +204,11 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                     (Jr(4) + Jl(4))/2,
                     (Jr(5) + Jl(5))/2
                 };
+                */
 
                 const float w = LSReweightTukey(y, c);
-                lss.JTJ = OuterProduct(J, w);
-                lss.JTy = mul_aTb(J, y*w);
+                lss.JTJ = OuterProduct(Jl, w);
+                lss.JTy = mul_aTb(Jl, y*w);
                 lss.obs = 1;
                 lss.sqErr = y * y;
 
