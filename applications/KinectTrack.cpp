@@ -9,8 +9,6 @@
 
 #include "common/ViconTracker.h"
 
-#include <fiducials/drawing.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/ImageSelect.h"
 #include "common/BaseDisplayCuda.h"
@@ -74,16 +72,16 @@ int main( int argc, char* argv[] )
 //    const Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3d(),Eigen::Vector3d(baseline,0,0)).inverse();
 //    Eigen::Matrix<double,3,4> KT_cd = Krgb * T_cd.matrix3x4();
 
-    Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
-    Image<uchar3, TargetDevice, Manage>  imgRGB(w,h);
-    Image<unsigned char, TargetDevice, Manage>  imgI(w,h);
+    Gpu::Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
+    Gpu::Image<uchar3, TargetDevice, Manage>  imgRGB(w,h);
+    Gpu::Image<unsigned char, TargetDevice, Manage>  imgI(w,h);
 
-    Pyramid<float, MaxLevels, TargetDevice, Manage> pyrD(w,h);
-    Pyramid<float4, MaxLevels, TargetDevice, Manage> pyrV(w,h);
-    Pyramid<float4, MaxLevels, TargetDevice, Manage> pyrN(w,h);
-    Pyramid<float4, MaxLevels, TargetDevice, Manage> pyrVprev(w,h);
-    Image<float4, TargetDevice, Manage>  dDebug(w,h);
-    Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
+    Gpu::Pyramid<float, MaxLevels, TargetDevice, Manage> pyrD(w,h);
+    Gpu::Pyramid<float4, MaxLevels, TargetDevice, Manage> pyrV(w,h);
+    Gpu::Pyramid<float4, MaxLevels, TargetDevice, Manage> pyrN(w,h);
+    Gpu::Pyramid<float4, MaxLevels, TargetDevice, Manage> pyrVprev(w,h);
+    Gpu::Image<float4, TargetDevice, Manage>  dDebug(w,h);
+    Gpu::Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
 
     GlBufferCudaPtr vbo(GlArrayBuffer, w*h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW );
@@ -167,7 +165,7 @@ int main( int argc, char* argv[] )
 
 //            imgRGB.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
 //            Gpu::ConvertImage<unsigned char, uchar3>(imgI, imgRGB);
-            dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[nid].Image.data,w,h));
+            dKinect.CopyFrom(Gpu::Image<unsigned short, TargetHost>((unsigned short*)img[nid].Image.data,w,h));
             BilateralFilter<float,unsigned short>(pyrD[0],dKinect,bigs,bigr,biwin,200);
             BoxReduceIgnoreInvalid<float,MaxLevels,float>(pyrD);
             for(int l=0; l<MaxLevels; ++l) {

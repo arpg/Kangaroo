@@ -9,8 +9,6 @@
 
 #include "common/ViconTracker.h"
 
-#include <fiducials/drawing.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/ImageSelect.h"
 #include "common/BaseDisplay.h"
@@ -98,18 +96,18 @@ int main( int /*argc*/, char* argv[] )
     const int w = img.empty() ? 64 : img[0].width();
     const int h = img.empty() ? 48 : img[0].height();
 
-    Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
-    Image<float, TargetDevice, Manage> dKinectf(w,h);
-    Image<float, TargetDevice, Manage> dKinectf2(w,h);
-    Image<uchar3, TargetDevice, Manage>  dI(w,h);
-    Image<unsigned char, TargetDevice, Manage>  dIgrey(w,h);
-    Image<float4, TargetDevice, Manage>  dV(w,h);
-    Image<float4, TargetDevice, Manage>  dN(w,h);
-    Image<uchar3, TargetDevice, Manage>  dIr(w,h);
-    Image<float4, TargetDevice, Manage>  dVr(w,h);
-    Image<float4, TargetDevice, Manage>  dNr(w,h);
-    Image<float4, TargetDevice, Manage>  dDebug(w,h);
-    Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
+    Gpu::Image<unsigned short, TargetDevice, Manage> dKinect(w,h);
+    Gpu::Image<float, TargetDevice, Manage> dKinectf(w,h);
+    Gpu::Image<float, TargetDevice, Manage> dKinectf2(w,h);
+    Gpu::Image<uchar3, TargetDevice, Manage>  dI(w,h);
+    Gpu::Image<unsigned char, TargetDevice, Manage>  dIgrey(w,h);
+    Gpu::Image<float4, TargetDevice, Manage>  dV(w,h);
+    Gpu::Image<float4, TargetDevice, Manage>  dN(w,h);
+    Gpu::Image<uchar3, TargetDevice, Manage>  dIr(w,h);
+    Gpu::Image<float4, TargetDevice, Manage>  dVr(w,h);
+    Gpu::Image<float4, TargetDevice, Manage>  dNr(w,h);
+    Gpu::Image<float4, TargetDevice, Manage>  dDebug(w,h);
+    Gpu::Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,12>),h);
 
     HeightmapFusion hm(10,10,50,-0.02,2.0);
 
@@ -192,8 +190,8 @@ int main( int /*argc*/, char* argv[] )
 
         if(go) {
             if(camera.Capture(img)) {
-                dI.CopyFrom(Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
-                dKinect.CopyFrom(Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
+                dI.CopyFrom(Gpu::Image<uchar3, TargetHost>((uchar3*)img[0].Image.data,w,h));
+                dKinect.CopyFrom(Gpu::Image<unsigned short, TargetHost>((unsigned short*)img[1].Image.data,w,h));
                 frame++;
             }
 
@@ -319,13 +317,13 @@ int main( int /*argc*/, char* argv[] )
             RenderVboIboCboNbo(vbo_hm,ibo_hm,cbo_hm,nbo_hm, show_mesh, show_colour, show_normals);
         }
 
-        if(tracking_good && show_kinect) {
-            glSetFrameOfReferenceF(T_wl);
-            glDrawAxis(0.2);
-            glColor3f(1,1,1);
-            RenderVboCbo(vbo, cbo);
-            glUnsetFrameOfReference();
-        }
+//        if(tracking_good && show_kinect) {
+//            glSetFrameOfReferenceF(T_wl);
+//            glDrawAxis(0.2);
+//            glColor3f(1,1,1);
+//            RenderVboCbo(vbo, cbo);
+//            glUnsetFrameOfReference();
+//        }
 
         glColor3f(0.8,0.8,0.8);
         glDraw_z0(1.0,5);

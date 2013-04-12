@@ -3,10 +3,6 @@
 #include <pangolin/video_record_repeat.h>
 #include <pangolin/input_record_repeat.h>
 
-#include <fiducials/tracker.h>
-#include <fiducials/drawing.h>
-#include <fiducials/utils.h>
-
 #include <Eigen/Eigen>
 #include <unsupported/Eigen/MatrixFunctions>
 #include <unsupported/Eigen/OpenGLSupport>
@@ -73,7 +69,7 @@ Eigen::Matrix<double,4,4> se3_gen(unsigned i) {
 
 double err(
         const MatlabCamera& cam,
-        const Target& target,
+        const RandomDotTarget& target,
         const std::vector<Observation>& vicon_obs,
         const Sophus::SE3d& T_cf,
         const Sophus::SE3d& T_wt
@@ -103,7 +99,7 @@ double err(
 
 void OptimiseTargetVicon(
     const MatlabCamera& cam,
-    const Target& target,
+    const RandomDotTarget& target,
     const std::vector<Observation>& vicon_obs,
     Sophus::SE3d& T_cf,
     Sophus::SE3d& T_wt
@@ -226,6 +222,7 @@ int main( int argc, char* argv[] )
     const unsigned h = images[0].height();
 
     // Setup Tracker and associated target
+    TrackerParams tracker_params;
     Tracker tracker(w,h);
 
     // Create Target in Meters
@@ -308,7 +305,7 @@ int main( int argc, char* argv[] )
         vicon_T_wf = vicon.T_wf();
 
         const bool tracking_good =
-                tracker.ProcessFrame(cam,images[0].Image.data);
+                tracker.ProcessFrame(tracker_params,cam,images[0].Image.data);
 
         if(Pushed(guess) || (add_image && vicon_obs.size()==0) ) {
             Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,   0,0,1;

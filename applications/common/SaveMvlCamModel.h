@@ -1,6 +1,6 @@
 #pragma once
 
-#include <fiducials/camera.h>
+#include <calibu/cam/CameraModel.h>
 #include <Eigen/Eigen>
 #include <mvl++/Mvlpp/SE3.h>
 
@@ -55,13 +55,13 @@ inline void SaveCamModelLeftRightVisionConvention(
     SaveCamModelRobotConvention(filename_prefix + "rcmod.xml", "right", w,h,rfu,rfv,ru0,rv0,rsx,rk1,rk2,rp1,rp2,rk3, Trobot_lr );
 }
 
-inline void SaveCamModelLeftRightVisionConvention(std::string filename_prefix, MatlabCamera cam, Eigen::Matrix4d T_lr)
+inline void SaveCamModelLeftRightVisionConvention(std::string filename_prefix, const calibu::CameraModel<calibu::Poly>& cam, Eigen::Matrix4d T_lr)
 {
     const double sx = 0;
     SaveCamModelLeftRightVisionConvention(
-        filename_prefix, cam.width(), cam.height(),
-        cam.K()(0,0), cam.K()(1,1), cam.K()(0,2), cam.K()(1,2), sx, cam._k1, cam._k2, cam._p1, cam._p2, cam._k3,
-        cam.K()(0,0), cam.K()(1,1), cam.K()(0,2), cam.K()(1,2), sx, cam._k1, cam._k2, cam._p1, cam._p2, cam._k3,
+        filename_prefix, cam.Width(), cam.Height(),
+        cam.data()[0], cam.data()[1], cam.data()[2], cam.data()[3], 0,  cam.data()[4], cam.data()[5], 0, 0, cam.data()[6],
+        cam.data()[0], cam.data()[1], cam.data()[2], cam.data()[3], 0,  cam.data()[4], cam.data()[5], 0, 0, cam.data()[6],
         T_lr
     );
 }

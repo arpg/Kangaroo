@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
-# git clone git://github.com/stevenlovegrove/fiducials.git
-find_package( Fiducials REQUIRED )
-include_directories( ${Fiducials_INCLUDE_DIRS} )
-link_directories(${Fiducials_LIBRARY_DIRS})
-link_libraries(${Fiducials_LIBRARIES})
-
 # git clone git://github.com/stevenlovegrove/Sophus.git
 find_package(Sophus REQUIRED)
 include_directories(${Sophus_INCLUDE_DIR})
@@ -44,9 +38,7 @@ endif()
 
 add_executable( ImuTest ImuTest.cpp)
 add_executable( CameraViewer CameraViewer.cpp)
-add_executable( StereoCalibration StereoCalibration.cpp)
 add_executable( ViconTest ViconTest.cpp)
-add_executable( ViconAlign ViconAlign.cpp)
 add_executable( GpsConvert GpsConvert.cpp)
 add_executable( StereoCalibrationOpenCV StereoCalibrationOpenCV.cpp)
 add_executable( StereoRectifyOpenCV StereoRectifyOpenCV.cpp)
@@ -82,6 +74,16 @@ if(CeresSolver_FOUND)
 
     add_executable( PoseGraphVicon PoseGraphVicon.cpp)
     target_link_libraries( PoseGraphVicon ${CeresSolver_LIBRARIES} )
+endif()
+
+find_package( Calibu REQUIRED )
+if(Calibu_FOUND)
+    include_directories( ${Calibu_INCLUDE_DIRS} )
+    link_directories(${Calibu_LIBRARY_DIRS})
+    link_libraries(${Calibu_LIBRARIES})
+
+#   add_executable( ViconAlign ViconAlign.cpp)
+#   add_executable( StereoCalibration StereoCalibration.cpp)
 endif()
 
 find_package( Kangaroo )

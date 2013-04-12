@@ -6,8 +6,6 @@
 #include <pangolin/glcuda.h>
 #include <npp.h>
 
-#include <fiducials/drawing.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
 #include "common/BaseDisplay.h"

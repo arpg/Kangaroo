@@ -6,8 +6,6 @@
 #include <pangolin/glcuda.h>
 #include <npp.h>
 
-#include <fiducials/drawing.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
 #include "common/BaseDisplayCuda.h"
@@ -19,7 +17,6 @@
 
 using namespace std;
 using namespace pangolin;
-using namespace Gpu;
 
 int main( int argc, char* argv[] )
 {
@@ -43,8 +40,8 @@ int main( int argc, char* argv[] )
     GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
 
     // Allocate Camera Images on device for processing
-    Image<unsigned char, TargetDevice, Manage> dImg(w,h);
-    Image<float, TargetDevice, Manage> dImgFilt(w,h);
+    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(w,h);
+    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> dImgFilt(w,h);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);
@@ -66,16 +63,16 @@ int main( int argc, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            BilateralFilter<float,unsigned char>(dImgFilt,dImg,bigs,bigr,bilateralWinSize);
+            Gpu::BilateralFilter<float,unsigned char>(dImgFilt,dImg,bigs,bigr,bilateralWinSize);
 //            ConvertImage<float,unsigned char>(dImgFilt,dImg);
 
             for(int i=0; i < domedits; ++i ) {
                 if(domed3x3) {
-                    MedianFilter3x3(dImgFilt,dImgFilt);
+                    Gpu::MedianFilter3x3(dImgFilt,dImgFilt);
                 }
 
                 if(domed5x5) {
-                    MedianFilter5x5(dImgFilt,dImgFilt);
+                    Gpu::MedianFilter5x5(dImgFilt,dImgFilt);
                 }
             }
 

@@ -13,8 +13,6 @@
 
 #include "common/ViconTracker.h"
 
-#include <fiducials/drawing.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/ImageSelect.h"
 #include "common/BaseDisplayCuda.h"

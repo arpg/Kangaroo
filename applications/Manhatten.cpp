@@ -6,8 +6,6 @@
 #include <pangolin/glcuda.h>
 #include <npp.h>
 
-#include <fiducials/drawing.h>
-
 #include "common/RpgCameraOpen.h"
 #include "common/DisplayUtils.h"
 #include "common/BaseDisplay.h"
@@ -58,10 +56,10 @@ int main( int argc, char* argv[] )
     // Initialise CUDA, allowing it to use OpenGL context
     cudaGLSetGLDevice(0);
 
-    Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
-    Image<unsigned char, TargetDevice, Manage> temp(w,h);
-    Image<float4, TargetDevice, Manage> debug[] = {{w,h},{w,h}};
-    Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,3>),h);
+    Gpu::Image<unsigned char, TargetDevice, Manage> img[] = {{w,h},{w,h}};
+    Gpu::Image<unsigned char, TargetDevice, Manage> temp(w,h);
+    Gpu::Image<float4, TargetDevice, Manage> debug[] = {{w,h},{w,h}};
+    Gpu::Image<unsigned char, TargetDevice,Manage> dScratch(w*sizeof(LeastSquaresSystem<float,3>),h);
 
     ActivateDrawImage<unsigned char> adImgL(img[0],GL_LUMINANCE8, false, true);
     ActivateDrawImage<unsigned char> adImgR(img[1],GL_LUMINANCE8, false, true);
