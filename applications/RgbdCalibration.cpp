@@ -472,7 +472,7 @@ int main( int argc, char* argv[] )
 
                             // build system
                             lss = lss + Gpu::PoseRefinementFromDepthESM( keyframe_l.img_rgb, keyframe_r.img_rgb, keyframe_r.img_d,
-                                        Kg.Matrix(), Kd.Matrix(), T_cd.matrix(), T_lr.matrix(), KgTlr,
+                                        Kg.Matrix(), Kg.Matrix(), Kd.Matrix(), T_cd.matrix(), T_lr.matrix(), KgTlr,
                                         lss_workspace, lss_debug,
                                         15.0, false, 0.3, 30.0 );
                             /*
