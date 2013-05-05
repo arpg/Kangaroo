@@ -31,8 +31,8 @@ struct __align__(8) SDF_t {
         }
     }
 
-    float w;
     float val;
+    float w;
 };
 
 //struct __align__(8) SDF_t {

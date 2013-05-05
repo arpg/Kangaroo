@@ -67,13 +67,13 @@ struct Mat
 
     inline __device__ __host__ void operator+=(const Mat<P,R,C>& rhs) {
         #pragma unroll
-        for( int i=0; i<R*C; ++i )
+        for( size_t i=0; i<R*C; ++i )
             m[i] += rhs.m[i];
     }
 
     inline __device__ __host__ void Fill(P val) {
         #pragma unroll
-        for( int i=0; i<R*C; ++i )
+        for( size_t i=0; i<R*C; ++i )
             m[i] = val;
     }
 
@@ -83,7 +83,7 @@ struct Mat
 
     inline __device__ __host__ P Length() const {
         P sum = 0;
-        for( int i=0; i<R*C; ++i )
+        for( size_t i=0; i<R*C; ++i )
             sum += m[i] * m[i];
         return sqrt(sum);
     }
@@ -93,7 +93,7 @@ struct Mat
         // TODO: static assert NR <= R;
         Mat<P,NR,1> ret;
         #pragma unroll
-        for( int i=0; i<R; ++i )
+        for( size_t i=0; i<R; ++i )
             ret[i] = m[i];
         return ret;
     }
@@ -103,9 +103,9 @@ struct Mat
         // TODO: static assert NR <= R, NC <= C;
         Mat<P,NR,NC> ret;
 
-        for( int r=0; r<NR; ++r )
+        for( size_t r=0; r<NR; ++r )
             #pragma unroll
-            for( int c=0; c<NC; ++c )
+            for( size_t c=0; c<NC; ++c )
                 ret[r*NC + c] = m[(rs+r)*NC + cs+c];
         return ret;
     }
@@ -117,16 +117,16 @@ struct Mat
 
     template<typename PF>
     inline __host__ Mat(const Eigen::Matrix<PF,R,C>& em) {
-        for( int r=0; r<R; ++r )
-            for( int c=0; c<C; ++c )
+        for( size_t r=0; r<R; ++r )
+            for( size_t c=0; c<C; ++c )
                 m[r*C + c] = (P)em(r,c);
     }
 
     template<typename PT>
     inline __host__ operator Eigen::Matrix<PT,R,C>() const {
         Eigen::Matrix<PT,R,C> ret;
-        for( int r=0; r<R; ++r )
-            for( int c=0; c<C; ++c )
+        for( size_t r=0; r<R; ++r )
+            for( size_t c=0; c<C; ++c )
                 ret(r,c) = (PT)m[r*C + c];
         return ret;
     }
@@ -135,15 +135,15 @@ struct Mat
 #ifdef USE_TOON
     inline __host__ operator TooN::Matrix<R,C,P>() const {
         TooN::Matrix<R,C,P> ret;
-        for( int r=0; r<R; ++r )
-            for( int c=0; c<C; ++c )
+        for( size_t r=0; r<R; ++r )
+            for( size_t c=0; c<C; ++c )
                 ret(r,c) = m[r*C + c];
         return ret;
     }
 
     inline __host__ operator TooN::Vector<R*C,P>() const {
         TooN::Vector<R*C,P> ret;
-        for( int i=0; i< R*C; ++i )
+        for( size_t i=0; i< R*C; ++i )
             ret[i] = m[i];
         return ret;
     }
@@ -161,7 +161,7 @@ inline __device__ __host__ Mat<P,R,C> MatZero()
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = 0.0f;
     return ret;
 }
@@ -171,7 +171,7 @@ inline __device__ __host__ Mat<P,R,R> MatId()
 {
     Mat<P,R,R> ret = MatZero<P,R,R>();
 #pragma unroll
-    for( unsigned i=0; i<R; ++i )
+    for( size_t i=0; i<R; ++i )
         ret(i,i) = 1.0f;
     return ret;
 }
@@ -181,7 +181,7 @@ inline __device__ __host__ Mat<P,R,C> MatFill(P val)
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = val;
     return ret;
 }
@@ -195,11 +195,11 @@ inline __device__ __host__ Mat<P,R,C> operator*(const Mat<P,R,CR>& lhs, const Ma
 {
     Mat<P,R,C> ret;
 
-    for( unsigned r=0; r<R; ++r) {
-        for( unsigned c=0; c<C; ++c) {
+    for( size_t r=0; r<R; ++r) {
+        for( size_t c=0; c<C; ++c) {
             ret(r,c) = 0;
 #pragma unroll
-            for( unsigned k=0; k<CR; ++k)  {
+            for( size_t k=0; k<CR; ++k)  {
                 ret(r,c) += lhs(r,k) * rhs(k,c);
             }
         }
@@ -228,7 +228,7 @@ inline __device__ __host__ P dot(const Mat<P,R1,C1>& lhs, const Mat<P,R2,C2>& rh
 {
     P ret = lhs(0) * rhs(0);
     #pragma unroll
-    for( int i=1; i<R1*C1; ++i)
+    for( size_t i=1; i<R1*C1; ++i)
         ret += lhs(i) * rhs(i);
     return ret;
 }
@@ -238,11 +238,11 @@ inline __device__ __host__ Mat<P,R,C> mul_aTb(const Mat<P,CR,R>& a, const Mat<P,
 {
     Mat<P,R,C> ret;
 
-    for( unsigned r=0; r<R; ++r) {
-        for( unsigned c=0; c<C; ++c) {
+    for( size_t r=0; r<R; ++r) {
+        for( size_t c=0; c<C; ++c) {
             ret(r,c) = 0;
             #pragma unroll
-            for( unsigned k=0; k<CR; ++k)  {
+            for( size_t k=0; k<CR; ++k)  {
                 ret(r,c) += a(k,r) * b(k,c);
             }
         }
@@ -255,9 +255,9 @@ inline __device__ __host__ Mat<P,R,C> mul_aTb(const Mat<P,C,R>& a, const P b)
 {
     Mat<P,R,C> ret;
 
-    for( unsigned r=0; r<R; ++r) {
+    for( size_t r=0; r<R; ++r) {
 #pragma unroll
-        for( unsigned c=0; c<C; ++c) {
+        for( size_t c=0; c<C; ++c) {
             ret(r,c) = a(c,r) * b;
         }
     }
@@ -269,10 +269,10 @@ inline __device__ __host__ Mat<P,R,C> mul_abT(const Mat<P,R,CR>& a, const Mat<P,
 {
     Mat<P,R,C> ret;
 
-    for( unsigned r=0; r<R; ++r) {
-        for( unsigned c=0; c<C; ++c) {
+    for( size_t r=0; r<R; ++r) {
+        for( size_t c=0; c<C; ++c) {
             ret(r,c) = 0;
-            for( unsigned k=0; k<CR; ++k)  {
+            for( size_t k=0; k<CR; ++k)  {
                 ret(r,c) += a(r,k) * b(c,k);
             }
         }
@@ -285,7 +285,7 @@ inline __device__ __host__ Mat<P,R,C> operator+(const Mat<P,R,C>& lhs, const Mat
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = lhs(i) + rhs(i);
     return ret;
 }
@@ -295,7 +295,7 @@ inline __device__ __host__ Mat<P,R,C> operator-(const Mat<P,R,C>& lhs, const Mat
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = lhs(i) - rhs(i);
     return ret;
 }
@@ -309,7 +309,7 @@ inline __device__ __host__ Mat<P,R,C> operator*(const Mat<P,R,C>& lhs, const P r
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = lhs(i) * rhs;
     return ret;
 }
@@ -319,7 +319,7 @@ inline __device__ __host__ Mat<P,R,C> operator*(const P lhs, const Mat<P,R,C>& r
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = lhs * rhs(i);
     return ret;
 }
@@ -329,7 +329,7 @@ inline __device__ __host__ Mat<P,R,C> operator/(const Mat<P,R,C>& lhs, const P r
 {
     Mat<P,R,C> ret;
 #pragma unroll
-    for( unsigned i=0; i<R*C; ++i )
+    for( size_t i=0; i<R*C; ++i )
         ret(i) = lhs(i) / rhs;
     return ret;
 }
@@ -349,9 +349,9 @@ struct SymMat
     inline __device__ __host__ operator Mat<PT,N,N>()
     {
         Mat<PT,N,N> ret;
-        int i = 0;
-        for( int r=0; r<N; ++r ) {
-            for( int c=0; c<=r; ++c ) {
+        size_t i = 0;
+        for( size_t r=0; r<N; ++r ) {
+            for( size_t c=0; c<=r; ++c ) {
                 const PT elem = (PT)m[i++];
                 ret(r,c) = elem;
                 ret(c,r) = elem;
@@ -362,7 +362,7 @@ struct SymMat
 
     inline __device__ __host__ void SetZero() {
         #pragma unroll
-        for( unsigned i=0; i<unique; ++i )
+        for( size_t i=0; i<unique; ++i )
             m[i] = 0;
     }
 
@@ -371,9 +371,9 @@ struct SymMat
     inline __host__ operator Eigen::Matrix<PT,N,N>()
     {
         Eigen::Matrix<PT,N,N> ret;
-        int i = 0;
-        for( int r=0; r<N; ++r ) {
-            for( int c=0; c<=r; ++c ) {
+        size_t i = 0;
+        for( size_t r=0; r<N; ++r ) {
+            for( size_t c=0; c<=r; ++c ) {
                 const PT elem = (PT)m[i++];
                 ret(r,c) = elem;
                 ret(c,r) = elem;
@@ -389,9 +389,9 @@ struct SymMat
     inline __host__ operator TooN::Matrix<N,N,PT>()
     {
         TooN::Matrix<N,N,PT> ret;
-        int i = 0;
-        for( int r=0; r<N; ++r ) {
-            for( int c=0; c<=r; ++c ) {
+        size_t i = 0;
+        for( size_t r=0; r<N; ++r ) {
+            for( size_t c=0; c<=r; ++c ) {
                 const PT elem = (PT)m[i++];
                 ret(r,c) = elem;
                 ret(c,r) = elem;
@@ -404,14 +404,14 @@ struct SymMat
     inline __device__ __host__ void operator+=(const SymMat<P,N>& rhs)
     {
         #pragma unroll
-        for( unsigned i=0; i<unique; ++i )
+        for( size_t i=0; i<unique; ++i )
             m[i] += rhs.m[i];
     }
 
     inline __device__ __host__ void operator*=(const P w)
     {
         #pragma unroll
-        for( unsigned i=0; i<unique; ++i )
+        for( size_t i=0; i<unique; ++i )
             m[i] *= w;
     }
 
@@ -423,7 +423,7 @@ inline __device__ __host__ SymMat<P,N> operator+(const SymMat<P,N>& lhs, const S
 {
     SymMat<P,N> ret;
 #pragma unroll
-    for( unsigned i=0; i<SymMat<P,N>::unique; ++i )
+    for( size_t i=0; i<SymMat<P,N>::unique; ++i )
         ret.m[i] = lhs.m[i] + rhs.m[i];
     return ret;
 }
@@ -433,7 +433,7 @@ inline __device__ __host__ SymMat<P,N> operator*(const SymMat<P,N>& lhs, const f
 {
     SymMat<P,N> ret;
 #pragma unroll
-    for( unsigned i=0; i<SymMat<P,N>::unique; ++i )
+    for( size_t i=0; i<SymMat<P,N>::unique; ++i )
         ret.m[i] = lhs.m[i] * rhs;
     return ret;
 }
@@ -441,12 +441,12 @@ inline __device__ __host__ SymMat<P,N> operator*(const SymMat<P,N>& lhs, const f
 template<typename P, unsigned R, unsigned C>
 inline __device__ __host__ SymMat<P,R*C> OuterProduct(const Mat<P,R,C>& M)
 {
-    const unsigned N = R*C;
+    const size_t N = R*C;
     SymMat<P,N> ret;
-    int i=0;
-    for( int r=0; r<N; ++r )
+    size_t i=0;
+    for( size_t r=0; r<N; ++r )
 #pragma unroll
-        for( int c=0; c<=r; ++c )
+        for( size_t c=0; c<=r; ++c )
             ret.m[i++] = M(r) * M(c);
     return ret;
 }
@@ -456,10 +456,10 @@ inline __device__ __host__ SymMat<P,R*C> OuterProduct(const Mat<P,R,C>& M, const
 {
     const unsigned N = R*C;
     SymMat<P,N> ret;
-    int i=0;
-    for( int r=0; r<N; ++r )
+    size_t i=0;
+    for( size_t r=0; r<N; ++r )
 #pragma unroll
-        for( int c=0; c<=r; ++c )
+        for( size_t c=0; c<=r; ++c )
             ret.m[i++] = M(r) * M(c) * weight;
     return ret;
 }
@@ -469,7 +469,7 @@ inline __device__ __host__ SymMat<P,N> SymMat_zero()
 {
     SymMat<P,N> ret;
 #pragma unroll
-    for( unsigned i=0; i< SymMat<P,N>::unique; ++i )
+    for( size_t i=0; i< SymMat<P,N>::unique; ++i )
         ret.m[i] = 0.0f;
     return ret;
 }
@@ -568,9 +568,9 @@ inline __device__ __host__ float3 dn( const float4& x )
 template<typename P, unsigned R, unsigned C>
 inline __host__ std::ostream& operator<<( std::ostream& os, const Mat<P,R,C>& m )
 {
-    for( unsigned r=0; r<R; ++r)
+    for( size_t r=0; r<R; ++r)
     {
-        for( unsigned c=0; c<C; ++c)
+        for( size_t c=0; c<C; ++c)
             std::cout << m(r,c) << " ";
         std::cout << std::endl;
     }
@@ -580,7 +580,7 @@ inline __host__ std::ostream& operator<<( std::ostream& os, const Mat<P,R,C>& m 
 template<typename P, unsigned N>
 inline __host__ std::ostream& operator<<( std::ostream& os, const SymMat<P,N>& m )
 {
-    for(int i=0; i < SymMat<P,N>::unique; ++i ) {
+    for(size_t i=0; i < SymMat<P,N>::unique; ++i ) {
         std::cout << m.m[i] << " ";
     }
     return os;

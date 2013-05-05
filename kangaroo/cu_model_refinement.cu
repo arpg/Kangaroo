@@ -722,7 +722,7 @@ void SumSpeedTest(
     Image<unsigned char> dWorkspace, int w, int h, int blockx, int blocky
 ) {
     dim3 blockDim, gridDim;
-    blockDim = dim3(boost::math::gcd<unsigned>(w,blockx), boost::math::gcd<unsigned>(h,blocky), 1);
+    blockDim = dim3(Gcd<unsigned>(w,blockx), Gcd<unsigned>(h,blocky), 1);
     gridDim =  dim3( w / blockDim.x, h / blockDim.y, 1);
 
     HostSumLeastSquaresSystem<float,TEST_SYS_SIZE> lss(dWorkspace, blockDim, gridDim);

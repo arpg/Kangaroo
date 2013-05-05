@@ -1,10 +1,8 @@
 #ifndef CUDAIMAGE_H
 #define CUDAIMAGE_H
 
-#include <boost/type_traits.hpp>
-#include <boost/static_assert.hpp>
-
 #include <iostream>
+#include <sstream>
 #include <assert.h>
 
 #include <cuda_runtime.h>

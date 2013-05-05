@@ -37,7 +37,7 @@ void Resample(
     float4* in,  int istride, int iw, int ih,
     int resample_type
 ) {
-  dim3 blockdim(boost::math::gcd<unsigned>(ow,16), boost::math::gcd<unsigned>(oh,16), 1);
+  dim3 blockdim(Gcd<unsigned>(ow,16), Gcd<unsigned>(oh,16), 1);
   dim3 griddim( ow / blockdim.x, oh / blockdim.y);
   resample_kernal<<<griddim,blockdim>>>(out,ostride,ow,oh,in,istride,iw,ih, resample_type);
 }

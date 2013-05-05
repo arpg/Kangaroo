@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 2.8)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
+find_package( Boost COMPONENTS thread REQUIRED )
+include_directories( ${Boost_INCLUDE_DIRS} )
+link_libraries( ${Boost_LIBRARIES} )
+
 # git clone git://github.com/stevenlovegrove/Sophus.git
 find_package(Sophus REQUIRED)
 include_directories(${Sophus_INCLUDE_DIR})
