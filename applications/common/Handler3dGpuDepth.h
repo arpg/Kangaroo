@@ -19,10 +19,15 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
         const int imx = depth.w * (float)(x-view.v.l) / (float)view.v.w;
         const int imy = depth.h * (float)(view.v.t()-y) / (float)view.v.h;
         depth.SubImage(imx, imy, 1,1).MemcpyToHost(&z);
+        
+        if( z == 0 || !std::isfinite(z) ) {
+            z = default_z;
+        }
+        
         const float zw = 0.5*(1 + proj.m[2*4+2] + proj.m[3*4+2] / z);
         gluUnProject(x, y, zw, mv.m, proj.m, viewport, &Pw[0], &Pw[1], &Pw[2]);
         pangolin::LieApplySE34x4vec3(Pc, mv.m, Pw);
-        p[0] = x; p[1] = y; p[2] = std::isfinite(z) ? zw : default_z;
+        p[0] = x; p[1] = y; p[2] = zw;
     }
 
 protected:

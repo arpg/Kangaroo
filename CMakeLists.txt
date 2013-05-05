@@ -8,8 +8,6 @@ OPTION(BUILD_SHARED_LIBS "Build Shared Library" ON)
 
 # Overide with cmake -DCMAKE_BUILD_TYPE=Debug {dir}
 IF( NOT CMAKE_BUILD_TYPE )
-   MESSAGE("Build type not set (defaults to release)")
-   MESSAGE("-DCMAKE_BUILD_TYPE=Debug for debug")
    SET( CMAKE_BUILD_TYPE Release )
 ENDIF()
 

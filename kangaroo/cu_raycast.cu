@@ -197,44 +197,15 @@ void RaycastSdf(Image<float> depth, Image<float4> norm, Image<float> img, const 
 }
 
 //////////////////////////////////////////////////////
-// Raycast sphere
-//////////////////////////////////////////////////////
-
-__global__ void KernRaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r)
-{
-    const int u = blockIdx.x*blockDim.x + threadIdx.x;
-    const int v = blockIdx.y*blockDim.y + threadIdx.y;
-
-    if( u < depth.w && v < depth.h ) {
-        const float3 center_c = mulSE3inv(T_wc, center);
-        const float3 ray_c = K.Unproject(u,v);
-
-        const float ldotc = dot(ray_c,center_c);
-        const float lsq = dot(ray_c,ray_c);
-        const float csq = dot(center_c,center_c);
-        float dm = (ldotc - sqrt(ldotc*ldotc - lsq*(csq - r*r) )) / lsq;
-        depth(u,v) = dm;
-    }
-}
-
-void RaycastSphere(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r)
-{
-    dim3 blockDim, gridDim;
-    InitDimFromOutputImageOver(blockDim, gridDim, depth);
-    KernRaycastSphere<<<gridDim,blockDim>>>(depth, T_wc, K, center, r);
-    GpuCheckErrors();
-}
-
-//////////////////////////////////////////////////////
 // Raycast box
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox )
+__global__ void KernRaycastBox(Image<float> imgd, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox )
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
 
-    if( u < depth.w && v < depth.h ) {
+    if( u < imgd.w && v < imgd.h ) {
         const float3 c_w = SE3Translation(T_wc);
         const float3 ray_c = K.Unproject(u,v);
         const float3 ray_w = mulSO3(T_wc, ray_c);
@@ -257,15 +228,53 @@ __global__ void KernRaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, Im
             d = 0.0f/0.0f;
         }
 
-        depth(u,v) = d;
+        imgd(u,v) = d;
     }
 }
 
-void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox )
+void RaycastBox(Image<float> imgd, const Mat<float,3,4> T_wc, ImageIntrinsics K, const BoundingBox bbox )
 {
     dim3 blockDim, gridDim;
-    InitDimFromOutputImageOver(blockDim, gridDim, depth);
-    KernRaycastBox<<<gridDim,blockDim>>>(depth, T_wc, K, bbox);
+    InitDimFromOutputImageOver(blockDim, gridDim, imgd);
+    KernRaycastBox<<<gridDim,blockDim>>>(imgd, T_wc, K, bbox);
+    GpuCheckErrors();
+}
+
+//////////////////////////////////////////////////////
+// Raycast sphere
+//////////////////////////////////////////////////////
+
+__global__ void KernRaycastSphere(Image<float> imgd, Image<float> img, ImageIntrinsics K, float3 center_c, float r)
+{
+    const int u = blockIdx.x*blockDim.x + threadIdx.x;
+    const int v = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if( u < imgd.w && v < imgd.h ) {
+        const float3 ray_c = K.Unproject(u,v);
+
+        const float ldotc = dot(ray_c,center_c);
+        const float lsq = dot(ray_c,ray_c);
+        const float csq = dot(center_c,center_c);
+        float depth = (ldotc - sqrt(ldotc*ldotc - lsq*(csq - r*r) )) / lsq;
+        
+        const float prev_depth = imgd(u,v);
+        if(depth > 0 && (depth < prev_depth || !isfinite(prev_depth)) ) {
+            imgd(u,v) = depth;
+            if(img.ptr) {
+                const float3 p_c = depth * ray_c;           
+                const float3 n_c = p_c - center_c;
+                img(u,v) = PhongShade(p_c, n_c / length(n_c));
+            }
+        }
+    }
+}
+
+void RaycastSphere(Image<float> imgd, Image<float> img, const Mat<float,3,4> T_wc, ImageIntrinsics K, float3 center, float r)
+{
+    dim3 blockDim, gridDim;
+    InitDimFromOutputImageOver(blockDim, gridDim, imgd);
+    const float3 center_c = mulSE3inv(T_wc, center);    
+    KernRaycastSphere<<<gridDim,blockDim>>>(imgd, img, K, center_c, r);
     GpuCheckErrors();
 }
 
@@ -273,7 +282,7 @@ void RaycastBox(Image<float> depth, const Mat<float,3,4> T_wc, ImageIntrinsics K
 // Raycast plane
 //////////////////////////////////////////////////////
 
-__global__ void KernRaycastPlane(Image<float> imgdepth, Image<float> img, const Mat<float,3,4> T_wc, ImageIntrinsics K, const float3 n_c)
+__global__ void KernRaycastPlane(Image<float> imgd, Image<float> img, ImageIntrinsics K, const float3 n_c)
 {
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
@@ -282,22 +291,22 @@ __global__ void KernRaycastPlane(Image<float> imgdepth, Image<float> img, const 
         const float3 ray_c = K.Unproject(u,v);
         const float depth = -1 / dot(n_c, ray_c);
 
-        const float prev_depth = imgdepth(u,v);
+        const float prev_depth = imgd(u,v);
         if(depth > 0 && (depth < prev_depth || !isfinite(prev_depth)) ) {
             const float3 p_c = depth * ray_c;
             img(u,v) = PhongShade(p_c, n_c / length(n_c) );
-            imgdepth(u,v) = depth;
+            imgd(u,v) = depth;
         }
     }
 }
 
-void RaycastPlane(Image<float> depth, Image<float> img, const Mat<float,3,4> T_wc, ImageIntrinsics K, const float3 n_w )
+void RaycastPlane(Image<float> imgd, Image<float> img, const Mat<float,3,4> T_wc, ImageIntrinsics K, const float3 n_w )
 {
     const float3 n_c = Plane_b_from_a(T_wc, n_w);
 
     dim3 blockDim, gridDim;
     InitDimFromOutputImageOver(blockDim, gridDim, img);
-    KernRaycastPlane<<<gridDim,blockDim>>>(depth, img, T_wc, K, n_c );
+    KernRaycastPlane<<<gridDim,blockDim>>>(imgd, img, K, n_c );
     GpuCheckErrors();
 }
 

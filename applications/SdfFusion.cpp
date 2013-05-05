@@ -118,7 +118,7 @@ int main( int argc, char* argv[] )
             if(shape == 0) {
                 Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), K, Gpu::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
             }else if(shape ==1) {
-                Gpu::RaycastSphere(gtd, T_cw.inverse().matrix3x4(), K, make_float3(0,0,0), 0.9);
+                Gpu::RaycastSphere(gtd, Gpu::Image<float>(), T_cw.inverse().matrix3x4(), K, make_float3(0,0,0), 0.9);
             }
             CudaScopedMappedPtr dvbo(vbo);
             Gpu::Image<float4> vboimg((float4*)*dvbo,w,h);
