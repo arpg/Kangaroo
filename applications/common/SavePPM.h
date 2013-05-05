@@ -2,6 +2,7 @@
 
 #include <kangaroo/Image.h>
 #include <kangaroo/Volume.h>
+#include <Kangaroo/BoundedVolume.h>
 
 #include <iostream>
 
@@ -42,9 +43,8 @@ void SavePXM(const std::string filename, const Gpu::Image<T,Gpu::TargetDevice>& 
 /////////////////////////////////////////////////////////////////////////////
 
 template<typename T, typename Manage>
-void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetHost,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
+void SavePXM(std::ofstream& bFile, const Gpu::Volume<T,Gpu::TargetHost,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
 {
-    std::ofstream bFile( filename.c_str(), std::ios::out | std::ios::binary );
     bFile << ppm_type << std::endl;
     bFile << vol.w << " " << vol.h << " " << vol.d << '\n';
     bFile << num_colors << '\n';
@@ -57,22 +57,49 @@ void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetHost,Man
 }
 
 template<typename T, typename Manage>
-void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetDevice,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
+void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetHost,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
+{
+    std::ofstream bFile( filename.c_str(), std::ios::out | std::ios::binary );
+    SavePXM<T,Manage>(bFile, vol, ppm_type, num_colors);
+}
+
+template<typename T, typename Manage>
+void SavePXM(std::ofstream& bFile, const Gpu::Volume<T,Gpu::TargetDevice,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
 {
     Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage> hvol(vol.w, vol.h, vol.d);
     hvol.CopyFrom(vol);
-    SavePXM(filename, hvol, ppm_type, num_colors);
+    SavePXM(bFile, hvol, ppm_type, num_colors);
 }
+
+
+
+template<typename T, typename Manage>
+void SavePXM(const std::string filename, const Gpu::BoundedVolume<T,Gpu::TargetDevice,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
+{
+    std::ofstream bFile( filename.c_str(), std::ios::out | std::ios::binary );
+
+    bFile << vol.bbox.boxmin.x << " " <<  vol.bbox.boxmin.y << " " << vol.bbox.boxmin.z << std::endl;
+    bFile << vol.bbox.boxmax.x << " " <<  vol.bbox.boxmax.y << " " << vol.bbox.boxmax.z << std::endl;
+    SavePXM<T,Manage>(bFile,vol,ppm_type,num_colors);
+}
+
+template<typename T, typename Manage>
+void SavePXM(const std::string filename, const Gpu::Volume<T,Gpu::TargetDevice,Manage>& vol, std::string ppm_type = "P5", int num_colors = 255)
+{
+    std::ofstream bFile( filename.c_str(), std::ios::out | std::ios::binary );
+    SavePXM<T,Manage>(bFile,vol,ppm_type,num_colors);
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Load Volume types
 /////////////////////////////////////////////////////////////////////////////
 
 template<typename T>
-bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage>& vol)
+bool LoadPXM(std::ifstream& bFile, Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage>& vol)
 {
     // Parse header
-    std::ifstream bFile( filename.c_str(), std::ios::in | std::ios::binary );
+
     std::string ppm_type = "";
     int num_colors = 0;
     int w = 0;
@@ -97,8 +124,8 @@ bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetHost,Gpu::Mana
         vol.w = w; vol.h = h; vol.d = d;
 
         // Read in data
-        for(int d=0; d<vol.d; ++d) {
-            for(int r=0; r<vol.h; ++r) {
+        for(size_t d=0; d<vol.d; ++d) {
+            for(size_t r=0; r<vol.h; ++r) {
                 bFile.read( (char*)vol.RowPtr(r,d), vol.w * sizeof(T) );
             }
         }
@@ -108,6 +135,29 @@ bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetHost,Gpu::Mana
 
     return success;
 }
+
+template<typename T>
+bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetHost,Gpu::Manage>& vol)
+{
+    std::ifstream bFile( filename.c_str(), std::ios::in | std::ios::binary );
+    return LoadPXM<T>(bFile,vol);
+}
+
+template<typename T>
+bool LoadPXM(const std::string filename, Gpu::BoundedVolume<T,Gpu::TargetHost,Gpu::Manage>& vol)
+{
+    std::ifstream bFile( filename.c_str(), std::ios::in | std::ios::binary );
+    //read in the bounding volume bounds
+    bFile >> vol.bbox.boxmin.x;
+    bFile >> vol.bbox.boxmin.y;
+    bFile >> vol.bbox.boxmin.z;
+    bFile >> vol.bbox.boxmax.x;
+    bFile >> vol.bbox.boxmax.y;
+    bFile >> vol.bbox.boxmax.z;
+    bFile.ignore(1,'\n');
+    return LoadPXM<T>(bFile,vol);
+}
+
 
 template<typename T>
 bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetDevice,Gpu::Manage>& vol)
@@ -122,6 +172,24 @@ bool LoadPXM(const std::string filename, Gpu::Volume<T,Gpu::TargetDevice,Gpu::Ma
         vol.w = hvol.w; vol.h = hvol.h; vol.d = hvol.d;
 
         vol.CopyFrom(hvol);
+    }
+    return success;
+}
+
+template<typename T>
+bool LoadPXM(const std::string filename, Gpu::BoundedVolume<T,Gpu::TargetDevice,Gpu::Manage>& vol)
+{
+    Gpu::BoundedVolume<T,Gpu::TargetHost,Gpu::Manage> hvol;
+    bool success = LoadPXM(filename, hvol);
+
+    if(success) {
+        Gpu::Manage::Cleanup<T,Gpu::TargetDevice>(vol.ptr);
+
+        Gpu::TargetDevice::AllocatePitchedMem<T>(&vol.ptr,&vol.pitch,&vol.img_pitch,hvol.w,hvol.h,hvol.d);
+        vol.w = hvol.w; vol.h = hvol.h; vol.d = hvol.d;
+
+        vol.CopyFrom(hvol);
+        vol.bbox = hvol.bbox;
     }
     return success;
 }
