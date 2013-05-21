@@ -144,9 +144,15 @@ struct BoundingBox
     }
 
     inline __host__ __device__
+    float3 Center() const
+    {
+        return boxmin + (boxmax - boxmin)/2.0f;
+    }
+    
+    inline __host__ __device__
     void Enlarge(float3 scale)
     {
-        const float3 center = boxmin + (boxmax - boxmin)/2.0f;
+        const float3 center = Center();
         const float3 newHalfSize = (scale * Size()) / 2.0f;
         boxmin = center - newHalfSize;
         boxmax = center + newHalfSize;

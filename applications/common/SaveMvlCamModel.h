@@ -55,7 +55,7 @@ inline void SaveCamModelLeftRightVisionConvention(
     SaveCamModelRobotConvention(filename_prefix + "rcmod.xml", "right", w,h,rfu,rfv,ru0,rv0,rsx,rk1,rk2,rp1,rp2,rk3, Trobot_lr );
 }
 
-inline void SaveCamModelLeftRightVisionConvention(std::string filename_prefix, const calibu::CameraModelSpecialization<calibu::Poly>& cam, Eigen::Matrix4d T_lr)
+inline void SaveCamModelLeftRightVisionConvention(std::string filename_prefix, const calibu::CameraModelT<calibu::Poly>& cam, Eigen::Matrix4d T_lr)
 {
     const double sx = 0;
     SaveCamModelLeftRightVisionConvention(
