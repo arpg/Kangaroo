@@ -42,6 +42,15 @@ list(APPEND SRC_CU
     cu_raycast.cu cu_sdffusion.cu
 )
 
+find_package( Eigen3 REQUIRED )
+find_package( ASSIMP REQUIRED )
+if(EIGEN3_FOUND AND ASSIMP_FOUND)
+    message(STATUS "eigen: ${EIGEN3_INCLUDE_DIR}")
+    include_directories( ${EIGEN3_INCLUDE_DIR} )  
+    include_directories( ${ASSIMP_INCLUDE_DIR} )  
+    link_libraries( ${ASSIMP_LIBRARIES} )
+    list(APPEND SRC_CU MarchingCubes.cpp )
+endif()
 
 include_directories( ${Boost_INCLUDE_DIRS} )
 cuda_add_library( ${LIBRARY_NAME} ${SRC_H} ${SRC_CU} )
