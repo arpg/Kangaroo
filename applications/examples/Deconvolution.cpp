@@ -1,9 +1,9 @@
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 
-#include <kangaroo/common/DisplayUtils.h>
-#include <kangaroo/common/BaseDisplayCuda.h>
-#include <kangaroo/common/ImageSelect.h>
+#include <kangaroo/extra/DisplayUtils.h>
+#include <kangaroo/extra/BaseDisplayCuda.h>
+#include <kangaroo/extra/ImageSelect.h>
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>

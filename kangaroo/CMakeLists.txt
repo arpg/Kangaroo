@@ -1,5 +1,4 @@
 find_package(CUDA REQUIRED)
-find_package(Boost REQUIRED)
 
 set(CUDA_PROPAGATE_HOST_FLAGS off)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -52,7 +51,6 @@ if(EIGEN3_FOUND AND ASSIMP_FOUND)
     list(APPEND SRC_CU MarchingCubes.cpp )
 endif()
 
-include_directories( ${Boost_INCLUDE_DIRS} )
 cuda_add_library( ${LIBRARY_NAME} ${SRC_H} ${SRC_CU} )
 
 ##############################################################################

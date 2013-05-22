@@ -25,7 +25,7 @@
 
 #include <assimp/cexport.h>
 #include <assimp/scene.h>
-#include "common/AssimpMissing.h"
+#include "extra/AssimpMissing.h"
 
 namespace roo
 {

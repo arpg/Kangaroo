@@ -6,10 +6,10 @@
 #include <sophus/se3.hpp>
 
 #include <kangaroo/kangaroo.h>
-#include <kangaroo/common/DisplayUtils.h>
-#include <kangaroo/common/BaseDisplayCuda.h>
-#include <kangaroo/common/ImageSelect.h>
-#include <kangaroo/common/Handler3dGpuDepth.h>
+#include <kangaroo/extra/DisplayUtils.h>
+#include <kangaroo/extra/BaseDisplayCuda.h>
+#include <kangaroo/extra/ImageSelect.h>
+#include <kangaroo/extra/Handler3dGpuDepth.h>
 
 using namespace std;
 using namespace pangolin;

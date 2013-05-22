@@ -11,11 +11,11 @@
 #include <SceneGraph/GLVbo.h>
 #include "common/GLCameraHistory.h"
 
-#include <kangaroo/common/RpgCameraOpen.h>
-#include <kangaroo/common/DisplayUtils.h>
+#include <kangaroo/extra/RpgCameraOpen.h>
+#include <kangaroo/extra/DisplayUtils.h>
 #include "common/ScanlineRectify.h"
-#include <kangaroo/common/ImageSelect.h>
-#include <kangaroo/common/BaseDisplayCuda.h>
+#include <kangaroo/extra/ImageSelect.h>
+#include <kangaroo/extra/BaseDisplayCuda.h>
 #include "common/HeightmapFusion.h"
 #include "common/CameraModelPyramid.h"
 #include "common/LoadPosesFromFile.h"

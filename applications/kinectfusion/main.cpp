@@ -10,14 +10,14 @@
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/BoundedVolume.h>
 #include <kangaroo/MarchingCubes.h>
-#include <kangaroo/common/RpgCameraOpen.h>
-#include <kangaroo/common/ImageSelect.h>
-#include <kangaroo/common/BaseDisplayCuda.h>
-#include <kangaroo/common/DisplayUtils.h>
-#include <kangaroo/common/Handler3dGpuDepth.h>
-#include <kangaroo/common/SavePPM.h>
-#include <kangaroo/common/SaveMeshlab.h>
-#include <kangaroo/common/CVarHelpers.h>
+#include <kangaroo/extra/RpgCameraOpen.h>
+#include <kangaroo/extra/ImageSelect.h>
+#include <kangaroo/extra/BaseDisplayCuda.h>
+#include <kangaroo/extra/DisplayUtils.h>
+#include <kangaroo/extra/Handler3dGpuDepth.h>
+#include <kangaroo/extra/SavePPM.h>
+#include <kangaroo/extra/SaveMeshlab.h>
+#include <kangaroo/extra/CVarHelpers.h>
 
 using namespace std;
 using namespace pangolin;
