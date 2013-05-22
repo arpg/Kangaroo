@@ -30,7 +30,7 @@ find_package( Kangaroo REQUIRED)
 include_directories( ${Kangaroo_INCLUDE_DIRS} )
 link_libraries(${Kangaroo_LIBRARIES})
 
-add_executable( StereoViewer StereoViewer.cpp)
+add_executable( Anaglyph Anaglyph.cpp)
 add_executable( BilateralFilter BilateralFilter.cpp)
 add_executable( GuidedFilter GuidedFilter.cpp)
 add_executable( Denoising Denoising.cpp)
