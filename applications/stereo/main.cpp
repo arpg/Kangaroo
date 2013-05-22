@@ -28,7 +28,7 @@
 const int MAXD = 60;
 
 using namespace std;
-using namespace Gpu;
+using namespace roo;
 
 int main( int argc, char* argv[] )
 {
@@ -339,10 +339,10 @@ int main( int argc, char* argv[] )
                 CostVolMinimumSquarePenaltySubpix(imga, vol[0], imgd, maxdisp, -1, lambda, (theta) );
 
                 // Dual Ascent
-                Gpu::WeightedHuberGradU_DualAscentP(imgq, imgd, imgw, sigma_q, huber_alpha);
+                roo::WeightedHuberGradU_DualAscentP(imgq, imgd, imgw, sigma_q, huber_alpha);
 
                 // Primal Descent
-                Gpu::WeightedL2_u_minus_g_PrimalDescent(imgd, imgq, imga, imgw, sigma_d, 1.0f / (theta) );
+                roo::WeightedL2_u_minus_g_PrimalDescent(imgd, imgq, imga, imgw, sigma_d, 1.0f / (theta) );
 
                 theta= theta * (1-beta*n);
                 ++n;
@@ -350,7 +350,7 @@ int main( int argc, char* argv[] )
             if( theta <= min_theta && save_depthmaps ) {
                 cv::Mat dmap = cv::Mat( lh, lw, CV_32FC1 );
                 // convert disparity to depth
-                Gpu::Disp2Depth(imgd, depthmap, Kl(0,0), baseline );
+                roo::Disp2Depth(imgd, depthmap, Kl(0,0), baseline );
                 depthmap.MemcpyToHost( dmap.data );
 
                 // save depth image
@@ -424,14 +424,14 @@ int main( int argc, char* argv[] )
                 // Copy point cloud into VBO
                 {
                     pangolin::CudaScopedMappedPtr var(vbo);
-                    Gpu::Image<float4> dVbo((float4*)*var,lw,lh);
+                    roo::Image<float4> dVbo((float4*)*var,lw,lh);
                     dVbo.CopyFrom(d3d);
                 }
 
                 // Generate CBO
                 {
                     pangolin::CudaScopedMappedPtr var(cbo);
-                    Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
+                    roo::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
                     ConvertImage<uchar4,unsigned char>(dCbo, img_pyr[0][level]);
                 }
             }

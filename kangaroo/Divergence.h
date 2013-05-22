@@ -2,7 +2,7 @@
 
 #include "Image.h"
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Normalisation of Dual variables back to inside unit ball

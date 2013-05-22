@@ -1,13 +1,12 @@
+#include "cu_census.h"
+
 #include "MatUtils.h"
-#include "Image.h"
-#include "Volume.h"
 #include "hamming_distance.h"
 #include "launch_utils.h"
 #include "InvalidValue.h"
 #include "CUDA_SDK/sharedmem.h"
 
-
-namespace Gpu
+namespace roo
 {
 
 const int MaxImageWidth = 1024;

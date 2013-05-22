@@ -21,15 +21,15 @@ int main( int argc, char* argv[] )
     // Image dimensions and host copy
     const unsigned int w = video.Width();
     const unsigned int h = video.Height();
-    Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> host(w,h);
+    roo::Image<unsigned char, roo::TargetHost, roo::Manage> host(w,h);
 
     // Initialise window
     View& container = SetupPangoGLWithCuda(180+2*w, h,180);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> imgf(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgs(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> imgf(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgs(w,h);
 
     ActivateDrawImage<unsigned char> adg(img, GL_LUMINANCE8, true, true);
     ActivateDrawImage<unsigned char> ads(imgf, GL_LUMINANCE8, true, true);
@@ -65,10 +65,10 @@ int main( int argc, char* argv[] )
         go |= GuiVarHasChanged();
         if(go) {
             if(do_fast) {
-                Gpu::SegmentTest(imgf, img, fast_thresh, minseglen);
+                roo::SegmentTest(imgf, img, fast_thresh, minseglen);
             }else{
-                Gpu::HarrisScore(imgs, img, harris_lambda);
-                Gpu::NonMaximalSuppression(imgf, imgs, harris_nms_rad, harris_thresh);
+                roo::HarrisScore(imgs, img, harris_lambda);
+                roo::NonMaximalSuppression(imgf, imgs, harris_nms_rad, harris_thresh);
             }
         }
 

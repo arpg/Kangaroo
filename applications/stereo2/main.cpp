@@ -31,7 +31,7 @@ const int MAXD = 128;
 
 using namespace std;
 using namespace pangolin;
-using namespace Gpu;
+using namespace roo;
 
 int main( int argc, char* argv[] )
 {
@@ -148,34 +148,34 @@ int main( int argc, char* argv[] )
     GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
-    Gpu::Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
+    roo::Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
+    roo::Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
 
-    Gpu::Image<unsigned char, TargetDevice, Manage> upload(w,h);
+    roo::Image<unsigned char, TargetDevice, Manage> upload(w,h);
     Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
 
-    Gpu::Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
+    roo::Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
     Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD},{lw,lh,MAXD}};
-    Gpu::Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
-    Gpu::Image<float, TargetDevice, Manage> meanI(lw,lh);
-    Gpu::Image<float, TargetDevice, Manage> varI(lw,lh);
-    Gpu::Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
+    roo::Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
+    roo::Image<float, TargetDevice, Manage> meanI(lw,lh);
+    roo::Image<float, TargetDevice, Manage> varI(lw,lh);
+    roo::Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
 
-    Gpu::Image<float4, TargetDevice, Manage>  d3d(lw,lh);
-    Gpu::Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
-    Gpu::Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
-    Gpu::Image<float, TargetDevice, Manage>  Err(lw,lh);
+    roo::Image<float4, TargetDevice, Manage>  d3d(lw,lh);
+    roo::Image<float, TargetDevice, Manage>  dCrossSection(lw,MAXD);
+    roo::Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
+    roo::Image<float, TargetDevice, Manage>  Err(lw,lh);
 
     typedef ulong4 census_t;
-    Gpu::Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
+    roo::Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
 
-    Gpu::Image<unsigned char, TargetHost, Manage> hImg[] = {{lw,lh},{lw,lh}};
-    Gpu::Image<float, TargetHost, Manage> hDisp(lw,lh);
+    roo::Image<unsigned char, TargetHost, Manage> hImg[] = {{lw,lh},{lw,lh}};
+    roo::Image<float, TargetHost, Manage> hDisp(lw,lh);
 
 #ifdef COSTVOL_TIME
     Sophus::SE3d T_wv;
     Volume<CostVolElem, TargetDevice, Manage>  dCostVol(lw,lh,MAXD);
-    Gpu::Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
+    roo::Image<unsigned char, TargetDevice, Manage> dImgv(lw,lh);
 #endif
 
 #ifdef HM_FUSION
@@ -191,7 +191,7 @@ int main( int argc, char* argv[] )
     //generate index buffer for heightmap
     {
         CudaScopedMappedPtr var(ibo_hm);
-        Gpu::Image<uint2> dIbo((uint2*)*var,hm.WidthPixels(),hm.HeightPixels());
+        roo::Image<uint2> dIbo((uint2*)*var,hm.WidthPixels(),hm.HeightPixels());
         GenerateTriangleStripIndexBuffer(dIbo);
     }
 #endif // HM_FUSION
@@ -393,12 +393,12 @@ int main( int argc, char* argv[] )
                 // Filter Cost volume
                 for(int v=0; v<(leftrightcheck?2:1); ++v)
                 {
-                    Gpu::Image<float, TargetDevice, Manage>& I = img[v];
+                    roo::Image<float, TargetDevice, Manage>& I = img[v];
                     ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
 
                     for(int d=0; d<maxdisp; ++d)
                     {
-                        Gpu::Image<float> P = vol[v].ImageXY(d);
+                        roo::Image<float> P = vol[v].ImageXY(d);
                         ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
                         GuidedFilter(P,temp[0],varI,temp[1],meanI,I,Scratch,temp[2],temp[3],temp[4],rad,eps);
                     }
@@ -409,11 +409,11 @@ int main( int argc, char* argv[] )
                 // Filter Cost volume
                 for(int v=0; v<(leftrightcheck?2:1); ++v)
                 {
-                    Gpu::Image<float, TargetDevice, Manage>& I = img[v];
+                    roo::Image<float, TargetDevice, Manage>& I = img[v];
 
                     for(int d=0; d<maxdisp; ++d)
                     {
-                        Gpu::Image<float> P = vol[v].ImageXY(d);
+                        roo::Image<float> P = vol[v].ImageXY(d);
                         temp[0].CopyFrom(P);
                         BilateralFilter<float,float,float>(P,temp[0],I,gs,gr,gc,bilateralWinSize);
                     }
@@ -507,7 +507,7 @@ int main( int argc, char* argv[] )
                 // Fit plane
                 for(int i=0; i<(resetPlane*100+5); ++i )
                 {
-                    Gpu::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, Scratch, Err, plane_within, plane_c);
+                    roo::LeastSquaresSystem<float,3> lss = PlaneFitGN(d3d, Qinv, z, Scratch, Err, plane_within, plane_c);
                     Eigen::FullPivLU<Eigen::Matrix3d> lu_JTJ( (Eigen::Matrix3d)lss.JTJ );
                     Eigen::Vector3d x = -1.0 * lu_JTJ.solve( (Eigen::Vector3d)lss.JTy );
                     if( x.norm() > 1 ) x = x / x.norm();
@@ -547,14 +547,14 @@ int main( int argc, char* argv[] )
                 // Copy point cloud into VBO
                 {
                     CudaScopedMappedPtr var(vbo);
-                    Gpu::Image<float4> dVbo((float4*)*var,lw,lh);
+                    roo::Image<float4> dVbo((float4*)*var,lw,lh);
                     dVbo.CopyFrom(d3d);
                 }
 
                 // Generate CBO
                 {
                     CudaScopedMappedPtr var(cbo);
-                    Gpu::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
+                    roo::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
 #ifdef COSTVOL_TIME
                     ConvertImage<uchar4,unsigned char>(dCbo, dImgv);
 #else

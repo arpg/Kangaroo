@@ -1,8 +1,9 @@
-#include "Image.h"
+#include "cu_convert.h"
+
 #include "launch_utils.h"
 #include "pixel_convert.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////
@@ -42,4 +43,4 @@ template void ConvertImage<unsigned char, uchar4>(Image<unsigned char>, const Im
 template void ConvertImage<float4, float>(Image<float4>, const Image<float>);
 
 
-} // namespace Gpu
+} // namespace roo

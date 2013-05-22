@@ -19,9 +19,9 @@ int main( int /*argc*/, char* argv[] )
     const int h = 480 >> l;
     const int num_trials = 100;
 
-    Gpu::Image<unsigned char,Gpu::TargetDevice, Gpu::Manage> dWorkspace(w*sizeof(Gpu::LeastSquaresSystem<float,6>),h);
+    roo::Image<unsigned char,roo::TargetDevice, roo::Manage> dWorkspace(w*sizeof(roo::LeastSquaresSystem<float,6>),h);
 
-    Gpu::CudaTimer timer;
+    roo::CudaTimer timer;
 
     timer.Start();
     cout << "Started" << endl;

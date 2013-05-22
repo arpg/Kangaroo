@@ -1,11 +1,8 @@
-#include "Image.h"
 #include "variational.h"
+
 #include "launch_utils.h"
-#include "Divergence.h"
 
-using namespace std;
-
-namespace Gpu
+namespace roo
 {
 
 __global__ void KernTgvL1DenoisingDescentU(

@@ -37,7 +37,7 @@ inline void ApplyPreferredGlSettings()
 }
 
 template<typename T, typename Owner>
-inline void CopyToTex(pangolin::GlTextureCudaArray& tex, const Gpu::Image<T,Gpu::TargetDevice,Owner>& dImg)
+inline void CopyToTex(pangolin::GlTextureCudaArray& tex, const roo::Image<T,roo::TargetDevice,Owner>& dImg)
 {
     pangolin::CudaScopedMappedArray arr_tex(tex);
     cudaError_t err = cudaMemcpy2DToArray(*arr_tex, 0, 0, dImg.ptr, dImg.pitch, sizeof(T)*min(tex.width,dImg.w), min(tex.height,dImg.h), cudaMemcpyDeviceToDevice );
@@ -47,7 +47,7 @@ inline void CopyToTex(pangolin::GlTextureCudaArray& tex, const Gpu::Image<T,Gpu:
 }
 
 template<typename T, typename Owner>
-inline void operator<<(pangolin::GlTextureCudaArray& tex, const Gpu::Image<T,Gpu::TargetDevice,Owner>& dImg)
+inline void operator<<(pangolin::GlTextureCudaArray& tex, const roo::Image<T,roo::TargetDevice,Owner>& dImg)
 {
     CopyToTex(tex,dImg);
 }

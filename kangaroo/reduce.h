@@ -2,7 +2,7 @@
 
 #include "Image.h"
 
-namespace Gpu {
+namespace roo {
 
 template<typename To, typename UpType, typename Ti>
 void BoxHalf( Image<To> out, const Image<Ti> in);

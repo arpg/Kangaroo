@@ -22,7 +22,7 @@
 #include <Eigen/Dense>
 #endif // USE_EIGEN
 
-namespace Gpu
+namespace roo
 {
 
 ///////////////////////////////////////////

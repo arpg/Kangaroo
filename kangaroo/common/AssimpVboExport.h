@@ -26,7 +26,7 @@ inline aiFace* MakeAssimpImageFaces(size_t w, size_t h)
     return faces;
 }
 
-inline aiVector3D* MakeAssimpVertices(Gpu::Image<float4, Gpu::TargetHost> vbo)
+inline aiVector3D* MakeAssimpVertices(roo::Image<float4, roo::TargetHost> vbo)
 {
     aiVector3D* vertices = new aiVector3D[vbo.Area()];
     for(int x=0; x < vbo.w; ++x)
@@ -40,7 +40,7 @@ inline aiVector3D* MakeAssimpVertices(Gpu::Image<float4, Gpu::TargetHost> vbo)
     return vertices;
 }
 
-inline aiColor4D* MakeAssimVerticesColor(Gpu::Image<unsigned char, Gpu::TargetHost> cbo)
+inline aiColor4D* MakeAssimVerticesColor(roo::Image<unsigned char, roo::TargetHost> cbo)
 {
     aiColor4D* colors = new aiColor4D[cbo.Area()];
     for(int x=0; x < cbo.w; ++x)
@@ -54,7 +54,7 @@ inline aiColor4D* MakeAssimVerticesColor(Gpu::Image<unsigned char, Gpu::TargetHo
     return colors;
 }
 
-inline aiMesh* MakeAssimpMeshFromVbo(Gpu::Image<float4, Gpu::TargetHost> vbo)
+inline aiMesh* MakeAssimpMeshFromVbo(roo::Image<float4, roo::TargetHost> vbo)
 {
     aiMesh* mesh = new aiMesh();
     mesh->mPrimitiveTypes = aiPrimitiveType_POLYGON;
@@ -68,7 +68,7 @@ inline aiMesh* MakeAssimpMeshFromVbo(Gpu::Image<float4, Gpu::TargetHost> vbo)
     return mesh;
 }
 
-inline aiMesh* MakeAssimpMeshFromVboCbo(Gpu::Image<float4, Gpu::TargetHost> vbo, Gpu::Image<unsigned char, Gpu::TargetHost> img)
+inline aiMesh* MakeAssimpMeshFromVboCbo(roo::Image<float4, roo::TargetHost> vbo, roo::Image<unsigned char, roo::TargetHost> img)
 {
     aiMesh* mesh = new aiMesh();
     mesh->mPrimitiveTypes = aiPrimitiveType_POLYGON;

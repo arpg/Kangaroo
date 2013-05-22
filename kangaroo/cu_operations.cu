@@ -1,10 +1,11 @@
+#include "cu_operations.h"
+
 #include "MatUtils.h"
-#include "Image.h"
 #include "launch_utils.h"
 #include "CUDA_SDK/sharedmem.h"
 
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

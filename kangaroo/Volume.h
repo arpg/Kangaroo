@@ -16,7 +16,7 @@
 #include "Mat.h"
 #include "sampling.h"
 
-namespace Gpu
+namespace roo
 {
 
 template<typename T, typename Target = TargetDevice, typename Management = DontManage>
@@ -342,13 +342,13 @@ struct Volume
 
 #ifdef HAVE_THRUST
     inline __device__ __host__
-    typename Gpu::ThrustType<T,Target>::Ptr begin() {
-        return (typename Gpu::ThrustType<T,Target>::Ptr)(ptr);
+    typename roo::ThrustType<T,Target>::Ptr begin() {
+        return (typename roo::ThrustType<T,Target>::Ptr)(ptr);
     }
 
     inline __device__ __host__
-    typename Gpu::ThrustType<T,Target>::Ptr end() {
-        return (typename Gpu::ThrustType<T,Target>::Ptr)( RowPtr(h-1,d-1) + w );
+    typename roo::ThrustType<T,Target>::Ptr end() {
+        return (typename roo::ThrustType<T,Target>::Ptr)( RowPtr(h-1,d-1) + w );
     }
 
     inline __host__

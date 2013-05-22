@@ -14,10 +14,10 @@ struct KinectKeyframe
     }
 
     Sophus::SE3d T_iw;
-    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> img;
+    roo::Image<uchar3, roo::TargetDevice, roo::Manage> img;
 };
 
-void SaveMeshlab(Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage>& vol, boost::ptr_vector<KinectKeyframe>& keyframes, float fu, float fv, float u0, float v0)
+void SaveMeshlab(roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage>& vol, boost::ptr_vector<KinectKeyframe>& keyframes, float fu, float fv, float u0, float v0)
 {
     Eigen::Matrix3d RDFvision;  RDFvision  << 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFmeshlab; RDFmeshlab << 1,0,0,  0,-1,0, 0,0,-1;
@@ -39,7 +39,7 @@ void SaveMeshlab(Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage>&
 
     of << " <MeshGroup>" << std::endl;
 
-    Gpu::SaveMesh(mesh_filename, vol);
+    roo::SaveMesh(mesh_filename, vol);
     of << "  <MLMesh label=\"mesh.ply\" filename=\"" << mesh_filename << ".ply\">" << std::endl;
     of << "   <MLMatrix44>" << std::endl;
     of << "1 0 0 0 " << std::endl;

@@ -8,7 +8,7 @@
 
 using namespace std;
 using namespace pangolin;
-using namespace Gpu;
+using namespace roo;
 
 int main( int argc, char* argv[] )
 {
@@ -21,7 +21,7 @@ int main( int argc, char* argv[] )
     // Image dimensions and host copy
     const unsigned int w = video.Width();
     const unsigned int h = video.Height();
-    Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> host(w,h);
+    roo::Image<unsigned char, roo::TargetHost, roo::Manage> host(w,h);
 
     // Initialise window
     View& container = SetupPangoGLWithCuda(1024, 768);
@@ -32,24 +32,24 @@ int main( int argc, char* argv[] )
     GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> I(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> P(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> II(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> IP(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> meanI(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> meanP(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> meanII(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> meanIP(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> covIP(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> varI(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> a(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> b(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> meana(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> meanb(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> q(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> I(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> P(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> II(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> IP(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> meanI(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> meanP(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> meanII(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> meanIP(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> covIP(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> varI(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> a(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> b(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> meana(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> meanb(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> q(w,h);
 
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> Scratch(w*sizeof(int),h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> Scratch(w*sizeof(int),h);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", true, true);
@@ -63,7 +63,7 @@ int main( int argc, char* argv[] )
         if(go) {
             if(video.GrabNext(host.ptr)) {
                 img.CopyFrom(host);            
-                Gpu::ElementwiseScaleBias<float,unsigned char,float>(I,img,1/255.0,0);
+                roo::ElementwiseScaleBias<float,unsigned char,float>(I,img,1/255.0,0);
                 P.CopyFrom(I);
             }
         }
@@ -73,39 +73,39 @@ int main( int argc, char* argv[] )
             // Kaiming He, Jian Sun, and Xiaoou Tang
 
             // mean_I = boxfilter(I, r) ./ N;
-            Gpu::BoxFilter<float,float,float>(meanI,I,Scratch,rad);
+            roo::BoxFilter<float,float,float>(meanI,I,Scratch,rad);
 
             // mean_II = boxfilter(I.*I, r) ./ N;
-            Gpu::ElementwiseSquare<float,float,float>(II,I);
-            Gpu::BoxFilter<float,float,float>(meanII,II,Scratch,rad);
+            roo::ElementwiseSquare<float,float,float>(II,I);
+            roo::BoxFilter<float,float,float>(meanII,II,Scratch,rad);
 
             // mean_p = boxfilter(p, r) ./ N;
-            Gpu::BoxFilter<float,float,float>(meanP,P,Scratch,rad);
+            roo::BoxFilter<float,float,float>(meanP,P,Scratch,rad);
 
             // mean_Ip = boxfilter(I.*p, r) ./ N;
-            Gpu::ElementwiseMultiply<float,float,float,float>(IP,I,P);
-            Gpu::BoxFilter<float,float,float>(meanIP,IP,Scratch,rad);
+            roo::ElementwiseMultiply<float,float,float,float>(IP,I,P);
+            roo::BoxFilter<float,float,float>(meanIP,IP,Scratch,rad);
 
             // cov_Ip = mean_Ip - mean_I .* mean_p; % this is the covariance of (I, p) in each local patch.
-            Gpu::ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
+            roo::ElementwiseMultiplyAdd<float,float,float,float,float>(covIP, meanI, meanP, meanIP, -1);
 
             // var_I = mean_II - mean_I .* mean_I;
-            Gpu::ElementwiseMultiplyAdd<float,float,float,float,float>(varI, meanI, meanI, meanII,-1);
+            roo::ElementwiseMultiplyAdd<float,float,float,float,float>(varI, meanI, meanI, meanII,-1);
 
             // a = cov_Ip ./ (var_I + eps); % Eqn. (5) in the paper;
-            Gpu::ElementwiseDivision<float,float,float,float>(a, covIP, varI, 0, eps);
+            roo::ElementwiseDivision<float,float,float,float>(a, covIP, varI, 0, eps);
 
             // b = mean_p - a .* mean_I; % Eqn. (6) in the paper;
-            Gpu::ElementwiseMultiplyAdd<float,float,float,float,float>(b, a,meanI,meanP,-1);
+            roo::ElementwiseMultiplyAdd<float,float,float,float,float>(b, a,meanI,meanP,-1);
 
             // mean_a = boxfilter(a, r) ./ N;
-            Gpu::BoxFilter<float,float,float>(meana,a,Scratch,rad);
+            roo::BoxFilter<float,float,float>(meana,a,Scratch,rad);
 
             // mean_b = boxfilter(b, r) ./ N;
-            Gpu::BoxFilter<float,float,float>(meanb,b,Scratch,rad);
+            roo::BoxFilter<float,float,float>(meanb,b,Scratch,rad);
 
             // q = mean_a .* I + mean_b; % Eqn. (8) in the paper;
-            Gpu::ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
+            roo::ElementwiseMultiplyAdd<float,float,float,float,float>(q,meana,I,meanb);
         }
 
         /////////////////////////////////////////////////////////////

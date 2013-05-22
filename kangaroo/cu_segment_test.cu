@@ -1,4 +1,5 @@
-#include "Image.h"
+#include "cu_segment_test.h"
+
 #include "launch_utils.h"
 
 #include <thrust/copy.h>
@@ -6,7 +7,7 @@
 #include <thrust/functional.h>
 
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Segment test

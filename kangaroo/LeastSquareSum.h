@@ -3,7 +3,7 @@
 #include "Mat.h"
 #include "Image.h"
 
-namespace Gpu
+namespace roo
 {
 
 ///////////////////////////////////////////

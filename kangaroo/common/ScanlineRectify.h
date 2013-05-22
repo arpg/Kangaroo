@@ -20,7 +20,7 @@ inline Eigen::Matrix3d MakeK(const Eigen::VectorXd& camParamsVec, size_t w, size
 }
 
 inline Sophus::SE3d CreateScanlineRectifiedLookupAndT_rl(
-    Gpu::Image<float2> dlookup_left, Gpu::Image<float2> dlookup_right,
+    roo::Image<float2> dlookup_left, roo::Image<float2> dlookup_right,
     const Sophus::SE3d T_rl,
     const Eigen::Matrix3d& lK, double lk1, double lk2,
     const Eigen::Matrix3d& rK, double rk1, double rk2
@@ -62,8 +62,8 @@ inline Sophus::SE3d CreateScanlineRectifiedLookupAndT_rl(
     const Eigen::Matrix3d Hr_nr = rK * (mR_nl * R_lr.matrix()).transpose() * rKinv;
 
     // Copy to simple Array objects to pass to CUDA by Value
-    Gpu::Mat<float,9> H_ol_nl;
-    Gpu::Mat<float,9> H_or_nr;
+    roo::Mat<float,9> H_ol_nl;
+    roo::Mat<float,9> H_or_nr;
 
     for(int r=0; r<3; ++r) {
         for(int c=0; c<3; ++c) {
@@ -73,8 +73,8 @@ inline Sophus::SE3d CreateScanlineRectifiedLookupAndT_rl(
     }
 
     // Invoke CUDA Kernel to generate lookup table
-    Gpu::CreateMatlabLookupTable(dlookup_left, lK(0,0), lK(1,1), lK(0,2), lK(1,2), lk1, lk2, H_ol_nl);
-    Gpu::CreateMatlabLookupTable(dlookup_right,rK(0,0), rK(1,1), rK(0,2), rK(1,2), rk1, rk2, H_or_nr);
+    roo::CreateMatlabLookupTable(dlookup_left, lK(0,0), lK(1,1), lK(0,2), lK(1,2), lk1, lk2, H_ol_nl);
+    roo::CreateMatlabLookupTable(dlookup_right,rK(0,0), rK(1,1), rK(0,2), rK(1,2), rk1, rk2, H_or_nr);
 
     return T_nr_nl;
 }

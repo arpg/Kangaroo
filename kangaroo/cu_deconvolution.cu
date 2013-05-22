@@ -1,9 +1,10 @@
-#include "Image.h"
+#include "cu_deconvolution.h"
+
 #include "variational.h"
 #include "launch_utils.h"
 #include "Divergence.h"
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Convolution p ascent

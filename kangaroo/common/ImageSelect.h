@@ -175,13 +175,13 @@ template<typename T>
 class ActivateDrawImage
 {
 public:
-    ActivateDrawImage(Gpu::Image<T,Gpu::TargetDevice> image, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
+    ActivateDrawImage(roo::Image<T,roo::TargetDevice> image, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
         :image(image), glTex(image.w,image.h,internal_format,sampling_linear), flipy(flipy), pixScale(1)
     {
     }
 
     void operator()(pangolin::View& view) {
-        CopyToTex<T,Gpu::DontManage>(glTex,image);
+        CopyToTex<T,roo::DontManage>(glTex,image);
 
         glPushAttrib(GL_ENABLE_BIT);
         glDisable(GL_DEPTH_TEST);
@@ -202,7 +202,7 @@ public:
         glPopAttrib();
     }
 
-    void SetImage(Gpu::Image<T,Gpu::TargetDevice> image) {
+    void SetImage(roo::Image<T,roo::TargetDevice> image) {
         this->image.ptr = image.ptr;
         this->image.pitch = image.pitch;
         this->image.w = image.w;
@@ -214,7 +214,7 @@ public:
     }
 
 protected:    
-    Gpu::Image<T,Gpu::TargetDevice> image;
+    roo::Image<T,roo::TargetDevice> image;
     pangolin::GlTextureCudaArray glTex;
     bool flipy;
     float pixScale;
@@ -228,13 +228,13 @@ template<typename T, unsigned Levels>
 class ActivateDrawPyramid
 {
 public:
-    ActivateDrawPyramid(const Gpu::Pyramid<T,Levels> pyramid, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
+    ActivateDrawPyramid(const roo::Pyramid<T,Levels> pyramid, GLint internal_format = GL_RGBA8, bool sampling_linear = true, bool flipy=false)
         :pyramid(pyramid), glTex(pyramid[0].w,pyramid[0].h,internal_format,sampling_linear), flipy(flipy), pixScale(1), level(0)
     {
     }
 
     void operator()(pangolin::View& view) {
-        CopyToTex<T,Gpu::DontManage>(glTex,pyramid[level]);
+        CopyToTex<T,roo::DontManage>(glTex,pyramid[level]);
 
         glPushAttrib(GL_ENABLE_BIT);
         glDisable(GL_DEPTH_TEST);
@@ -272,7 +272,7 @@ public:
     }
 
 protected:
-    const Gpu::Pyramid<T,Levels> pyramid;
+    const roo::Pyramid<T,Levels> pyramid;
     pangolin::GlTextureCudaArray glTex;
     bool flipy;
     float pixScale;

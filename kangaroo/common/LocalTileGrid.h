@@ -84,7 +84,7 @@ protected:
     // Adjacency list of faces, ordered pairwise in opposites.
     Tile* adj[6];
 
-    bool IntersectsWithFrustum(const Sophus::SE3d T_wc, int w, int h, Gpu::ImageIntrinsics K, float near, float far)
+    bool IntersectsWithFrustum(const Sophus::SE3d T_wc, int w, int h, roo::ImageIntrinsics K, float near, float far)
     {
         // TODO: implement
         return false;

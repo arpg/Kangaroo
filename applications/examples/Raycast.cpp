@@ -18,7 +18,7 @@ int main( int argc, char* argv[] )
 {
     const unsigned int w = 512;
     const unsigned int h = 512;
-    const Gpu::ImageIntrinsics K(500,500,w /2, h /2);
+    const roo::ImageIntrinsics K(500,500,w /2, h /2);
     const int volres = 128;
 
     // Initialise window
@@ -29,10 +29,10 @@ int main( int argc, char* argv[] )
     Var<float> far("ui.far",10, 0, 10);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> depth(w,h);
-    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> norm(w,h);
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
+    roo::Image<float, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> depth(w,h);
+    roo::Image<float4, roo::TargetDevice, roo::Manage> norm(w,h);
+    roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
 
@@ -55,7 +55,7 @@ int main( int argc, char* argv[] )
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( &handler3d  );
 
-    Gpu::SdfSphere(vol, make_float3(0,0,0), 0.9 );
+    roo::SdfSphere(vol, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
 
@@ -63,7 +63,7 @@ int main( int argc, char* argv[] )
     {
         Sophus::SE3d T_cw(s_cam.GetModelViewMatrix());
 
-        Gpu::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), K, near, far, 0, subpix );
+        roo::RaycastSdf(depth, norm, img, vol, T_cw.inverse().matrix3x4(), K, near, far, 0, subpix );
 
         /////////////////////////////////////////////////////////////
         // Perform drawing

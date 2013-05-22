@@ -3,7 +3,7 @@
 #include "Volume.h"
 #include "BoundingBox.h"
 
-namespace Gpu
+namespace roo
 {
 
 template<typename T, typename Target = TargetDevice, typename Management = DontManage>

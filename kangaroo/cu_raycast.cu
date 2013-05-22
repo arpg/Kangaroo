@@ -1,11 +1,9 @@
-#include "MatUtils.h"
-#include "Image.h"
-#include "Sdf.h"
-#include "BoundedVolume.h"
-#include "launch_utils.h"
-#include "ImageIntrinsics.h"
+#include "cu_raycast.h"
 
-namespace Gpu
+#include "MatUtils.h"
+#include "launch_utils.h"
+
+namespace roo
 {
 
 //////////////////////////////////////////////////////

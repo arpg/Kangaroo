@@ -1,7 +1,8 @@
-#include "Image.h"
+#include "cu_convolution.h"
+
 #include "launch_utils.h"
 
-namespace Gpu
+namespace roo
 {
 
 // Crudest possible CUDA Convolution implementation

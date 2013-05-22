@@ -1,8 +1,9 @@
-#include "Image.h"
+#include "cu_plane_fit.h"
+
 #include "launch_utils.h"
 #include "LeastSquareSum.h"
 
-namespace Gpu
+namespace roo
 {
 
 __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qinv, const Mat<float,3> zhat, Image<LeastSquaresSystem<float,3> > dSum, Image<float> dErr, float zmin, float zmax, float c )

@@ -32,20 +32,20 @@ int main( int argc, char* argv[] )
     View& container = SetupPangoGLWithCuda(180+2*w, h,180);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> kernel(kw,kh);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> kernel(kw,kh);
 
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imggt(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgg(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgk(kw,kh);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgkT(kw,kh);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imggt(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgg(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgk(kw,kh);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgkT(kw,kh);
 
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  imgu(w,h);
-    Gpu::Image<float2, Gpu::TargetDevice, Gpu::Manage> imgp(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  imgq(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage>  imgu(w,h);
+    roo::Image<float2, roo::TargetDevice, roo::Manage> imgp(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage>  imgq(w,h);
 
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  imgAu(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage>  imgATq(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage>  imgAu(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage>  imgATq(w,h);
 
     ActivateDrawImage<float> adgt(imggt, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, true, true);
@@ -79,10 +79,10 @@ int main( int argc, char* argv[] )
             if(video.Grab(vid_buffer,images)) {
                 img.MemcpyFromHost(images[0].ptr );
                 kernel.MemcpyFromHost(images[1].ptr );
-                Gpu::ElementwiseScaleBias<float,unsigned char,float>(imggt, img, 1.0f/255.0f);
-                Gpu::ElementwiseScaleBias<float,unsigned char,float>(imgk, kernel, 1.0f/255.0f);
-                Gpu::Transpose<float,float>(imgkT, imgk);
-                Gpu::Convolution<float,float,float,float>(imgg, imggt, imgk, kw/2, kh/2);
+                roo::ElementwiseScaleBias<float,unsigned char,float>(imggt, img, 1.0f/255.0f);
+                roo::ElementwiseScaleBias<float,unsigned char,float>(imgk, kernel, 1.0f/255.0f);
+                roo::Transpose<float,float>(imgkT, imgk);
+                roo::Convolution<float,float,float,float>(imgg, imggt, imgk, kw/2, kh/2);
                 imgu.CopyFrom(imgg);
                 imgp.Memset(0);
                 imgq.Memset(0);
@@ -91,12 +91,12 @@ int main( int argc, char* argv[] )
 
         if(go) {
             for(int i=0; i<1; ++i ) {
-//                Gpu::TVL1GradU_DualAscentP(imgp,imgu,sigma_p);
-                Gpu::HuberGradU_DualAscentP(imgp,imgu,sigma_p,alpha);
-                Gpu::Convolution<float,float,float,float>(imgAu, imgu, imgk, kw/2, kh/2);
-                Gpu::DeconvolutionDual_qAscent(imgq,imgAu,imgg,sigma_q,lambda);
-                Gpu::Convolution<float,float,float,float>(imgATq, imgq, imgkT, kw/2, kh/2);
-                Gpu::Deconvolution_uDescent(imgu,imgp,imgATq, tau, lambda);
+//                roo::TVL1GradU_DualAscentP(imgp,imgu,sigma_p);
+                roo::HuberGradU_DualAscentP(imgp,imgu,sigma_p,alpha);
+                roo::Convolution<float,float,float,float>(imgAu, imgu, imgk, kw/2, kh/2);
+                roo::DeconvolutionDual_qAscent(imgq,imgAu,imgg,sigma_q,lambda);
+                roo::Convolution<float,float,float,float>(imgATq, imgq, imgkT, kw/2, kh/2);
+                roo::Deconvolution_uDescent(imgu,imgp,imgATq, tau, lambda);
             }
         }
 

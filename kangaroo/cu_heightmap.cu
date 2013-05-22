@@ -1,8 +1,9 @@
+#include "cu_heightmap.h"
+
 #include "MatUtils.h"
-#include "Image.h"
 #include "launch_utils.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

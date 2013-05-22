@@ -9,7 +9,7 @@
 #include "CUDA_SDK/cutil_math.h"
 #include "Mat.h"
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Cross type operations

@@ -4,7 +4,7 @@
 
 struct Handler3DGpuDepth : public pangolin::Handler3D
 {
-    Handler3DGpuDepth(Gpu::Image<float> depth, pangolin::OpenGlRenderState& cam_state, pangolin::AxisDirection enforce_up=pangolin::AxisNone, float trans_scale=0.01f)
+    Handler3DGpuDepth(roo::Image<float> depth, pangolin::OpenGlRenderState& cam_state, pangolin::AxisDirection enforce_up=pangolin::AxisNone, float trans_scale=0.01f)
         : pangolin::Handler3D(cam_state,enforce_up, trans_scale), depth(depth)
     {
     }
@@ -31,5 +31,5 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
     }
 
 protected:
-    Gpu::Image<float> depth;
+    roo::Image<float> depth;
 };

@@ -27,7 +27,7 @@
 #include <assimp/scene.h>
 #include "common/AssimpMissing.h"
 
-namespace Gpu
+namespace roo
 {
 
 //fGetOffset finds the approximate point of intersection of the surface
@@ -52,8 +52,8 @@ inline void vGetColor(float3 &rfColor, const float3 &rfPosition, const float3 &r
 //vMarchCube performs the Marching Cubes algorithm on a single cube
 template<typename T, typename TColor>
 void vMarchCube(
-    const BoundedVolume<T,Gpu::TargetHost> vol,
-    const BoundedVolume<TColor,Gpu::TargetHost> volColor,
+    const BoundedVolume<T,roo::TargetHost> vol,
+    const BoundedVolume<TColor,roo::TargetHost> volColor,
     int x, int y, int z,
     std::vector<aiVector3D>& verts,
     std::vector<aiVector3D>& norms,
@@ -135,7 +135,7 @@ void vMarchCube(
 
             if(volColor.IsValid()) {
                 const TColor c = volColor.GetUnitsTrilinearClamped(asEdgeVertex[iVertex]);
-                float3 sColor = Gpu::ConvertPixel<float3,TColor>(c);
+                float3 sColor = roo::ConvertPixel<float3,TColor>(c);
                 colors.push_back(aiColor4D(sColor.x, sColor.y, sColor.z, 1.0f));
             }
 

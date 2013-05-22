@@ -1,7 +1,7 @@
-#include "Image.h"
+#include "cu_anaglyph.h"
 #include "launch_utils.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

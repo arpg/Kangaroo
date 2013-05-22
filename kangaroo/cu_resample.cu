@@ -1,9 +1,10 @@
-#include "Image.h"
+#include "cu_resample.h"
+
 #include "launch_utils.h"
 #include "sampling.h"
 #include "InvalidValue.h"
 
-namespace Gpu
+namespace roo
 {
 
 __global__ void  resample_kernal(

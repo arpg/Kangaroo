@@ -1,8 +1,9 @@
-#include "Image.h"
+#include "cu_median.h"
+
 #include "launch_utils.h"
 #include "InvalidValue.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

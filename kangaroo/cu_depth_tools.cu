@@ -1,10 +1,10 @@
-#include "Image.h"
+#include "cu_depth_tools.h"
+
 #include "launch_utils.h"
 #include "patch_score.h"
-#include "ImageKeyframe.h"
 #include "MatUtils.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

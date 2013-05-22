@@ -1,8 +1,9 @@
-#include "Image.h"
+#include "cu_integral_image.h"
+
 #include "launch_utils.h"
 #include "CUDA_SDK/sharedmem.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

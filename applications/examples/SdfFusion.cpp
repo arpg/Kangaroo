@@ -18,7 +18,7 @@ int main( int argc, char* argv[] )
 {
     const unsigned int w = 512;
     const unsigned int h = 512;
-    const Gpu::ImageIntrinsics K(500,500,w /2, h /2);
+    const roo::ImageIntrinsics K(500,500,w /2, h /2);
     const int volres = 128;
 
     // Initialise window
@@ -29,15 +29,15 @@ int main( int argc, char* argv[] )
     Var<float> far("ui.far",100, 0, 100);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> depth(w,h);
-    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> norm(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> gtd(w,h);
-    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> gtn(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> depth(w,h);
+    roo::Image<float4, roo::TargetDevice, roo::Manage> norm(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> gtd(w,h);
+    roo::Image<float4, roo::TargetDevice, roo::Manage> gtn(w,h);
 
     pangolin::GlBufferCudaPtr vbo(pangolin::GlArrayBuffer, w*h,GL_FLOAT,4, cudaGraphicsMapFlagsWriteDiscard, GL_STREAM_DRAW);
 
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
+    roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage> vol(volres,volres,volres,make_float3(-1,-1,-1), make_float3(1,1,1));
     ActivateDrawImage<float> adg(img, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float4> adn(norm, GL_RGBA32F, true, true);
     ActivateDrawImage<float4> adin(gtn, GL_RGBA32F, true, true);
@@ -71,7 +71,7 @@ int main( int argc, char* argv[] )
     container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 
     const float voxsize = length(vol.VoxelSizeUnits());
-    Gpu::SdfSphere(vol, make_float3(0,0,0), 0.9 );
+    roo::SdfSphere(vol, make_float3(0,0,0), 0.9 );
 
     Var<bool> subpix("ui.subpix", true, true);
     Var<bool> sdfreset("ui.reset", false, false);
@@ -95,42 +95,42 @@ int main( int argc, char* argv[] )
         Sophus::SE3d T_cw(stacks_capture.GetModelViewMatrix());
 
         if(Pushed(sdfreset)) {
-            Gpu::SdfReset(vol, trunc_dist);
+            roo::SdfReset(vol, trunc_dist);
         }
 
         if(Pushed(sdfsphere)) {
-            Gpu::SdfSphere(vol, make_float3(0,0,0), 0.9 );
+            roo::SdfSphere(vol, make_float3(0,0,0), 0.9 );
         }
 
         // Raycast current view
         {
-            Gpu::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), K, near, far, trunc_dist, subpix );
+            roo::RaycastSdf(depth, norm, img, vol, T_vw.inverse().matrix3x4(), K, near, far, trunc_dist, subpix );
         }
 
         // Generate depthmap by raycasting against groundtruth object
         {
             if(shape == 0) {
-                Gpu::RaycastBox(gtd, T_cw.inverse().matrix3x4(), K, Gpu::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
+                roo::RaycastBox(gtd, T_cw.inverse().matrix3x4(), K, roo::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
             }else if(shape ==1) {
-                Gpu::RaycastSphere(gtd, Gpu::Image<float>(), T_cw.inverse().matrix3x4(), K, make_float3(0,0,0), 0.9);
+                roo::RaycastSphere(gtd, roo::Image<float>(), T_cw.inverse().matrix3x4(), K, make_float3(0,0,0), 0.9);
             }
             CudaScopedMappedPtr dvbo(vbo);
-            Gpu::Image<float4> vboimg((float4*)*dvbo,w,h);
-            Gpu::DepthToVbo(vboimg, gtd, K, 1.0f);
-            Gpu::NormalsFromVbo(gtn,vboimg);
+            roo::Image<float4> vboimg((float4*)*dvbo,w,h);
+            roo::DepthToVbo(vboimg, gtd, K, 1.0f);
+            roo::NormalsFromVbo(gtn,vboimg);
             glvbo.SetPose(T_cw.inverse().matrix());
         }
 
         if(Pushed(fuseonce) || fuse) {
             // integrate gtd into TSDF
-            Gpu::SdfFuse(vol, gtd, gtn, T_cw.matrix3x4(), K, trunc_dist, max_w, mincostheta );
+            roo::SdfFuse(vol, gtd, gtn, T_cw.matrix3x4(), K, trunc_dist, max_w, mincostheta );
         }
 
         if(test) {
             // override img with difference between depth and gtd
-            Gpu::ElementwiseAdd<float,float,float,float>(img, depth, gtd, 1.0f, -1.0f, 0.0f);
-//            Gpu::ElementwiseSquare<float,float,float>(img,img);
-            Gpu::ElementwiseScaleBias<float,float,float>(img,img,scale);
+            roo::ElementwiseAdd<float,float,float,float>(img, depth, gtd, 1.0f, -1.0f, 0.0f);
+//            roo::ElementwiseSquare<float,float,float>(img,img);
+            roo::ElementwiseScaleBias<float,float,float>(img,img,scale);
         }
 
         /////////////////////////////////////////////////////////////

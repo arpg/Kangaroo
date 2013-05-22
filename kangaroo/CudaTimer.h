@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <iomanip>
 
-namespace Gpu
+namespace roo
 {
 
 ////////////////////////////////////////

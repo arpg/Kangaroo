@@ -2,7 +2,7 @@
 
 #include "Image.h"
 
-namespace Gpu
+namespace roo
 {
 
 inline __device__ __host__

@@ -1,8 +1,9 @@
+#include "cu_remap.h"
+
 #include "MatUtils.h"
-#include "Image.h"
 #include "launch_utils.h"
 
-namespace Gpu
+namespace roo
 {
 
 // h [0,360)

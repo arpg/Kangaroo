@@ -8,10 +8,10 @@
 //#define GPU_CHECK_ERRORS_SYNC
 
 // Based on cutil methods for error checking.
-#define GpuCheckSuccess( err ) Gpu::__SuccessOrDie( err, __FILE__, __LINE__ )
-#define GpuCheckErrors() Gpu::__CheckForErrorsDie( __FILE__, __LINE__ )
+#define GpuCheckSuccess( err ) roo::__SuccessOrDie( err, __FILE__, __LINE__ )
+#define GpuCheckErrors() roo::__CheckForErrorsDie( __FILE__, __LINE__ )
 
-namespace Gpu
+namespace roo
 {
 
 // Based on cutil methods for error checking.

@@ -3,7 +3,7 @@
 #include "Image.h"
 #include "InvalidValue.h"
 
-namespace Gpu
+namespace roo
 {
 
 template<typename T, int MAXBW, int MAXBH, int RAD>

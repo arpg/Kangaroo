@@ -1,5 +1,5 @@
-#include "Image.h"
-#include "Volume.h"
+#include "cu_semi_global_matching.h"
+
 #include "launch_utils.h"
 #include "patch_score.h"
 #include "disparity.h"
@@ -7,7 +7,7 @@
 #include "ImageApron.h"
 #include "CostVolElem.h"
 
-namespace Gpu
+namespace roo
 {
 
 //template<typename TH, typename TC>

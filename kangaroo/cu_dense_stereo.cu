@@ -1,14 +1,13 @@
-#include "MatUtils.h"
-#include "Image.h"
-#include "Volume.h"
+#include "cu_dense_stereo.h"
+
 #include "launch_utils.h"
+#include "MatUtils.h"
 #include "patch_score.h"
 #include "disparity.h"
 #include "InvalidValue.h"
 #include "ImageApron.h"
-#include "CostVolElem.h"
 
-namespace Gpu
+namespace roo
 {
 
 const int MinDisparity = 0;

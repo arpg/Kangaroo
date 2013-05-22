@@ -21,18 +21,18 @@ int main( int argc, char* argv[] )
     // Image dimensions and host copy
     const unsigned int w = video.Width();
     const unsigned int h = video.Height();
-    Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> host(w,h);
+    roo::Image<unsigned char, roo::TargetHost, roo::Manage> host(w,h);
 
     // Initialise window
     View& container = SetupPangoGLWithCuda(2*w, 2*h,180);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgg(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgu(w,h);
-    Gpu::Image<float2, Gpu::TargetDevice, Gpu::Manage> imgp(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgdivp(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imglambda(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgg(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgu(w,h);
+    roo::Image<float2, roo::TargetDevice, roo::Manage> imgp(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgdivp(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imglambda(w,h);
 
     const bool bilinear = false;
     ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, bilinear, true);
@@ -68,26 +68,26 @@ int main( int argc, char* argv[] )
         if(go) {
             if(video.GrabNext(host.ptr)) {
                 img.CopyFrom(host);
-                Gpu::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
+                roo::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
                 imgu.CopyFrom(imgg);
                 imgp.Memset(0);
                 imgdivp.Memset(0);
-                Gpu::Fill<float>(imglambda, 1.0);
+                roo::Fill<float>(imglambda, 1.0);
             }
         }
 
         go |= run;
         if(go) {
             for(int i=0; i<10; ++i ) {
-                Gpu::HuberGradU_DualAscentP(imgp,imgu,sigma,alpha);
-                Gpu::Divergence(imgdivp,imgp);
-                Gpu::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg,imglambda, tau, lambda);
+                roo::HuberGradU_DualAscentP(imgp,imgu,sigma,alpha);
+                roo::Divergence(imgdivp,imgp);
+                roo::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg,imglambda, tau, lambda);
             }
         }
 
         if(handler2d.IsSelected()) {
             Eigen::Vector2d p = handler2d.GetSelectedPoint(true);
-            Gpu::PaintCircle<float>(imglambda, 0.0f, p[0], p[1], r);
+            roo::PaintCircle<float>(imglambda, 0.0f, p[0], p[1], r);
         }
 
         /////////////////////////////////////////////////////////////

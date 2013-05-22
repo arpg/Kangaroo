@@ -1,9 +1,10 @@
-#include "Image.h"
+#include "cu_manhatten.h"
+
 #include "LeastSquareSum.h"
 #include "launch_utils.h"
 #include "MatUtils.h"
 
-namespace Gpu
+namespace roo
 {
 
 template<typename T>

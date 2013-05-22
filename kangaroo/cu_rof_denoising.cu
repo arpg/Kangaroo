@@ -1,11 +1,10 @@
-#include "Image.h"
 #include "variational.h"
+
 #include "launch_utils.h"
-#include "Divergence.h"
 
 using namespace std;
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////
@@ -237,4 +236,4 @@ void WeightedL2_u_minus_g_PrimalDescent(
 }
 
 
-} // namespace Gpu
+} // namespace roo

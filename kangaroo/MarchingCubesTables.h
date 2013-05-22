@@ -18,7 +18,7 @@
 // This code is public domain.
 //
 
-namespace Gpu
+namespace roo
 {
 
 typedef double GLdouble;

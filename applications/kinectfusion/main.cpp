@@ -36,17 +36,17 @@ int main( int argc, char* argv[] )
 
     const double baseline_m = 0.08; //camera.GetDeviceProperty(<double>("Depth0Baseline", 0) / 100;
     const double depth_focal = 570.342; //camera.GetProperty<double>("Depth0FocalLength", 570.342);
-    const Gpu::ImageIntrinsics K(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );
+    const roo::ImageIntrinsics K(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );
     
     const double knear = 0.4;
     const double kfar = 4;
     const int volres = 256;
     const float volrad = 0.6;
 
-    Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
-//    Gpu::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
+    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
+//    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
 
-    CVarUtils::AttachCVar<Gpu::BoundingBox>("BoundingBox", &reset_bb);
+    CVarUtils::AttachCVar<roo::BoundingBox>("BoundingBox", &reset_bb);
 
     const Eigen::Vector4d its(1,0,2,3);
 
@@ -54,32 +54,32 @@ int main( int argc, char* argv[] )
     Eigen::Vector3d c_d(baseline_m,0,0);
     Sophus::SE3d T_cd = Sophus::SE3d(Sophus::SO3d(),c_d).inverse();
 
-    Gpu::Image<unsigned short, Gpu::TargetDevice, Gpu::Manage> dKinect(w,h);
-    Gpu::Image<uchar3, Gpu::TargetDevice, Gpu::Manage> drgb(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> dKinectMeters(w,h);
-    Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_d(w,h);
-    Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_v(w,h);
-    Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> kin_n(w,h);
-    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage>  dDebug(w,h);
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dScratch(w*sizeof(Gpu::LeastSquaresSystem<float,12>),h);
+    roo::Image<unsigned short, roo::TargetDevice, roo::Manage> dKinect(w,h);
+    roo::Image<uchar3, roo::TargetDevice, roo::Manage> drgb(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> dKinectMeters(w,h);
+    roo::Pyramid<float, MaxLevels, roo::TargetDevice, roo::Manage> kin_d(w,h);
+    roo::Pyramid<float4, MaxLevels, roo::TargetDevice, roo::Manage> kin_v(w,h);
+    roo::Pyramid<float4, MaxLevels, roo::TargetDevice, roo::Manage> kin_n(w,h);
+    roo::Image<float4, roo::TargetDevice, roo::Manage>  dDebug(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> dScratch(w*sizeof(roo::LeastSquaresSystem<float,12>),h);
 
-    Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_i(w,h);
-    Gpu::Pyramid<float, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_d(w,h);
-    Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_n(w,h);
-    Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_v(w,h);
-    Gpu::Pyramid<float4, MaxLevels, Gpu::TargetDevice, Gpu::Manage> ray_c(w,h);
-    Gpu::BoundedVolume<Gpu::SDF_t, Gpu::TargetDevice, Gpu::Manage> vol(volres,volres,volres,reset_bb);
-    Gpu::BoundedVolume<float, Gpu::TargetDevice, Gpu::Manage> colorVol(volres,volres,volres,reset_bb);
+    roo::Pyramid<float, MaxLevels, roo::TargetDevice, roo::Manage> ray_i(w,h);
+    roo::Pyramid<float, MaxLevels, roo::TargetDevice, roo::Manage> ray_d(w,h);
+    roo::Pyramid<float4, MaxLevels, roo::TargetDevice, roo::Manage> ray_n(w,h);
+    roo::Pyramid<float4, MaxLevels, roo::TargetDevice, roo::Manage> ray_v(w,h);
+    roo::Pyramid<float4, MaxLevels, roo::TargetDevice, roo::Manage> ray_c(w,h);
+    roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage> vol(volres,volres,volres,reset_bb);
+    roo::BoundedVolume<float, roo::TargetDevice, roo::Manage> colorVol(volres,volres,volres,reset_bb);
 
     boost::ptr_vector<KinectKeyframe> keyframes;
-    Gpu::Mat<Gpu::ImageKeyframe<uchar3>,10> kfs;
+    roo::Mat<roo::ImageKeyframe<uchar3>,10> kfs;
 
     SceneGraph::GLSceneGraph glgraph;
     SceneGraph::GLAxis glcamera(0.1);
     SceneGraph::GLAxisAlignedBox glboxfrustum;
     SceneGraph::GLAxisAlignedBox glboxvol;
 
-    glboxvol.SetBounds(Gpu::ToEigen(vol.bbox.Min()), Gpu::ToEigen(vol.bbox.Max()) );
+    glboxvol.SetBounds(roo::ToEigen(vol.bbox.Min()), roo::ToEigen(vol.bbox.Max()) );
     glgraph.AddChild(&glcamera);
     glgraph.AddChild(&glboxvol);
     glgraph.AddChild(&glboxfrustum);
@@ -139,7 +139,7 @@ int main( int argc, char* argv[] )
     pangolin::RegisterKeyPressCallback(' ', [&reset,&viewonly]() { reset = true; viewonly=false;} );
     pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
 //    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
-//    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {Gpu::SaveMesh("mesh",vol,colorVol); } );
+//    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {roo::SaveMesh("mesh",vol,colorVol); } );
     pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); } );
 
     pb::ImageArray imgs;    
@@ -150,21 +150,21 @@ int main( int argc, char* argv[] )
 
         if(Pushed(save_kf)) {
             KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
-            kf->img.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)imgs[0].data(),w,h));
+            kf->img.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].data(),w,h));
             keyframes.push_back(kf);
         }
 
         if(go) {
             if(camera.Capture(imgs)) {
-                dKinect.CopyFrom(Gpu::Image<unsigned short, Gpu::TargetHost>((unsigned short*)imgs[1].data(),w,h));
-                drgb.CopyFrom(Gpu::Image<uchar3, Gpu::TargetHost>((uchar3*)imgs[0].data(),w,h));
-                Gpu::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
-                Gpu::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
+                dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)imgs[1].data(),w,h));
+                drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].data(),w,h));
+                roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
+                roo::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
     
-                Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);
+                roo::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);
                 for(int l=0; l<MaxLevels; ++l) {
-                    Gpu::DepthToVbo(kin_v[l], kin_d[l], K[l] );
-                    Gpu::NormalsFromVbo(kin_n[l], kin_v[l]);
+                    roo::DepthToVbo(kin_v[l], kin_d[l], K[l] );
+                    roo::NormalsFromVbo(kin_n[l], kin_v[l]);
                 }
     
                 frame++;
@@ -175,30 +175,30 @@ int main( int argc, char* argv[] )
             T_wl = Sophus::SE3d();
 
             vol.bbox = reset_bb;
-            Gpu::SdfReset(vol);
+            roo::SdfReset(vol);
             keyframes.clear();
 
             colorVol.bbox = reset_bb;
-            Gpu::SdfReset(colorVol);
+            roo::SdfReset(colorVol);
 
             // Fuse first kinect frame in.
             const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
-//            Gpu::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
-            Gpu::SdfFuse(vol, colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), Gpu::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
+//            roo::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
+            roo::SdfFuse(vol, colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), roo::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
         }
 
         if(viewonly) {
             const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
             Sophus::SE3d T_vw(s_cam.GetModelViewMatrix());
-            const Gpu::BoundingBox roi(T_vw.inverse().matrix3x4(), w, h, K, 0, 50);
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( roi );
-            Gpu::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
+            const roo::BoundingBox roi(T_vw.inverse().matrix3x4(), w, h, K, 0, 50);
+            roo::BoundedVolume<roo::SDF_t> work_vol = vol.SubBoundingVolume( roi );
+            roo::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
             if(work_vol.IsValid()) {
                 if(showcolor) {
-                    Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, work_colorVol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
+                    roo::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, work_colorVol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
                 }else{
-                    Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
+                    roo::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_vw.inverse().matrix3x4(), K, 0.1, 50, trunc_dist, true );
                 }
 
                 if(keyframes.size() > 0) {
@@ -208,34 +208,34 @@ int main( int argc, char* argv[] )
                         if(k < keyframes.size()) {
                             kfs[k].img = keyframes[k].img;
                             kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
-                            kfs[k].K = Gpu::ImageIntrinsics(rgb_fl, kfs[k].img);
+                            kfs[k].K = roo::ImageIntrinsics(rgb_fl, kfs[k].img);
                         }else{
                             kfs[k].img.ptr = 0;
                         }
                     }
-                    Gpu::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_vw.inverse().matrix3x4(), K);
+                    roo::TextureDepth<float4,uchar3,10>(ray_c[0], kfs, ray_d[0], ray_n[0], ray_i[0], T_vw.inverse().matrix3x4(), K);
                 }
             }
         }else{
             bool tracking_good = true;
 
-            const Gpu::BoundingBox roi(Gpu::BoundingBox(T_wl.matrix3x4(), w, h, K, knear,kfar));
-            Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( roi );
-            Gpu::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
+            const roo::BoundingBox roi(roo::BoundingBox(T_wl.matrix3x4(), w, h, K, knear,kfar));
+            roo::BoundedVolume<roo::SDF_t> work_vol = vol.SubBoundingVolume( roi );
+            roo::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
             if(work_vol.IsValid()) {
-//                Gpu::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
-//                Gpu::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);
+//                roo::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
+//                roo::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);
                 for(int l=0; l<MaxLevels; ++l) {
                     if(its[l] > 0) {
-                        const Gpu::ImageIntrinsics Kl = K[l];
+                        const roo::ImageIntrinsics Kl = K[l];
                         if(showcolor) {
-                            Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, colorVol, T_wl.matrix3x4(), Kl, knear,kfar, true );
+                            roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, colorVol, T_wl.matrix3x4(), Kl, knear,kfar, true );
                         }else{
-                            Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), Kl, knear,kfar, true );
+                            roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), Kl, knear,kfar, true );
                         }
-                        Gpu::DepthToVbo(ray_v[l], ray_d[l], Kl );
-    //                    Gpu::DepthToVbo(ray_v[l], ray_d[l], Kl.fu, Kl.fv, Kl.u0, Kl.v0 );
-    //                    Gpu::NormalsFromVbo(ray_n[l], ray_v[l]);
+                        roo::DepthToVbo(ray_v[l], ray_d[l], Kl );
+    //                    roo::DepthToVbo(ray_v[l], ray_d[l], Kl.fu, Kl.fv, Kl.u0, Kl.v0 );
+    //                    roo::NormalsFromVbo(ray_n[l], ray_v[l]);
                     }
                 }
 
@@ -243,8 +243,8 @@ int main( int argc, char* argv[] )
                     Sophus::SE3d T_lp;
 
 //                    const int l = show_level;
-//                    Gpu::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
-//                    Gpu::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
+//                    roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), fu/(1<<l), fv/(1<<l), w/(2 * 1<<l) - 0.5, h/(2 * 1<<l) - 0.5, knear,kfar, true );
+//                    roo::DepthToVbo(ray_v[l], ray_d[l], fu/(1<<l), fv/(1<<l), w/(2.0f * (1<<l)) - 0.5, h/(2.0f * (1<<l)) - 0.5 );
 
                     for(int l=MaxLevels-1; l >=0; --l)
                     {
@@ -253,7 +253,7 @@ int main( int argc, char* argv[] )
                         for(int i=0; i<its[l]; ++i ) {
                             const Eigen::Matrix<double, 3,4> mKT_lp = Kdepth * T_lp.matrix3x4();
                             const Eigen::Matrix<double, 3,4> mT_pl = T_lp.inverse().matrix3x4();
-                            Gpu::LeastSquaresSystem<float,6> lss = Gpu::PoseRefinementProjectiveIcpPointPlane(
+                            roo::LeastSquaresSystem<float,6> lss = roo::PoseRefinementProjectiveIcpPointPlane(
                                 kin_v[l], ray_v[l], ray_n[l], mKT_lp, mT_pl, icp_c, dScratch, dDebug.SubImage(0,0,w>>l,h>>l)
                             );
 
@@ -290,13 +290,13 @@ int main( int argc, char* argv[] )
 
             if(pose_refinement && fuse) {
                 if(tracking_good) {
-                    const Gpu::BoundingBox roi(T_wl.matrix3x4(), w, h, K, knear,kfar);
-                    Gpu::BoundedVolume<Gpu::SDF_t> work_vol = vol.SubBoundingVolume( roi );
-                    Gpu::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
+                    const roo::BoundingBox roi(T_wl.matrix3x4(), w, h, K, knear,kfar);
+                    roo::BoundedVolume<roo::SDF_t> work_vol = vol.SubBoundingVolume( roi );
+                    roo::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
                     if(work_vol.IsValid()) {
                         const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
-//                        Gpu::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
-                        Gpu::SdfFuse(work_vol, work_colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), Gpu::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
+//                        roo::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
+                        roo::SdfFuse(work_vol, work_colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), roo::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
                     }
                 }
             }
@@ -304,19 +304,19 @@ int main( int argc, char* argv[] )
 
         glcamera.SetPose(T_wl.matrix());
 
-        Gpu::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, K.fu, K.fv, K.u0, K.v0, knear,kfar);
+        roo::BoundingBox bbox_work(T_wl.matrix3x4(), w, h, K.fu, K.fv, K.u0, K.v0, knear,kfar);
         bbox_work.Intersect(vol.bbox);
-        glboxfrustum.SetBounds(Gpu::ToEigen(bbox_work.Min()), Gpu::ToEigen(bbox_work.Max()) );
+        glboxfrustum.SetBounds(roo::ToEigen(bbox_work.Min()), roo::ToEigen(bbox_work.Max()) );
 
 //        {
 //            CudaScopedMappedPtr var(cbo);
-//            Gpu::Image<uchar4> dCbo((uchar4*)*var,w,h);
-//            Gpu::ConvertImage<uchar4,float4>(dCbo,kin_n[0]);
+//            roo::Image<uchar4> dCbo((uchar4*)*var,w,h);
+//            roo::ConvertImage<uchar4,float4>(dCbo,kin_n[0]);
 //        }
 
 //        {
 //            CudaScopedMappedPtr var(vbo);
-//            Gpu::Image<float4> dVbo((float4*)*var,w,h);
+//            roo::Image<float4> dVbo((float4*)*var,w,h);
 //            dVbo.CopyFrom(kin_v[0]);
 //        }
 

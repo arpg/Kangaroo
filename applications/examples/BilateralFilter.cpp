@@ -22,7 +22,7 @@ int main( int argc, char* argv[] )
     // Image dimensions and host copy
     const unsigned int w = video.Width();
     const unsigned int h = video.Height();
-    Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> host(w,h);
+    roo::Image<unsigned char, roo::TargetHost, roo::Manage> host(w,h);
 
     // Initialise window
     View& container = SetupPangoGLWithCuda(1024, 768);
@@ -33,8 +33,8 @@ int main( int argc, char* argv[] )
     GlTextureCudaArray texf(w,h,GL_LUMINANCE32F_ARB);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> dImgFilt(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> dImg(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> dImgFilt(w,h);
 
     Var<bool> step("ui.step", false, false);
     Var<bool> run("ui.run", false, true);
@@ -57,16 +57,16 @@ int main( int argc, char* argv[] )
         }
 
         if(go || GuiVarHasChanged() ) {
-            Gpu::BilateralFilter<float,unsigned char>(dImgFilt,dImg,bigs,bigr,bilateralWinSize);
+            roo::BilateralFilter<float,unsigned char>(dImgFilt,dImg,bigs,bigr,bilateralWinSize);
 //            ConvertImage<float,unsigned char>(dImgFilt,dImg);
 
             for(int i=0; i < domedits; ++i ) {
                 if(domed3x3) {
-                    Gpu::MedianFilter3x3(dImgFilt,dImgFilt);
+                    roo::MedianFilter3x3(dImgFilt,dImgFilt);
                 }
 
                 if(domed5x5) {
-                    Gpu::MedianFilter5x5(dImgFilt,dImgFilt);
+                    roo::MedianFilter5x5(dImgFilt,dImgFilt);
                 }
             }
 

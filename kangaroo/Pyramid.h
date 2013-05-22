@@ -2,7 +2,7 @@
 
 #include "Image.h"
 
-namespace Gpu
+namespace roo
 {
 
 // Power of two pyramid.
@@ -27,7 +27,7 @@ struct Pyramid {
 
         // Build power of two structure
         for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l ) {
-            imgs[l] = Gpu::Image<T,Target,Management>(w>>l,h>>l);
+            imgs[l] = roo::Image<T,Target,Management>(w>>l,h>>l);
         }
     }
 
@@ -81,13 +81,13 @@ struct Pyramid {
     //////////////////////////////////////////////////////
 
     inline __host__ __device__
-    Gpu::Image<T,Target,Management>& operator[](size_t i)
+    roo::Image<T,Target,Management>& operator[](size_t i)
     {
         return imgs[i];
     }
 
     inline __host__ __device__
-    const Gpu::Image<T,Target,Management>& operator[](size_t i) const
+    const roo::Image<T,Target,Management>& operator[](size_t i) const
     {
         return imgs[i];
     }
@@ -131,7 +131,7 @@ struct Pyramid {
     // Member variables
     //////////////////////////////////////////////////////
 
-    Gpu::Image<T,Target,Management> imgs[Levels];
+    roo::Image<T,Target,Management> imgs[Levels];
 };
 
 

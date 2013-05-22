@@ -1,11 +1,12 @@
+#include "cu_model_refinement.h"
+
 #include "MatUtils.h"
-#include "Image.h"
 #include "launch_utils.h"
 #include "reweighting.h"
 #include "disparity.h"
 #include "LeastSquareSum.h"
 
-namespace Gpu {
+namespace roo {
 
 ///////////////////////////////////////////
 // IsFinite

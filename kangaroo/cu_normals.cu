@@ -1,7 +1,8 @@
-#include "Image.h"
+#include "cu_normals.h"
+
 #include "launch_utils.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

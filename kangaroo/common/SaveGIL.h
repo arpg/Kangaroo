@@ -13,7 +13,7 @@
 #include <boost/gil/extension/io/png_io.hpp>
 #endif // HAVE_PNG
 
-void SaveGIL(const std::string filename, const Gpu::Image<uchar3,Gpu::TargetHost>& image)
+void SaveGIL(const std::string filename, const roo::Image<uchar3,roo::TargetHost>& image)
 {
     boost::gil::rgb8_view_t v = boost::gil::interleaved_view(image.w, image.h, reinterpret_cast<boost::gil::rgb8_ptr_t>(image.ptr), image.pitch);
     
@@ -25,9 +25,9 @@ void SaveGIL(const std::string filename, const Gpu::Image<uchar3,Gpu::TargetHost
 }
 
 template<typename T, typename Manage>
-void SaveGIL(const std::string filename, const Gpu::Image<T,Gpu::TargetDevice,Manage>& img)
+void SaveGIL(const std::string filename, const roo::Image<T,roo::TargetDevice,Manage>& img)
 {
-    Gpu::Image<T,Gpu::TargetHost,Gpu::Manage> himg(img.w, img.h);
+    roo::Image<T,roo::TargetHost,roo::Manage> himg(img.w, img.h);
     himg.CopyFrom(img);
     SaveGIL(filename, himg);
 }

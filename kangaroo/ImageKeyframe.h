@@ -4,13 +4,13 @@
 #include "MatUtils.h"
 #include "ImageIntrinsics.h"
 
-namespace Gpu
+namespace roo
 {
 
 template<typename T, typename Target = TargetDevice, typename Management = DontManage>
 struct ImageKeyframe : public ImageTransformProject
 {
-    Image<T, Gpu::TargetDevice> img;
+    Image<T, roo::TargetDevice> img;
 };
 
-} // namespace Gpu
+} // namespace roo

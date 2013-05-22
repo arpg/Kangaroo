@@ -31,44 +31,44 @@ public:
     void Init(Eigen::Matrix4d T_pw)
     {
         eT_hw = eT_hp * T_pw;
-        Gpu::InitHeightMap(dHeightMap);
+        roo::InitHeightMap(dHeightMap);
     }
 
-    void Fuse(Gpu::Image<float4> d3d, const Sophus::SE3d& T_wc)
+    void Fuse(roo::Image<float4> d3d, const Sophus::SE3d& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
-        Gpu::UpdateHeightMap(dHeightMap,d3d,Gpu::Image<unsigned char>(),T_hc, min_height, max_height);
+        roo::UpdateHeightMap(dHeightMap,d3d,roo::Image<unsigned char>(),T_hc, min_height, max_height);
     }
 
-    void Fuse(Gpu::Image<float4> d3d, Gpu::Image<unsigned char> dImg, const Sophus::SE3d& T_wc)
+    void Fuse(roo::Image<float4> d3d, roo::Image<unsigned char> dImg, const Sophus::SE3d& T_wc)
     {
         Eigen::Matrix<double,3,4> T_hc = (eT_hw * T_wc.matrix()).block<3,4>(0,0);
-        Gpu::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc, min_height, max_height);
+        roo::UpdateHeightMap(dHeightMap,d3d,dImg,T_hc, min_height, max_height);
     }
 
     void GenerateVboNbo(pangolin::GlBufferCudaPtr& vbo, pangolin::GlBufferCudaPtr& nbo)
     {
         pangolin::CudaScopedMappedPtr varvbo(vbo);
         pangolin::CudaScopedMappedPtr varnbo(nbo);
-        Gpu::Image<float4> dVbo((float4*)*varvbo,wp,hp);
-        Gpu::Image<float4> dNbo((float4*)*varnbo,wp,hp);
+        roo::Image<float4> dVbo((float4*)*varvbo,wp,hp);
+        roo::Image<float4> dNbo((float4*)*varnbo,wp,hp);
         const Eigen::Matrix<double,3,4> eT_wh = eT_hw.inverse().block<3,4>(0,0);
-        Gpu::VboWorldFromHeightMap(dVbo,dHeightMap, eT_wh );
-        Gpu::NormalsFromVbo(dNbo,dVbo);
+        roo::VboWorldFromHeightMap(dVbo,dHeightMap, eT_wh );
+        roo::NormalsFromVbo(dNbo,dVbo);
     }
 
     void GenerateVbo(pangolin::GlBufferCudaPtr& vbo)
     {
         pangolin::CudaScopedMappedPtr var(vbo);
-        Gpu::Image<float4> dVbo((float4*)*var,wp,hp);
-        Gpu::VboFromHeightMap(dVbo,dHeightMap);
+        roo::Image<float4> dVbo((float4*)*var,wp,hp);
+        roo::VboFromHeightMap(dVbo,dHeightMap);
     }
 
     void GenerateCbo(pangolin::GlBufferCudaPtr& cbo)
     {
         pangolin::CudaScopedMappedPtr var(cbo);
-        Gpu::Image<uchar4> dCbo((uchar4*)*var,wp,hp);
-        Gpu::ColourHeightMap(dCbo,dHeightMap);
+        roo::Image<uchar4> dCbo((uchar4*)*var,wp,hp);
+        roo::ColourHeightMap(dCbo,dHeightMap);
     }
 
     template<typename T>
@@ -84,8 +84,8 @@ public:
 
     void LoadModel(const std::string filename)
     {
-        Gpu::Image<float4, Gpu::TargetHost, Gpu::Manage> hVbo(wp,hp);
-        Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
+        roo::Image<float4, roo::TargetHost, roo::Manage> hVbo(wp,hp);
+        roo::Image<unsigned char, roo::TargetHost, roo::Manage> hImg(wp,hp);
 
         // TODO: Load data
 
@@ -94,15 +94,15 @@ public:
     void SaveModel(const std::string filename)
     {
         // Generate VBO / img
-        Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> dVbo(wp,hp);
-        Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(wp,hp);
+        roo::Image<float4, roo::TargetDevice, roo::Manage> dVbo(wp,hp);
+        roo::Image<unsigned char, roo::TargetDevice, roo::Manage> dImg(wp,hp);
 
         Eigen::Matrix<double,3,4> eT_wh = eT_hw.inverse().block<3,4>(0,0);
-        Gpu::GenerateWorldVboAndImageFromHeightmap(dVbo, dImg, dHeightMap, eT_wh );
+        roo::GenerateWorldVboAndImageFromHeightmap(dVbo, dImg, dHeightMap, eT_wh );
 
         // Copy to host
-        Gpu::Image<float4, Gpu::TargetHost, Gpu::Manage> hVbo(wp,hp);
-        Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
+        roo::Image<float4, roo::TargetHost, roo::Manage> hVbo(wp,hp);
+        roo::Image<unsigned char, roo::TargetHost, roo::Manage> hImg(wp,hp);
         hImg.CopyFrom(dImg);
         hVbo.CopyFrom(dVbo);
 
@@ -133,16 +133,16 @@ public:
 
     void SaveHeightmap(const std::string heightfile, const std::string imagefile)
     {
-        Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> dVbo(wp,hp);
-        Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> dImg(wp,hp);
+        roo::Image<float4, roo::TargetDevice, roo::Manage> dVbo(wp,hp);
+        roo::Image<unsigned char, roo::TargetDevice, roo::Manage> dImg(wp,hp);
 
         Eigen::Matrix<double,3,4> eT_wh = eT_hw.inverse().block<3,4>(0,0);
-        Gpu::GenerateWorldVboAndImageFromHeightmap(dVbo, dImg, dHeightMap, eT_wh );
+        roo::GenerateWorldVboAndImageFromHeightmap(dVbo, dImg, dHeightMap, eT_wh );
 
         const int32_t width = wp;
         const int32_t height = hp;
-        Gpu::Image<float4, Gpu::TargetHost, Gpu::Manage> hVbo(wp,hp);
-        Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> hImg(wp,hp);
+        roo::Image<float4, roo::TargetHost, roo::Manage> hVbo(wp,hp);
+        roo::Image<unsigned char, roo::TargetHost, roo::Manage> hImg(wp,hp);
         hImg.CopyFrom(dImg);
         hVbo.CopyFrom(dVbo);
 
@@ -174,7 +174,7 @@ public:
         std::cout << "Done" << std::endl;
     }
 
-    Gpu::Image<float4> GetHeightMap()
+    roo::Image<float4> GetHeightMap()
     {
         return dHeightMap;
     }
@@ -210,5 +210,5 @@ protected:
     // Heightmap to world transform (set once we know the plane)
     Eigen::Matrix4d eT_hw;
 
-    Gpu::Image<float4,Gpu::TargetDevice,Gpu::Manage> dHeightMap;
+    roo::Image<float4,roo::TargetDevice,roo::Manage> dHeightMap;
 };

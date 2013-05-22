@@ -5,7 +5,7 @@
 
 using namespace std;
 using namespace pangolin;
-using namespace Gpu;
+using namespace roo;
 
 int main( int argc, char* argv[] )
 {
@@ -42,8 +42,8 @@ int main( int argc, char* argv[] )
     GlTextureCudaArray texrgb(w,h,GL_RGBA8);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
-    Gpu::Image<uchar4, TargetDevice, Manage> d3d(w,h);
+    roo::Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
+    roo::Image<uchar4, TargetDevice, Manage> d3d(w,h);
 
     int shift = 0;
     bool run = true;
@@ -63,7 +63,7 @@ int main( int argc, char* argv[] )
             if(video.Grab(vid_buffer,images)) {
                 // Upload images to device
                 for(int i=0; i<2; ++i ) {
-                    dCamImg[i].CopyFrom( Gpu::Image<unsigned char,TargetHost>(
+                    dCamImg[i].CopyFrom( roo::Image<unsigned char,TargetHost>(
                         images[i].ptr, images[i].w,
                         images[i].h, images[i].pitch
                     ));

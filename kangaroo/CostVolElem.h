@@ -2,7 +2,7 @@
 
 #include <cuda_runtime.h>
 
-namespace Gpu
+namespace roo
 {
 
 struct __align__(8) CostVolElem

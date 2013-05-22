@@ -1,7 +1,8 @@
-#include "Image.h"
+#include "cu_painting.h"
+
 #include "launch_utils.h"
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Paint circle at x,y with radius r

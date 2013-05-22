@@ -1,6 +1,6 @@
 #include <cuda_runtime.h>
 
-namespace Gpu {
+namespace roo {
 
 __host__ __device__ inline
 float LSReweightSq(float /*r*/, float /*c*/) {

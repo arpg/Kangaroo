@@ -2,7 +2,7 @@
 
 #include "BoundedVolume.h"
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////
 // Save SDF
@@ -14,8 +14,8 @@ void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol, const
 template<typename T, typename Manage>
 void SaveMesh(std::string filename, BoundedVolume<T,TargetDevice,Manage>& vol )
 {
-    Gpu::BoundedVolume<T,Gpu::TargetHost,Gpu::Manage> hvol(vol.w, vol.h, vol.d, vol.bbox.Min(), vol.bbox.Max());
-    Gpu::BoundedVolume<float,Gpu::TargetHost,Gpu::Manage> hvolcolor(1,1,1, vol.bbox.Min(), vol.bbox.Max() );
+    roo::BoundedVolume<T,roo::TargetHost,roo::Manage> hvol(vol.w, vol.h, vol.d, vol.bbox.Min(), vol.bbox.Max());
+    roo::BoundedVolume<float,roo::TargetHost,roo::Manage> hvolcolor(1,1,1, vol.bbox.Min(), vol.bbox.Max() );
     hvol.CopyFrom(vol);
     SaveMesh<T,float>(filename, hvol, hvolcolor);
 }
@@ -23,8 +23,8 @@ void SaveMesh(std::string filename, BoundedVolume<T,TargetDevice,Manage>& vol )
 template<typename T, typename TColor, typename Manage>
 void SaveMesh(std::string filename, BoundedVolume<T,TargetDevice,Manage>& vol, BoundedVolume<TColor,TargetDevice,Manage>& volColor )
 {
-    Gpu::BoundedVolume<T,Gpu::TargetHost,Gpu::Manage> hvol(vol.w, vol.h, vol.d, vol.bbox.Min(), vol.bbox.Max());
-    Gpu::BoundedVolume<TColor,Gpu::TargetHost,Gpu::Manage> hvolcolor(volColor.w, volColor.h, volColor.d, volColor.bbox.Min(), volColor.bbox.Max());
+    roo::BoundedVolume<T,roo::TargetHost,roo::Manage> hvol(vol.w, vol.h, vol.d, vol.bbox.Min(), vol.bbox.Max());
+    roo::BoundedVolume<TColor,roo::TargetHost,roo::Manage> hvolcolor(volColor.w, volColor.h, volColor.d, volColor.bbox.Min(), volColor.bbox.Max());
     hvol.CopyFrom(vol);
     hvolcolor.CopyFrom(volColor);
     SaveMesh<T,TColor>(filename, hvol, hvolcolor);

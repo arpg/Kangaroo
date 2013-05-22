@@ -1,8 +1,9 @@
-#include "Image.h"
+#include "cu_lookup_warp.h"
+
 #include "launch_utils.h"
 #include "sampling.h"
 
-namespace Gpu
+namespace roo
 {
 
 //////////////////////////////////////////////////////

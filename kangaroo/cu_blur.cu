@@ -1,8 +1,9 @@
-#include "Image.h"
+#include "cu_blur.h"
+
 #include "launch_utils.h"
 #include "ImageApron.h"
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Small Radius Gaussian Blur

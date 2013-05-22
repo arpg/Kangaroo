@@ -22,20 +22,20 @@ int main( int argc, char* argv[] )
     // Image dimensions and host copy
     const unsigned int w = video.Width();
     const unsigned int h = video.Height();
-    Gpu::Image<unsigned char, Gpu::TargetHost, Gpu::Manage> host(w,h);
+    roo::Image<unsigned char, roo::TargetHost, roo::Manage> host(w,h);
 
     // Initialise window
     View& container = SetupPangoGLWithCuda(2*w, h);
 
     // Allocate Camera Images on device for processing
-    Gpu::Image<unsigned char, Gpu::TargetDevice, Gpu::Manage> img(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgg(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgu(w,h);
-    Gpu::Image<float2, Gpu::TargetDevice, Gpu::Manage> imgp(w,h);
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> img(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgg(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgu(w,h);
+    roo::Image<float2, roo::TargetDevice, roo::Manage> imgp(w,h);
 
-    Gpu::Image<float2, Gpu::TargetDevice, Gpu::Manage> imgv(w,h);
-    Gpu::Image<float4, Gpu::TargetDevice, Gpu::Manage> imgq(w,h);
-    Gpu::Image<float, Gpu::TargetDevice, Gpu::Manage> imgr(w,h);
+    roo::Image<float2, roo::TargetDevice, roo::Manage> imgv(w,h);
+    roo::Image<float4, roo::TargetDevice, roo::Manage> imgq(w,h);
+    roo::Image<float, roo::TargetDevice, roo::Manage> imgr(w,h);
 
     ActivateDrawImage<float> adg(imgg, GL_LUMINANCE32F_ARB, true, true);
     ActivateDrawImage<float> adu(imgu, GL_LUMINANCE32F_ARB, true, true);
@@ -67,27 +67,27 @@ int main( int argc, char* argv[] )
         if(reset) {
             if(video.GrabNext(host.ptr)) {
                 img.CopyFrom(host);
-                Gpu::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
+                roo::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
                 imgu.CopyFrom(imgg);
                 imgp.Memset(0);
     
                 imgq.Memset(0);
                 imgr.Memset(0);
     
-                Gpu::GradU(imgv,imgu);
+                roo::GradU(imgv,imgu);
             }
         }
 
         if(go) {
             if(!tgv_do) {
                 for(int i=0; i<10; ++i ) {
-                    Gpu::HuberGradU_DualAscentP(imgp,imgu,sigma,alpha);
-                    Gpu::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg, tau, lambda);
+                    roo::HuberGradU_DualAscentP(imgp,imgu,sigma,alpha);
+                    roo::L2_u_minus_g_PrimalDescent(imgu,imgp,imgg, tau, lambda);
                 }
             }else{
                 for(int i=0; i<20; ++i ) {
                     const float tgv_a0 = tgv_k * tgv_a1;
-                    Gpu::TGV_L1_DenoisingIteration(imgu,imgv,imgp,imgq,imgr,imgg,tgv_a0, tgv_a1, sigma, tau, tgv_delta);
+                    roo::TGV_L1_DenoisingIteration(imgu,imgv,imgp,imgq,imgr,imgg,tgv_a0, tgv_a1, sigma, tau, tgv_delta);
                 }
             }
         }

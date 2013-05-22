@@ -4,7 +4,7 @@
 #include "ImageIntrinsics.h"
 #include <iostream>
 
-namespace Gpu
+namespace roo
 {
 
 // Axis Aligned Bounding Box
@@ -163,13 +163,13 @@ struct BoundingBox
     float3 boxmax;
 };
 
-inline std::ostream& operator<<( std::ostream& os, const Gpu::BoundingBox& bbox)
+inline std::ostream& operator<<( std::ostream& os, const roo::BoundingBox& bbox)
 {
     os << bbox.Min() << " - " << bbox.Max();
     return os;
 }
 
-inline std::istream& operator>>( std::istream& is, Gpu::BoundingBox& bbox)
+inline std::istream& operator>>( std::istream& is, roo::BoundingBox& bbox)
 {
     is >> bbox.Min();
     is.ignore(3, '-');

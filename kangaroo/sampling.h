@@ -39,7 +39,7 @@ inline __device__ __host__ float4 lerp(uchar4 a, uchar4 b, float t)
     );
 }
 
-namespace Gpu {
+namespace roo {
 
 //////////////////////////////////////////////////////
 // Sampling
