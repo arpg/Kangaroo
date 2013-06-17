@@ -1,24 +1,22 @@
-PROJECT( Kangaroo )
+cmake_minimum_required( VERSION 2.8 )
+project( Kangaroo )
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules/")
 
-OPTION(BUILD_APPLICATIONS "Build Applications" ON)
-OPTION(BUILD_SHARED_LIBS "Build Shared Library" ON)
+option(BUILD_APPLICATIONS "Build Applications" ON)
+option(BUILD_SHARED_LIBS "Build Shared Library" ON)
 
 # Overide with cmake -DCMAKE_BUILD_TYPE=Debug {dir}
-IF( NOT CMAKE_BUILD_TYPE )
-   SET( CMAKE_BUILD_TYPE Release )
-ENDIF()
+if( NOT CMAKE_BUILD_TYPE )
+   set( CMAKE_BUILD_TYPE Release )
+endif()
 
 # Platform configuration vars
-INCLUDE(SetPlatformVars)
+include(SetPlatformVars)
 
-STRING(TOLOWER ${PROJECT_NAME} LIBRARY_NAME)
+add_subdirectory(kangaroo)
 
-ADD_SUBDIRECTORY(${LIBRARY_NAME})
-
-IF(BUILD_APPLICATIONS)
-  ADD_SUBDIRECTORY(applications)
-ENDIF()
+if(BUILD_APPLICATIONS)
+  add_subdirectory(applications)
+endif()
 

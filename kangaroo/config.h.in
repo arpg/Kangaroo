@@ -1,0 +1,17 @@
+#ifndef KANGAROO_CONFIG_H
+#define KANGAROO_CONFIG_H
+
+/// Platform
+#cmakedefine _UNIX_
+#cmakedefine _WIN_
+#cmakedefine _OSX_
+#cmakedefine _LINUX_
+
+/// Configured libraries
+#cmakedefine HAVE_EIGEN
+#cmakedefine HAVE_ASSIMP
+#cmakedefine HAVE_THRUST
+#cmakedefine HAVE_NPP
+#cmakedefine HAVE_OPENCV
+
+#endif // KANGAROO_CONFIG_H

@@ -7,7 +7,7 @@
 
 #include "CUDA_SDK/cutil_math.h"
 
-#define HAVE_EIGEN
+#include "kangaroo/config.h"
 
 #ifndef __CUDACC__
     #ifdef HAVE_EIGEN

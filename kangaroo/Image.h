@@ -7,7 +7,7 @@
 
 #include <cuda_runtime.h>
 
-#define HAVE_OPENCV
+#include <kangaroo/config.h>
 
 #ifndef __CUDACC__
     #ifdef HAVE_OPENCV
@@ -19,12 +19,10 @@
 #include <opencv2/opencv.hpp>
 #endif // HAVE_OPENCV
 
-#define HAVE_THRUST
 #ifdef HAVE_THRUST
 #include <thrust/device_vector.h>
 #endif // HAVE_THRUST
 
-#define HAVE_NPP
 #ifdef HAVE_NPP
 #include <npp.h>
 #endif // HAVE_NPP
