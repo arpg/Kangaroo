@@ -37,7 +37,7 @@ float4 ProjectUnitBall(float4 val, float maxrad = 1.0f)
 //////////////////////////////////////////////////////
 
 inline __host__ __device__
-float2 GradUFwd(const Image<float>& imgu, float u, int x, int y)
+float2 GradUFwd(const Image<float>& imgu, float u, size_t x, size_t y)
 {
     float2 du = make_float2(0,0);
     if(x < imgu.w-1 ) du.x = imgu(x+1,y) - u;
@@ -64,7 +64,7 @@ float DivA(const Image<float2>& A, int x, int y)
 //////////////////////////////////////////////////////
 
 inline __host__ __device__
-float4 Epsilon(const Image<float2>& imgA, int x, int y)
+float4 Epsilon(const Image<float2>& imgA, size_t x, size_t y)
 {
     const float2 A = imgA(x,y);
 
