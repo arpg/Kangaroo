@@ -18,6 +18,36 @@
 namespace roo
 {
 
+inline NppiRect GetTopLeftAlignedRegion(int w, int h, int blockx, int blocky)
+{
+    NppiRect ret;
+    ret.width = blockx * (w / blockx);
+    ret.height = blocky * (h / blocky);
+    ret.x = 0;
+    ret.y = 0;
+    return ret;
+}
+
+inline NppiRect GetCenteredAlignedRegion(int w, int h, int blockx, int blocky)
+{
+    NppiRect ret;
+    ret.width = blockx * (w / blockx);
+    ret.height = blocky * (h / blocky);
+    ret.x = (w - ret.width) / 2;
+    ret.y = (h - ret.height) / 2;
+    return ret;
+}
+
+inline int GetLevelFromMaxPixels(int w, int h, unsigned long maxpixels)
+{
+    int level = 0;
+    while( (w >> level)*(h >> level) > maxpixels ) {
+        ++level;
+    }
+    return level;
+}
+
+
 struct ImageIntrinsics
 {
 
@@ -110,6 +140,33 @@ struct ImageIntrinsics
         const float scale = 1.0f / (1 << l);
         return ImageIntrinsics(scale*fu, scale*fv, scale*(u0+0.5f)-0.5f, scale*(v0+0.5f)-0.5f);
     }
+
+
+    //////////////////////////////////////////////////////
+    // Scaling and ROI
+    //////////////////////////////////////////////////////
+    inline __host__ __device__
+    ImageIntrinsics Scale(double scale)
+    {
+        ImageIntrinsics scaledImage;
+        scaledImage.fu = fu * scale;
+        scaledImage.fv = fv * scale;
+        scaledImage.u0 = u0;
+        scaledImage.v0 = v0;
+        return scaledImage;
+    }
+
+    inline __host__ __device__
+    ImageIntrinsics CropToROI(const NppiRect& roi)
+    {
+        ImageIntrinsics roidImage;
+        roidImage.u0 = u0 - roi.x;
+        roidImage.v0 = v0 - roi.y;
+        roidImage.fu = fu;
+        roidImage.fv = fv;
+        return roidImage;
+    }
+
 
     //////////////////////////////////////////////////////
     // Interop
