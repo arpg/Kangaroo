@@ -11,9 +11,9 @@ endif()
 if(NOT CUDA_npp_LIBRARY)
     # Hack for old FindCUDA to locate libnpp.so
     if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        set(CUDA_npp_LIBRARY "/usr/local/cuda/lib/libnpp.dylib")
+        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/libnpp.dylib")
     else()
-        set(CUDA_npp_LIBRARY "/usr/local/cuda/lib64/libnpp.so")
+        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpp.so")
     endif()
 endif()
 

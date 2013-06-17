@@ -23,7 +23,7 @@ int main( int argc, char* argv[] )
     const unsigned int h = video.Height();
 
     // Setup OpenGL Display (based on GLUT)
-    pangolin::CreateGlutWindowAndBind(__FILE__,2*w,2*h);
+    pangolin::CreateWindowAndBind(__FILE__,2*w,2*h);
 
     // Initialise CUDA, allowing it to use OpenGL context
     cudaGLSetGLDevice(0);
@@ -79,7 +79,7 @@ int main( int argc, char* argv[] )
         CopyDevMemtoTex(d3d.ptr, d3d.pitch, texrgb );
         texrgb.RenderToViewportFlipY();
 
-        pangolin::FinishGlutFrame();
+        pangolin::FinishFrame();
         usleep(1000000 / 30);
     }
 }

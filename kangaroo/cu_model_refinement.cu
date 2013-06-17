@@ -47,7 +47,7 @@ void BuildPoseRefinementFromDepthmapSystem(
     const Mat<float,3,4>& KT_lr, float c,
     LeastSquaresSystem<float,6>& lss, Image<float4> dDebug
 ) {
-    const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1};
+    const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1.0f};
 
     const Mat<float,3> KPl = KT_lr * Pr;
     const Mat<float,2> pl = {KPl(0)/KPl(2), KPl(1)/KPl(2)};

@@ -67,7 +67,7 @@ template<>
 __host__ __device__ inline
 float4 ConvertPixel(float p)
 {
-    return make_float4(p,p,p,1.0);
+    return make_float4(p,p,p,1.0f);
 }
 
 template<>
@@ -88,7 +88,14 @@ template<>
 __host__ __device__ inline
 float4 ConvertPixel(uchar4 p)
 {
-    return make_float4(p.x,p.y,p.z,p.z);
+    return make_float4(p.x/255.0f,p.y/255.0f,p.z/255.0f,p.w);
+}
+
+template<>
+__host__ __device__ inline
+float4 ConvertPixel(uchar3 p)
+{
+    return make_float4(p.x/255.0f,p.y/255.0f,p.z/255.0f,1.0);
 }
 
 template<>

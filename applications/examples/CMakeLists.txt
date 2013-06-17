@@ -10,7 +10,7 @@ include_directories( ${Boost_INCLUDE_DIRS} )
 link_libraries( ${Boost_LIBRARIES} )
 
 # git clone git://github.com/stevenlovegrove/Pangolin.git
-find_package(Pangolin REQUIRED)
+find_package(Pangolin 0.1 REQUIRED)
 include_directories(${Pangolin_INCLUDE_DIRS})
 link_directories(${Pangolin_LIBRARY_DIRS})
 link_libraries(${Pangolin_LIBRARIES})
@@ -22,7 +22,7 @@ link_directories(${Sophus_LIBRARY_DIRS})
 link_libraries(${Sophus_LIBRARIES})
 
 # git clone http://robotics.gwu.edu/git/SceneGraph
-find_package(SceneGraph REQUIRED)
+find_package(SceneGraph 0.1 REQUIRED)
 include_directories(${SceneGraph_INCLUDE_DIRS})
 link_libraries(${SceneGraph_LIBRARIES})
 

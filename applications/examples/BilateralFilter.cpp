@@ -91,6 +91,6 @@ int main( int argc, char* argv[] )
             texf.RenderToViewportFlipY();
         }
 
-        pangolin::FinishGlutFrame();
+        pangolin::FinishFrame();
     }
 }

@@ -55,11 +55,6 @@ struct SumLeastSquaresSystem
         return thrust::reduce(dSum.begin(), dSum.end(), sum, thrust::plus<LeastSquaresSystem<T,N> >() );
     }
 
-    __device__ inline SumLeastSquaresSystem()
-    {
-
-    }
-
     __device__ inline LeastSquaresSystem<T,N>& ThisObs()
     {
         const unsigned int tid = threadIdx.y*blockDim.x + threadIdx.x;

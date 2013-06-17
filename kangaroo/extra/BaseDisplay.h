@@ -5,7 +5,7 @@
 inline pangolin::View& SetupPangoGL(int w, int h, int ui_width = 180, std::string window_title = "-")
 {
     // Setup OpenGL Display (based on GLUT)
-    pangolin::CreateGlutWindowAndBind(window_title,ui_width+w,h);
+    pangolin::CreateWindowAndBind(window_title,ui_width+w,h);
     glewInit();
 
     // Setup default OpenGL parameters

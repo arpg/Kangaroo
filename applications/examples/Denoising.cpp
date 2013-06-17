@@ -67,15 +67,15 @@ int main( int argc, char* argv[] )
         if(reset) {
             if(video.GrabNext(host.ptr)) {
                 img.CopyFrom(host);
-                roo::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
-                imgu.CopyFrom(imgg);
-                imgp.Memset(0);
-    
-                imgq.Memset(0);
-                imgr.Memset(0);
-    
-                roo::GradU(imgv,imgu);
             }
+            roo::ElementwiseScaleBias<float,unsigned char,float>(imgg, img, 1.0f/255.0f);
+            imgu.CopyFrom(imgg);
+            imgp.Memset(0);
+
+            imgq.Memset(0);
+            imgr.Memset(0);
+
+            roo::GradU(imgv,imgu);
         }
 
         if(go) {
@@ -97,6 +97,6 @@ int main( int argc, char* argv[] )
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glColor3f(1,1,1);
 
-        pangolin::FinishGlutFrame();
+        pangolin::FinishFrame();
     }
 }

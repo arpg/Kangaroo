@@ -127,6 +127,6 @@ int main( int argc, char* argv[] )
 //            GlSlUtilities::UseNone();
         }
 
-        pangolin::FinishGlutFrame();
+        pangolin::FinishFrame();
     }
 }
