@@ -38,9 +38,9 @@ inline NppiRect GetCenteredAlignedRegion(int w, int h, int blockx, int blocky)
     return ret;
 }
 
-inline int GetLevelFromMaxPixels(int w, int h, unsigned long maxpixels)
+inline int GetLevelFromMaxPixels(size_t w, size_t h, unsigned long maxpixels)
 {
-    int level = 0;
+    size_t level = 0;
     while( (w >> level)*(h >> level) > maxpixels ) {
         ++level;
     }

@@ -5,10 +5,6 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "-std=c++11 -g")
 endif()
 
-find_package( Boost COMPONENTS thread REQUIRED )
-include_directories( ${Boost_INCLUDE_DIRS} )
-link_libraries( ${Boost_LIBRARIES} )
-
 find_package( Kangaroo 0.1 REQUIRED)
 include_directories( ${Kangaroo_INCLUDE_DIRS} )
 link_libraries(${Kangaroo_LIBRARIES})

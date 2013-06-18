@@ -10,7 +10,6 @@
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/BoundedVolume.h>
 #include <kangaroo/MarchingCubes.h>
-#include <kangaroo/extra/RpgCameraOpen.h>
 #include <kangaroo/extra/ImageSelect.h>
 #include <kangaroo/extra/BaseDisplayCuda.h>
 #include <kangaroo/extra/DisplayUtils.h>
@@ -29,9 +28,14 @@ int main( int argc, char* argv[] )
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
     // Open video device
-    hal::Camera camera = OpenRpgCamera(argc,argv);
-    const int w = camera.Width();
-    const int h = camera.Height();
+    pangolin::VideoInput video(argc >= 2 ? argv[1] : "openni:[img1=rgb,img2=depth]//" );
+    if(video.Streams().size() != 2)
+        throw pangolin::VideoException("Requires RGB and Depth streams.");    
+    
+    unsigned char vid_buffer[video.SizeBytes()];
+    std::vector<pangolin::Image<unsigned char> > imgs;    
+    const int w = video.Width();
+    const int h = video.Height();
     const int MaxLevels = 4;
 
     const double baseline_m = 0.08; //camera.GetDeviceProperty(<double>("Depth0Baseline", 0) / 100;
@@ -142,22 +146,20 @@ int main( int argc, char* argv[] )
 //    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {roo::SaveMesh("mesh",vol,colorVol); } );
     pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); } );
 
-    pb::ImageArray imgs;    
-    
     for(long frame=-1; !pangolin::ShouldQuit();)
     {
         const bool go = !viewonly && (frame==-1 || run);
 
         if(Pushed(save_kf)) {
             KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
-            kf->img.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].data(),w,h));
+            kf->img.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].ptr,imgs[0].w,imgs[0].h,imgs[0].pitch));
             keyframes.push_back(kf);
         }
 
         if(go) {
-            if(camera.Capture(imgs)) {
-                dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)imgs[1].data(),w,h));
-                drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].data(),w,h));
+            if(video.Grab(vid_buffer, imgs,true,false)) {
+                dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)imgs[1].ptr, imgs[1].w, imgs[1].h, imgs[1].pitch ));
+                drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].ptr, imgs[0].w, imgs[0].h, imgs[0].pitch ));
                 roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
                 roo::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
     
@@ -221,7 +223,6 @@ int main( int argc, char* argv[] )
 
             const roo::BoundingBox roi(roo::BoundingBox(T_wl.matrix3x4(), w, h, K, knear,kfar));
             roo::BoundedVolume<roo::SDF_t> work_vol = vol.SubBoundingVolume( roi );
-            roo::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
             if(work_vol.IsValid()) {
 //                roo::RaycastSdf(ray_d[0], ray_n[0], ray_i[0], work_vol, T_wl.matrix3x4(), fu, fv, u0, v0, knear, kfar, true );
 //                roo::BoxReduceIgnoreInvalid<float,MaxLevels,float>(ray_d);

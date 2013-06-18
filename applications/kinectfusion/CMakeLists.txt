@@ -5,10 +5,6 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "-std=c++11 -g")
 endif()
 
-find_package( Boost COMPONENTS thread REQUIRED )
-include_directories( ${Boost_INCLUDE_DIRS} )
-link_libraries( ${Boost_LIBRARIES} )
-
 find_package( Kangaroo 0.1 REQUIRED)
 include_directories( ${Kangaroo_INCLUDE_DIRS} )
 link_libraries(${Kangaroo_LIBRARIES})
@@ -22,13 +18,7 @@ find_package(Sophus QUIET)
 # git clone http://robotics.gwu.edu/git/SceneGraph
 find_package(SceneGraph 0.1 QUIET)
 
-# git clone http://robotics.gwu.edu/git/RPG
-find_package( HAL 0.1 QUIET )
-
-# git clone http://robotics.gwu.edu/git/calibu
-find_package( Calibu 0.1 QUIET )
-
-if(Pangolin_FOUND AND Sophus_FOUND AND SceneGraph_FOUND AND HAL_FOUND AND Calibu_FOUND)
+if(Pangolin_FOUND AND Sophus_FOUND AND SceneGraph_FOUND )
     include_directories(${Pangolin_INCLUDE_DIRS})
     link_libraries(${Pangolin_LIBRARIES})
     
@@ -37,12 +27,6 @@ if(Pangolin_FOUND AND Sophus_FOUND AND SceneGraph_FOUND AND HAL_FOUND AND Calibu
     
     include_directories(${SceneGraph_INCLUDE_DIRS})
     link_libraries(${SceneGraph_LIBRARIES})
-    
-    include_directories( ${HAL_INCLUDE_DIRS} )
-    link_libraries(${HAL_LIBRARIES})
-    
-    include_directories( ${Calibu_INCLUDE_DIRS} )
-    link_libraries(${Calibu_LIBRARIES})
 
     add_executable( KinectFusion main.cpp)
 endif()
