@@ -6,6 +6,8 @@
 #include "SaveGIL.h"
 #include "../MarchingCubes.h"
 
+#include <boost/ptr_container/ptr_vector.hpp>
+
 struct KinectKeyframe
 {
     KinectKeyframe(int w, int h, Sophus::SE3d T_iw)
