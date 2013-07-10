@@ -1,13 +1,12 @@
 #pragma once
 
+#include <kangaroo/config.h>
 #include <cuda_runtime.h>
 
-#define HAVE_THRUST
 #ifdef HAVE_THRUST
 #include <thrust/device_vector.h>
 #endif // HAVE_THRUST
 
-#define HAVE_NPP
 #ifdef HAVE_NPP
 #include <npp.h>
 #endif // HAVE_NPP
