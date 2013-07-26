@@ -1,2 +1,3 @@
 ADD_SUBDIRECTORY(examples)
 ADD_SUBDIRECTORY(kinectfusion)
+ADD_SUBDIRECTORY(stereo)

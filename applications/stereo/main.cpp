@@ -5,21 +5,24 @@
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 #include <pangolin/glsl.h>
-#include <npp.h>
+//#include <npp.h>
 
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLVbo.h>
-#include "common/GLCameraHistory.h"
 
+#include <calibu/Calibu.h>
+
+//#include <kangaroo/extra/GLCameraHistory.h>
 #include <kangaroo/extra/RpgCameraOpen.h>
-#include <kangaroo/extra/DisplayUtils.h>
-#include "common/ScanlineRectify.h"
+//#include <kangaroo/extra/DisplayUtils.h>
+//#include <kangaroo/extra/ScanlineRectify.h>
 #include <kangaroo/extra/ImageSelect.h>
 #include <kangaroo/extra/BaseDisplayCuda.h>
-#include "common/HeightmapFusion.h"
-#include "common/CameraModelPyramid.h"
-#include "common/LoadPosesFromFile.h"
-#include "common/SavePPM.h"
+#include <kangaroo/extra/BaselineFromCamModel.h>
+//#include <kangaroo/extra/HeightmapFusion.h>
+//#include <kangaroo/extra/CameraModelPyramid.h>
+//#include <kangaroo/extra/LoadPosesFromFile.h>
+//#include <kangaroo/extra/SavePPM.h>
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
@@ -27,8 +30,6 @@
 
 const int MAXD = 60;
 
-using namespace std;
-using namespace roo;
 
 int main( int argc, char* argv[] )
 {
@@ -39,39 +40,63 @@ int main( int argc, char* argv[] )
     glClearColor(1,1,1,0);
 
     // Open video device
-    CameraDevice video = OpenRpgCamera(argc,argv,2,true);
+    hal::Camera video = OpenRpgCamera(argc,argv);
 
     // Capture first image
-    std::vector<rpg::ImageWrapper> images;
-    video.Capture(images);
+    pb::ImageArray images;
 
-    // native width and height (from camera)
-    const unsigned int nw = images[0].width();
-    const unsigned int nh = images[0].height();
+    // N cameras, each w*h in dimension, greyscale
+    const size_t N = video.NumChannels();
+    if( N != 2 ) {
+        std::cerr << "Two images are required to run this program!" << std::endl;
+        exit(1);
+    }
+    const size_t nw = video.Width();
+    const size_t nh = video.Height();
+
+    // Capture first image
+    video.Capture(images);
 
     // Downsample this image to process less pixels
     const int max_levels = 6;
-    const int level = GetLevelFromMaxPixels( nw, nh, 640*480 );
+    const int level = roo::GetLevelFromMaxPixels( nw, nh, 640*480 );
 //    const int level = 4;
     assert(level <= max_levels);
 
     // Find centered image crop which aligns to 16 pixels at given level
-    const NppiRect roi = GetCenteredAlignedRegion(nw,nh,16 << level,16 << level);
+    const NppiRect roi = roo::GetCenteredAlignedRegion(nw,nh,16 << level,16 << level);
 
     // Load Camera intrinsics from file
-    CameraModelPyramid cam[] = {
-        video.GetProperty("DataSourceDir") + "/lcmod.xml",
-        video.GetProperty("DataSourceDir") + "/rcmod.xml"
+    GetPot clArgs( argc, argv );
+    const std::string filename = clArgs.follow("","-cmod");
+    if( filename.empty() ) {
+        std::cerr << "Camera models file is required!" << std::endl;
+        exit(1);
+    }
+    const calibu::CameraRig rig = calibu::ReadXmlRig(filename);
+
+    if( rig.cameras.size() != 2 ) {
+        std::cerr << "Two camera models are required to run this program!" << std::endl;
+        exit(1);
+    }
+
+    Eigen::Matrix3d CamModel0 = rig.cameras[0].camera.K();
+    Eigen::Matrix3d CamModel1 = rig.cameras[1].camera.K();
+
+    roo::ImageIntrinsics camMod[] = {
+        {CamModel0(0,0),CamModel0(1,1),CamModel0(0,2),CamModel0(1,2)},
+        {CamModel1(0,0),CamModel1(1,1),CamModel1(0,2),CamModel1(1,2)}
     };
 
     for(int i=0; i<2; ++i ) {
         // Adjust to match camera image dimensions
-        CamModelScaleToDimensions(cam[i], nw, nh );
+        const double scale = nw / rig.cameras[i].camera.Width();
+        roo::ImageIntrinsics camModel = camMod[i].Scale( scale );
 
         // Adjust to match cropped aligned image
-        CamModelCropToRegionOfInterest(cam[i], roi);
+        camModel = camModel.CropToROI( roi );
 
-        cam[i].PopulatePyramid(max_levels);
+        camMod[i] = camModel;
     }
 
     const unsigned int w = roi.width;
@@ -79,16 +104,19 @@ int main( int argc, char* argv[] )
     const unsigned int lw = w >> level;
     const unsigned int lh = h >> level;
 
-    const Eigen::Matrix3d& K0 = cam[0].K();
-    const Eigen::Matrix3d& Kl = cam[0].K(level);
+    const Eigen::Matrix3d& K0 = camMod[0].Matrix();
+    const Eigen::Matrix3d& Kl = camMod[0][level].Matrix();
 
-    cout << "Video stream dimensions: " << nw << "x" << nh << endl;
-    cout << "Chosen Level: " << level << endl;
-    cout << "Processing dimensions: " << lw << "x" << lh << endl;
-    cout << "Offset: " << roi.x << "x" << roi.y << endl;
+    std::cout << "K Matrix: " << std::endl << K0 << std::endl;
+    std::cout << "K Matrix - Level: " << std::endl << Kl << std::endl;
+
+    std::cout << "Video stream dimensions: " << nw << "x" << nh << std::endl;
+    std::cout << "Chosen Level: " << level << std::endl;
+    std::cout << "Processing dimensions: " << lw << "x" << lh << std::endl;
+    std::cout << "Offset: " << roi.x << "x" << roi.y << std::endl;
 
     // print selected camera model
-    std::cout << "Camera Model used: " << std::endl << cam[0].K(level) << std::endl;
+    std::cout << "Camera Model used: " << std::endl << camMod[0][level].Matrix() << std::endl;
 
     Eigen::Matrix3d RDFvision;RDFvision<< 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFrobot; RDFrobot << 0,1,0,  0,0, 1,  1,0,0;
@@ -97,23 +125,27 @@ int main( int argc, char* argv[] )
     Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
     T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
 
-    const Sophus::SE3d T_rl_orig = T_rlFromCamModelRDF(cam[0], cam[1], RDFvision);
+    const Sophus::SE3d T_rl_orig = T_rlFromCamModelRDF(rig.cameras[0], rig.cameras[1], RDFvision);
+
+    // TODO(jmf): For now, assume cameras are rectified. Later allow unrectified cameras.
+    /*
     double k1 = 0;
     double k2 = 0;
 
     if(cam[0].Type() == MVL_CAMERA_WARPED)
     {
-//        k1 = cam[0].GetModel()->warped.kappa1;
-//        k2 = cam[0].GetModel()->warped.kappa2;
+        k1 = cam[0].GetModel()->warped.kappa1;
+        k2 = cam[0].GetModel()->warped.kappa2;
     }
+    */
 
-    const bool rectify = (k1!=0 || k2!=0); // || camModel[0].GetPose().block<3,3>(0,0)
+    const bool rectify = false;
     if(!rectify) {
-        cout << "Using pre-rectified images" << endl;
+        std::cout << "Using pre-rectified images" << std::endl;
     }
 
     // Check we received at least two images
-    if(images.size() < 2) {
+    if(images.Size() < 2) {
         std::cerr << "Failed to capture first stereo pair from camera" << std::endl;
         return -1;
     }
@@ -129,30 +161,30 @@ int main( int argc, char* argv[] )
     pangolin::GlBuffer ibo = pangolin::MakeTriangleStripIboForVbo(lw,lh);
 
     // Allocate Camera Images on device for processing
-    Image<unsigned char, TargetHost, DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
-    Image<float2, TargetDevice, Manage> dLookup[] = {{w,h},{w,h}};
+    roo::Image<unsigned char, roo::TargetHost, roo::DontManage> hCamImg[] = {{0,nw,nh},{0,nw,nh}};
+    roo::Image<float2, roo::TargetDevice, roo::Manage> dLookup[] = {{w,h},{w,h}};
 
-    Image<unsigned char, TargetDevice, Manage> upload(w,h);
-    Pyramid<unsigned char, max_levels, TargetDevice, Manage> img_pyr[] = {{w,h},{w,h}};
+    roo::Image<unsigned char, roo::TargetDevice, roo::Manage> upload(w,h);
+    roo::Pyramid<unsigned char, max_levels, roo::TargetDevice, roo::Manage> img_pyr[] = {{w,h},{w,h}};
 
-    Image<float, TargetDevice, Manage> img[] = {{lw,lh},{lw,lh}};
-    Volume<float, TargetDevice, Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD}};
-    Image<float, TargetDevice, Manage>  disp[] = {{lw,lh},{lw,lh}};
-    Image<float, TargetDevice, Manage> meanI(lw,lh);
-    Image<float, TargetDevice, Manage> varI(lw,lh);
-    Image<float, TargetDevice, Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
+    roo::Image<float, roo::TargetDevice, roo::Manage> img[] = {{lw,lh},{lw,lh}};
+    roo::Volume<float, roo::TargetDevice, roo::Manage> vol[] = {{lw,lh,MAXD},{lw,lh,MAXD}};
+    roo::Image<float, roo::TargetDevice, roo::Manage>  disp[] = {{lw,lh},{lw,lh}};
+    roo::Image<float, roo::TargetDevice, roo::Manage> meanI(lw,lh);
+    roo::Image<float, roo::TargetDevice, roo::Manage> varI(lw,lh);
+    roo::Image<float, roo::TargetDevice, roo::Manage> temp[] = {{lw,lh},{lw,lh},{lw,lh},{lw,lh},{lw,lh}};
 
-    Image<float,TargetDevice, Manage>& imgd = disp[0];
-    Image<float,TargetDevice, Manage> depthmap(lw,lh);
-    Image<float,TargetDevice, Manage> imga(lw,lh);
-    Image<float2,TargetDevice, Manage> imgq(lw,lh);
-    Image<float,TargetDevice, Manage> imgw(lw,lh);
+    roo::Image<float,roo::TargetDevice, roo::Manage>& imgd = disp[0];
+    roo::Image<float,roo::TargetDevice, roo::Manage> depthmap(lw,lh);
+    roo::Image<float,roo::TargetDevice, roo::Manage> imga(lw,lh);
+    roo::Image<float2,roo::TargetDevice, roo::Manage> imgq(lw,lh);
+    roo::Image<float,roo::TargetDevice, roo::Manage> imgw(lw,lh);
 
-    Image<float4, TargetDevice, Manage>  d3d(lw,lh);
-    Image<unsigned char, TargetDevice,Manage> Scratch(lw*sizeof(LeastSquaresSystem<float,6>),lh);
+    roo::Image<float4, roo::TargetDevice, roo::Manage>  d3d(lw,lh);
+    roo::Image<unsigned char, roo::TargetDevice,roo::Manage> Scratch(lw*sizeof(roo::LeastSquaresSystem<float,6>),lh);
 
     typedef ulong4 census_t;
-    Image<census_t, TargetDevice, Manage> census[] = {{lw,lh},{lw,lh}};
+    roo::Image<census_t, roo::TargetDevice, roo::Manage> census[] = {{lw,lh},{lw,lh}};
 
     // Stereo transformation (post-rectification)
     Sophus::SE3d T_rl = T_rl_orig;
@@ -161,7 +193,7 @@ int main( int argc, char* argv[] )
     std::cout << "Baseline: " << baseline << std::endl;
 
     cudaMemGetInfo( &cu_mem_end, &cu_mem_total );
-    cout << "CuTotal: " << cu_mem_total/(1024*1024) << ", Available: " << cu_mem_end/(1024*1024) << ", Used: " << (cu_mem_start-cu_mem_end)/(1024*1024) << endl;
+    std::cout << "CuTotal: " << cu_mem_total/(1024*1024) << ", Available: " << cu_mem_end/(1024*1024) << ", Used: " << (cu_mem_start-cu_mem_end)/(1024*1024) << std::endl;
 
     pangolin::Var<bool> step("ui.step", false, false);
     pangolin::Var<bool> run("ui.run", false, true);
@@ -249,14 +281,18 @@ int main( int argc, char* argv[] )
         }
 
         if(go) {
-            if(frame>0) video.Capture(images);
+            if(frame>0) {
+                if( video.Capture(images) == false) {
+                    exit(1);
+                }
+            }
 
             frame++;
 
             /////////////////////////////////////////////////////////////
             // Upload images to device (Warp / Decimate if necessery)
             for(int i=0; i<2; ++i ) {
-                hCamImg[i].ptr = images[i].Image.data;
+                hCamImg[i].ptr = images[i].data();
 
                 if(rectify) {
                     upload.CopyFrom(hCamImg[i].SubImage(roi));
@@ -265,17 +301,17 @@ int main( int argc, char* argv[] )
                     img_pyr[i][0].CopyFrom(hCamImg[i].SubImage(roi));
                 }
 
-                BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
+                roo::BoxReduce<unsigned char, max_levels, unsigned int>(img_pyr[i]);
             }
         }
 
         go |= avg_rad.GuiChanged() | use_census.GuiChanged();
         if( go ) {
             for(int i=0; i<2; ++i ) {
-                ElementwiseScaleBias<float,unsigned char,float>(img[i], img_pyr[i][level],1.0f/255.0f);
+                roo::ElementwiseScaleBias<float,unsigned char,float>(img[i], img_pyr[i][level],1.0f/255.0f);
                 if(avg_rad > 0 ) {
-                    BoxFilter<float,float,float>(temp[0],img[i],Scratch,avg_rad);
-                    ElementwiseAdd<float,float,float,float>(img[i], img[i], temp[0], 1, -1, 0.5);
+                    roo::BoxFilter<float,float,float>(temp[0],img[i],Scratch,avg_rad);
+                    roo::ElementwiseAdd<float,float,float,float>(img[i], img[i], temp[0], 1, -1, 0.5);
                 }
                 if(use_census) {
                     Census(census[i], img[i]);
@@ -290,8 +326,8 @@ int main( int argc, char* argv[] )
         go |= filter.GuiChanged() | leftrightcheck.GuiChanged() | rad.GuiChanged() | eps.GuiChanged() | alpha.GuiChanged() | r1.GuiChanged() | r2.GuiChanged();
         if(go) {
             if(use_census) {
-                CensusStereoVolume<float, census_t>(vol[0], census[0], census[1], maxdisp, -1);
-                if(leftrightcheck) CensusStereoVolume<float, census_t>(vol[1], census[1], census[0], maxdisp, +1);
+                roo::CensusStereoVolume<float, census_t>(vol[0], census[0], census[1], maxdisp, -1);
+                if(leftrightcheck) roo::CensusStereoVolume<float, census_t>(vol[1], census[1], census[0], maxdisp, +1);
             }else{
                 CostVolumeFromStereoTruncatedAbsAndGrad(vol[0], img[0], img[1], -1, alpha, r1, r2);
                 if(leftrightcheck) CostVolumeFromStereoTruncatedAbsAndGrad(vol[1], img[1], img[0], +1, alpha, r1, r2);
@@ -301,13 +337,13 @@ int main( int argc, char* argv[] )
                 // Filter Cost volume
                 for(int v=0; v<(leftrightcheck?2:1); ++v)
                 {
-                    Image<float, TargetDevice, Manage>& I = img[v];
-                    ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
+                    roo::Image<float, roo::TargetDevice, roo::Manage>& I = img[v];
+                    roo::ComputeMeanVarience<float,float,float>(varI, temp[0], meanI, I, Scratch, rad);
 
                     for(int d=0; d<maxdisp; ++d)
                     {
-                        Image<float> P = vol[v].ImageXY(d);
-                        ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
+                        roo::Image<float> P = vol[v].ImageXY(d);
+                        roo::ComputeCovariance(temp[0],temp[2],temp[1],P,meanI,I,Scratch,rad);
                         GuidedFilter(P,temp[0],varI,temp[1],meanI,I,Scratch,temp[2],temp[3],temp[4],rad,eps);
                     }
                 }
@@ -360,7 +396,7 @@ int main( int argc, char* argv[] )
                 std::string DepthFile;
                 DepthFile = DepthPrefix + Index + ".pdm";
                 std::cout << "Depth File: " << DepthFile << std::endl;
-                ofstream pDFile( DepthFile.c_str(), ios::out | ios::binary );
+                std::ofstream pDFile( DepthFile.c_str(), std::ios::out | std::ios::binary );
                 pDFile << "P7" << std::endl;
                 pDFile << dmap.cols << " " << dmap.rows << std::endl;
                 unsigned int Size = dmap.elemSize1() * dmap.rows * dmap.cols;
@@ -432,7 +468,7 @@ int main( int argc, char* argv[] )
                 {
                     pangolin::CudaScopedMappedPtr var(cbo);
                     roo::Image<uchar4> dCbo((uchar4*)*var,lw,lh);
-                    ConvertImage<uchar4,unsigned char>(dCbo, img_pyr[0][level]);
+                    roo::ConvertImage<uchar4,unsigned char>(dCbo, img_pyr[0][level]);
                 }
             }
 
