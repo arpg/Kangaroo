@@ -2,7 +2,7 @@
 
 #include <kangaroo/Image.h>
 #include <kangaroo/Volume.h>
-#include <Kangaroo/BoundedVolume.h>
+#include <kangaroo/BoundedVolume.h>
 
 #include <iostream>
 
