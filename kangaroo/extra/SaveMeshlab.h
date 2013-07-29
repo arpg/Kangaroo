@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Sophus/se3.hpp>
+#include <sophus/se3.hpp>
 #include <kangaroo/Sdf.h>
 
 #include "SaveGIL.h"
