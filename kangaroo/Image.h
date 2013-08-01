@@ -56,14 +56,16 @@ struct TargetHost
     template<typename T> inline static
     void AllocatePitchedMem(T** hostPtr, size_t *pitch, size_t w, size_t h){
         *pitch = w*sizeof(T);
-        *hostPtr = (T*)malloc(*pitch * h);
+        const cudaError err = cudaMallocHost(hostPtr, *pitch * h);
+        if( err != cudaSuccess ) {
+            throw CudaException("Unable to cudaMallocHost", err);
+        }
     }
 
     template<typename T> inline static
     void AllocatePitchedMem(T** hostPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
         *pitch = w*sizeof(T);
         *img_pitch = *pitch*h;
-//        *hostPtr = (T*)malloc(*pitch * h * d);
         const cudaError err = cudaMallocHost(hostPtr, *pitch * h * d);
         if( err != cudaSuccess ) {
             throw CudaException("Unable to cudaMallocHost", err);
@@ -72,7 +74,6 @@ struct TargetHost
 
     template<typename T> inline static
     void DeallocatePitchedMem(T* hostPtr){
-//        free(hostPtr);
 		cudaFreeHost(hostPtr);
     }
 };
