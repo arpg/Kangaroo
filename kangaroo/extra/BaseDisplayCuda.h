@@ -9,11 +9,15 @@ inline pangolin::View& SetupPangoGLWithCuda(int w, int h, int ui_width = 180, st
 {
     pangolin::View& container = SetupPangoGL(w,h,ui_width, window_title);
 
+#if CUDART_VERSION < 5000
+    // This is now deprecated and actually seems to fail in 5.0
     // Initialise CUDA, allowing it to use OpenGL context
     if( cudaGLSetGLDevice(0) != cudaSuccess ) {
         std::cerr << "Unable to get CUDA Device" << std::endl;
         exit(-1);
     }
+#endif
+    
     const unsigned bytes_per_mb = 1024*1000;
     size_t cu_mem_start, cu_mem_total;
     if(cudaMemGetInfo( &cu_mem_start, &cu_mem_total ) != cudaSuccess) {

@@ -6,7 +6,9 @@ inline pangolin::View& SetupPangoGL(int w, int h, int ui_width = 180, std::strin
 {
     // Setup OpenGL Display (based on GLUT)
     pangolin::CreateWindowAndBind(window_title,ui_width+w,h);
-    glewInit();
+    if (glewInit() != GLEW_OK ) {
+        std::cerr << "Unable to initialize GLEW." << std::endl;
+    }
 
     // Setup default OpenGL parameters
     glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
