@@ -69,7 +69,7 @@ struct TargetHost
         const cudaError err = cudaMallocHost(hostPtr, *pitch * h * d);
         if( err != cudaSuccess ) {
             throw CudaException("Unable to cudaMallocHost", err);
-        }        
+        }
     }
 
     template<typename T> inline static
@@ -160,7 +160,7 @@ struct DontManage
 
 
     template<typename T, typename Target> inline static __device__ __host__
-    void Cleanup(T* ptr)
+    void Cleanup(T* /*ptr*/)
     {
     }
 };

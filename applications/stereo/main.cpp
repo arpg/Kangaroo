@@ -80,8 +80,8 @@ int main( int argc, char* argv[] )
         exit(1);
     }
 
-    Eigen::Matrix3d CamModel0 = rig.cameras[0].camera.K();
-    Eigen::Matrix3d CamModel1 = rig.cameras[1].camera.K();
+    Eigen::Matrix3f CamModel0 = rig.cameras[0].camera.K().cast<float>();
+    Eigen::Matrix3f CamModel1 = rig.cameras[1].camera.K().cast<float>();
 
     roo::ImageIntrinsics camMod[] = {
         {CamModel0(0,0),CamModel0(1,1),CamModel0(0,2),CamModel0(1,2)},

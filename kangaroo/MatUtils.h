@@ -320,15 +320,15 @@ float length3(float4 r)
 //////////////////////////////////////////////////////
 
 __host__ __device__ inline
-Mat<float,3> SE3gen0mul(const Mat<float,3>& p) {
+Mat<float,3> SE3gen0mul(const Mat<float,3>& /*p*/) {
     return make_mat(1,0,0);
 }
 __host__ __device__ inline
-Mat<float,3> SE3gen1mul(const Mat<float,3>& p) {
+Mat<float,3> SE3gen1mul(const Mat<float,3>& /*p*/) {
     return make_mat(0,1,0);
 }
 __host__ __device__ inline
-Mat<float,3> SE3gen2mul(const Mat<float,3>& p) {
+Mat<float,3> SE3gen2mul(const Mat<float,3>& /*p*/) {
     return make_mat(0,0,1);
 }
 __host__ __device__ inline
@@ -350,15 +350,15 @@ Mat<float,3> SE3gen5mul(const Mat<float,3>& p) {
 //////////////////////////////////////////////////////
 
 __host__ __device__ inline
-float3 SE3gen0mul(const float3& p) {
+float3 SE3gen0mul(const float3& /*p*/) {
     return make_float3(1,0,0);
 }
 __host__ __device__ inline
-float3 SE3gen1mul(const float3& p) {
+float3 SE3gen1mul(const float3& /*p*/) {
     return make_float3(0,1,0);
 }
 __host__ __device__ inline
-float3 SE3gen2mul(const float3& p) {
+float3 SE3gen2mul(const float3& /*p*/) {
     return make_float3(0,0,1);
 }
 __host__ __device__ inline
@@ -377,15 +377,15 @@ float3 SE3gen5mul(const float3& p) {
 //////////////////////////////////////////////////////
 
 __host__ __device__ inline
-float3 SE3gen0mul(const float4& p) {
+float3 SE3gen0mul(const float4& /*p*/) {
     return make_float3(1,0,0);
 }
 __host__ __device__ inline
-float3 SE3gen1mul(const float4& p) {
+float3 SE3gen1mul(const float4& /*p*/) {
     return make_float3(0,1,0);
 }
 __host__ __device__ inline
-float3 SE3gen2mul(const float4& p) {
+float3 SE3gen2mul(const float4& /*p*/) {
     return make_float3(0,0,1);
 }
 __host__ __device__ inline
