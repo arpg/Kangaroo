@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Tracking.h"
-#include <RPG/Devices/VirtualDevice.h>
+#include <HAL/Devices/DeviceTime.h>
 
 #include <boost/thread.hpp>
 
@@ -67,11 +67,11 @@ protected:
         
         while(m_run && index < vecT_wp.size() ) {
             if(index==0) {
-                VirtualDevice::PushTime(vecSystemTime[index]);
+                hal::DeviceTime::PushTime(vecSystemTime[index]);
             }else{
-                VirtualDevice::PopAndPushTime(vecSystemTime[index]);                
+                hal::DeviceTime::PopAndPushTime(vecSystemTime[index]);
             }
-            VirtualDevice::WaitForTime(vecSystemTime[index]);
+            hal::DeviceTime::WaitForTime(vecSystemTime[index]);
             
             TrackingEvent(vecT_wp[index], vecSystemTime[index], vecDeviceTime[index] );
             ++index;
