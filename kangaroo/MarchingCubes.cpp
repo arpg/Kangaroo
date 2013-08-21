@@ -16,6 +16,8 @@
 // This code is public domain.
 //
 
+#include <kangaroo/config.h>
+
 #include "stdio.h"
 #include "math.h"
 
@@ -23,12 +25,16 @@
 #include "MarchingCubes.h"
 #include "MarchingCubesTables.h"
 
+#if HAVE_ASSIMP
 #include <assimp/cexport.h>
 #include <assimp/scene.h>
 #include "extra/AssimpMissing.h"
+#endif // HAVE_ASSIMP
 
 namespace roo
 {
+
+#if HAVE_ASSIMP
 
 //fGetOffset finds the approximate point of intersection of the surface
 // between two points with the values fValue1 and fValue2
@@ -210,9 +216,12 @@ void SaveMesh(std::string filename, aiMesh* mesh)
     std::cout << "Mesh export result: " << res << std::endl;
 }
 
+#endif // HAVE_ASSIMP
+
 template<typename T, typename TColor>
 void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol, const BoundedVolume<TColor,TargetHost> volColor )
 {
+#if HAVE_ASSIMP
     std::vector<aiVector3D> verts;
     std::vector<aiVector3D> norms;
     std::vector<aiFace> faces;
@@ -228,6 +237,9 @@ void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol, const
 
     aiMesh* mesh = MeshFromLists(verts,norms,faces,colors);
     SaveMesh(filename, mesh);
+#else
+    std::cerr << "Mesh cannot be saved. Please configure Kangaroo with Assimp." << std::endl;
+#endif // HAVE_ASSIMP
 }
 
 // Instantiate templates

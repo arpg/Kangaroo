@@ -35,6 +35,7 @@ list(APPEND SRC_CU
     cu_segment_test.cu
     cu_painting.cu cu_remap.cu
     cu_raycast.cu cu_sdffusion.cu
+    MarchingCubes.cpp
 )
 
 ################################################################################
@@ -74,7 +75,6 @@ if(ASSIMP_FOUND)
     set(HAVE_ASSIMP 1)
     list(APPEND INTERNAL_INC ${ASSIMP_INCLUDE_DIR})
     list(APPEND LINK_LIBS ${ASSIMP_LIBRARIES} )
-    list(APPEND SRC_CU MarchingCubes.cpp )
 endif()
 
 find_package( OpenCV2 QUIET )
