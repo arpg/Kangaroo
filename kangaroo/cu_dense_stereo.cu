@@ -818,6 +818,9 @@ __global__ void KernCostVolumeFromStereoTruncatedAbsAndGrad(
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
     const int d = blockIdx.z*blockDim.z + threadIdx.z;
 
+    alpha = 0;
+    r1 = 1e37;
+
     const int r = u + sd*d;
     if( 0 <= r && r < dimgr.w ) {
         const float absI = abs( (float)dimgr(r,v) - (float)dimgl(u,v));
