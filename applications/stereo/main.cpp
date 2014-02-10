@@ -5,24 +5,16 @@
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 #include <pangolin/glsl.h>
-//#include <npp.h>
 
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLVbo.h>
 
 #include <calibu/Calibu.h>
 
-//#include <kangaroo/extra/GLCameraHistory.h>
 #include <kangaroo/extra/RpgCameraOpen.h>
-//#include <kangaroo/extra/DisplayUtils.h>
-//#include <kangaroo/extra/ScanlineRectify.h>
 #include <kangaroo/extra/ImageSelect.h>
 #include <kangaroo/extra/BaseDisplayCuda.h>
 #include <kangaroo/extra/BaselineFromCamModel.h>
-//#include <kangaroo/extra/HeightmapFusion.h>
-//#include <kangaroo/extra/CameraModelPyramid.h>
-//#include <kangaroo/extra/LoadPosesFromFile.h>
-//#include <kangaroo/extra/SavePPM.h>
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
@@ -377,7 +369,7 @@ int main( int argc, char* argv[] )
                 // Dual Ascent
                 roo::WeightedHuberGradU_DualAscentP(imgq, imgd, imgw, sigma_q, huber_alpha);
 
-                // Primal Descent                
+                // Primal Descent
                 roo::WeightedL2_u_minus_g_PrimalDescent(imgd, imgq, imga, imgw, sigma_d, 1.0f / (theta) );
 
                 // Auxillary exhaustive search
