@@ -27,9 +27,20 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
         const float omrocsq = (1-roc*roc);
         const float w = (absy <= c) ? omrocsq*omrocsq : 0;
 
+		// TODO: We must be able to write this in a more straightforward way.
+#ifdef _MSC_VER
+        // MSVC doesn't like the struct construction that we've used below.
+        const Mat<float,3,1> r0 = {Qinv(0,0), Qinv(1,0), Qinv(2,0)};
+        const Mat<float,3,1> r1 = {Qinv(0,1), Qinv(1,1), Qinv(2,1)};
+        const Mat<float,3,1> r2 = {Qinv(0,2), Qinv(1,2), Qinv(2,2)};
+		const Mat<float,3,1> dn_dz0 = zhat[0] * r0;
+        const Mat<float,3,1> dn_dz1 = zhat[1] * r1;
+        const Mat<float,3,1> dn_dz2 = zhat[2] * r2;
+#else
         const Mat<float,3,1> dn_dz0 = zhat[0] * (Mat<float,3,1>){Qinv(0,0), Qinv(1,0), Qinv(2,0)};
         const Mat<float,3,1> dn_dz1 = zhat[1] * (Mat<float,3,1>){Qinv(0,1), Qinv(1,1), Qinv(2,1)};
         const Mat<float,3,1> dn_dz2 = zhat[2] * (Mat<float,3,1>){Qinv(0,2), Qinv(1,2), Qinv(2,2)};
+#endif
 
         Mat<float,1,3> Ji;
         Ji[0] = ((-d*d*d*np_p1) * (nhat * dn_dz0)) + d * (dn_dz0[0]*P.x + dn_dz0[1]*P.y + dn_dz0[2]*P.z);

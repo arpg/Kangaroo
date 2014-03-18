@@ -29,7 +29,7 @@ __global__ void KernManhattenLineCost(
     const int border=3;
     if(in.InBounds(x,y,border)) {
 //        const float dx = in.template GetCentralDiffDx<float>(x,y) / 255.0;
-//        const float dy = in.template GetCentralDiffDx<float>(x,y) / 255.0;
+//        const float dy = in.template GetCentralDiffDy<float>(x,y) / 255.0;
 
         // http://www.holoborodko.com/pavel/image-processing/edge-detection/
         const float dx = (
@@ -71,26 +71,38 @@ __global__ void KernManhattenLineCost(
             Mat<float,3> J = make_mat(0.0f,0.0f,0.0f);
             float f = 0.0f;
 
+			float4 d1 = {0,0,0,1};
+			float4 d2 = {0,0,0,1};
+
             // categorise pixel as lowest cost line.
             if( dotxx < cut*min(dotyy,dotzz) ) {
                 // xline
                 f = mag*dotx;
                 J = make_mat(mag*dRRm0(0),mag*dRRm1(0),mag*dRRm2(0));
-                out(x,y) = f*f<cut*cut ? (float4){ scale*f*f ,0,0,1} : cutcolor;
-                if(f*f<cut*cut) out2(x,y) = (float4){10*mag,0,0,1};
+				if( f*f < cut*cut ) {
+				    d1.x = scale*f*f;
+				    d2.x = 10*mag;
+				}
             }else if( dotyy < cut*min(dotxx,dotzz) ) {
                 // yline
                 f = mag*doty;
                 J = make_mat(mag*dRRm0(1),mag*dRRm1(1),mag*dRRm2(1));
-                out(x,y) = f*f<cut*cut ? (float4){0,scale*f*f,0,1} : cutcolor;
-                if(f*f<cut*cut) out2(x,y) = (float4){0,10*mag,0,1};
+				if( f*f < cut*cut ) {
+				    d1.y = scale*f*f;
+				    d2.y = 10*mag;
+				}
             }else if( dotzz < cut*min(dotxx,dotyy) ) {
                 // zline
                 f = mag*dotz;
                 J = make_mat(mag*dRRm0(2),mag*dRRm1(2),mag*dRRm2(2));
-                out(x,y) = f*f<cut*cut ? (float4){0,0, scale*f*f,1} : cutcolor;
-                if(f*f<cut*cut) out2(x,y) = (float4){0,0,10*mag,1};
+				if( f*f < cut*cut ) {
+				    d1.z = scale*f*f;
+				    d2.z = 10*mag;
+				}
             }
+
+			out(x,y) = d1;
+			out2(x,y) = d2;
 
 //            if( f*f < cut ) {
                 sum.JTy = J*f;

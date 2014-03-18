@@ -50,8 +50,8 @@ int main( int argc, char* argv[] )
     Handler3DGpuDepth handler(depth,s_cam, AxisNone);
     SceneGraph::HandlerSceneGraph handler3d(graph, s_cam, AxisNone);
     SetupContainer(container, 3, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler);
-    container[1].SetDrawFunction(boost::ref(adn)).SetHandler(&handler);
+    container[0].SetDrawFunction(std::ref(adg)).SetHandler(&handler);
+    container[1].SetDrawFunction(std::ref(adn)).SetHandler(&handler);
     container[2].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( &handler3d  );
 

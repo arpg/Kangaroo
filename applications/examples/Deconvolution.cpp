@@ -20,7 +20,8 @@ int main( int argc, char* argv[] )
         throw pangolin::VideoException("Requires two video streams.");    
     if(video.PixFormat().format != "GRAY8" || video.Streams()[1].PixFormat().format != "GRAY8" )
         throw pangolin::VideoException("Wrong format. Gray8 required.");    
-    unsigned char vid_buffer[video.SizeBytes()];
+
+    std::unique_ptr<unsigned char> vid_buffer( new unsigned char[video.SizeBytes()] );
 
     // Image dimensions
     const unsigned int w = video.Streams()[0].Width();
@@ -55,11 +56,11 @@ int main( int argc, char* argv[] )
 
     Handler2dImageSelect handler2d(w,h);
     SetupContainer(container, 5, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adgt)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(adk)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(boost::ref(adu)).SetHandler(&handler2d);
-    container[4].SetDrawFunction(boost::ref(adAu)).SetHandler(&handler2d);
+    container[0].SetDrawFunction(std::ref(adgt)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(std::ref(adk)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(std::ref(adg)).SetHandler(&handler2d);
+    container[3].SetDrawFunction(std::ref(adu)).SetHandler(&handler2d);
+    container[4].SetDrawFunction(std::ref(adAu)).SetHandler(&handler2d);
 
     Var<bool> nextImage("ui.step", false, false);
     Var<bool> go("ui.go", false, true);
@@ -76,7 +77,7 @@ int main( int argc, char* argv[] )
 
         if(reset) {
             std::vector<pangolin::Image<unsigned char> > images;
-            if(video.Grab(vid_buffer,images)) {
+            if(video.Grab(vid_buffer.get(),images)) {
                 img.MemcpyFromHost(images[0].ptr );
                 kernel.MemcpyFromHost(images[1].ptr );
                 roo::ElementwiseScaleBias<float,unsigned char,float>(imggt, img, 1.0f/255.0f);

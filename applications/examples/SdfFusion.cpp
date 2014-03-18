@@ -64,9 +64,9 @@ int main( int argc, char* argv[] )
     SceneGraph::HandlerSceneGraph handlerView(graph, stacks_view, AxisNone);
     SceneGraph::HandlerSceneGraph handlerCapture(graph, stacks_capture, AxisNone);
     SetupContainer(container, 5, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler);
-    container[1].SetDrawFunction(boost::ref(adn)).SetHandler(&handler);
-    container[2].SetDrawFunction(boost::ref(adin)).SetHandler(&handler);
+    container[0].SetDrawFunction(std::ref(adg)).SetHandler(&handler);
+    container[1].SetDrawFunction(std::ref(adn)).SetHandler(&handler);
+    container[2].SetDrawFunction(std::ref(adin)).SetHandler(&handler);
     container[3].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_view)).SetHandler( &handlerView  );
     container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, stacks_capture)).SetHandler( &handlerCapture  );
 

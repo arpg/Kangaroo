@@ -42,10 +42,10 @@ int main( int argc, char* argv[] )
 
     Handler2dImageSelect handler2d(w,h);
     SetupContainer(container, 4, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(adu)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(boost::ref(addivp)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(boost::ref(adlambda)).SetHandler(&handler2d);
+    container[0].SetDrawFunction(std::ref(adg)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(std::ref(adu)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(std::ref(addivp)).SetHandler(&handler2d);
+    container[3].SetDrawFunction(std::ref(adlambda)).SetHandler(&handler2d);
 
     Var<bool> run("ui.run", true, true);
     Var<bool> step("ui.step", false, false);

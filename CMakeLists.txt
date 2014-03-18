@@ -14,6 +14,11 @@ endif()
 # Platform configuration vars
 include(SetPlatformVars)
 
+if(MSVC)
+    # Report unknown pragma only once in MSVC - there are many
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wo4068" )
+endif()
+
 add_subdirectory(kangaroo)
 
 if(BUILD_APPLICATIONS)

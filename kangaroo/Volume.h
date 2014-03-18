@@ -351,8 +351,14 @@ struct Volume
     }
 
     inline __host__
-    void Fill(T val) {
+    void Fill(const T& val) {
+#     ifndef _MSC_VER
         thrust::fill(begin(), end(), val);
+#     else
+        // We get a very strange compilation error on windows when using thrust::fill:
+        // 'cannot pass a parameter with a too large explicit alignment to a __global__ routine on win32 platforms'
+        throw std::runtime_error("Not implemented for MSVC");
+#     endif
     }
 #endif
 

@@ -3,8 +3,6 @@
 #include "Image.h"
 #include "MatUtils.h"
 
-#define HAVE_EIGEN
-
 #ifndef __CUDACC__
     #ifdef HAVE_EIGEN
     #define USE_EIGEN

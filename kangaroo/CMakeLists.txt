@@ -53,16 +53,16 @@ set(CUDA_PROPAGATE_HOST_FLAGS off)
 # Generate code for 2.0 and 3.0 CUDA compute architectures (TODO: Verify this works)
 set(CUDA_NVCC_FLAGS "-use_fast_math -gencode arch=compute_30,code=sm_30 -gencode arch=compute_20,code=sm_20" )
 
-# Make sure that NPP is found
-if(NOT CUDA_npp_LIBRARY)
-    # TODO: Fix FindCUDA or make this more robust
-    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/libnpp.dylib")
-    else()
-        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpp.so")
-    endif()
-endif()
-list(APPEND LINK_LIBS ${CUDA_npp_LIBRARY} )
+## Make sure that NPP is found
+#if(NOT CUDA_npp_LIBRARY)
+#    # TODO: Fix FindCUDA or make this more robust
+#    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+#        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/libnpp.dylib")
+#    else()
+#        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpp.so")
+#    endif()
+#endif()
+#list(APPEND LINK_LIBS ${CUDA_npp_LIBRARY} )
 
 find_package( Eigen3 QUIET )
 if(EIGEN3_FOUND)

@@ -3,10 +3,11 @@
 #include <sophus/se3.hpp>
 #include <kangaroo/Sdf.h>
 
+#ifdef HAVE_BOOST_GIL
 #include "SaveGIL.h"
-#include "../MarchingCubes.h"
+#endif // HAVE_BOOST_GIL
 
-#include <boost/ptr_container/ptr_vector.hpp>
+#include "../MarchingCubes.h"
 
 struct KinectKeyframe
 {
@@ -19,7 +20,7 @@ struct KinectKeyframe
     roo::Image<uchar3, roo::TargetDevice, roo::Manage> img;
 };
 
-void SaveMeshlab(roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage>& vol, boost::ptr_vector<KinectKeyframe>& keyframes, float fu, float fv, float u0, float v0)
+void SaveMeshlab(roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage>& vol, std::vector<std::unique_ptr<KinectKeyframe> >& keyframes, float fu, float fv, float u0, float v0)
 {
     Eigen::Matrix3d RDFvision;  RDFvision  << 1,0,0,  0,1,0,  0,0,1;
     Eigen::Matrix3d RDFmeshlab; RDFmeshlab << 1,0,0,  0,-1,0, 0,0,-1;
@@ -55,14 +56,19 @@ void SaveMeshlab(roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage>&
 
     of << " <RasterGroup>" << std::endl;
     for(int i=0; i<keyframes.size(); ++i) {
-        const KinectKeyframe& kf = keyframes[i];
+        const KinectKeyframe& kf = *keyframes[i];
         const Eigen::Matrix4d T = T_ml_vis * kf.T_iw.matrix();
 //        const Eigen::Matrix4d T = kf.T_iw.inverse().matrix() * T_vis_gl;
 //        const Eigen::Matrix3d R = T.block<3,3>(0,0);
 //        const Eigen::Vector3d t = T.block<3,1>(0,3);
         std::ostringstream oss; oss << "keyframe_" << i << ".png";
         std::string img_filename = oss.str();
+
+#ifdef HAVE_BOOST_GIL
+        // TODO: Use another method to save?
         SaveGIL(img_filename,kf.img );
+#endif // HAVE_BOOST_GIL
+
         of << "  <MLRaster label=\"" << img_filename << "\">" << std::endl;
 //        of << "   <VCGCamera TranslationVector=\"" << t.transpose() << " 1\" LensDistortion=\"0 0\" ViewportPx=\"" << kf.img.w << " " << kf.img.h << "\" PixelSizeMm=\"" << pu << " " << pv << "\" CenterPx=\"" << u0 << " " << v0 << "\" FocalMm=\"" << f << "\" RotationMatrix=\"" << R(0,0) << " " << R(0,1) << " " << R(0,2) << " 0 " << R(1,0) << " " << R(1,1) << " " << R(1,2) << " 0 " << R(2,0) << " " << R(2,1) << " " << R(2,2) << " 0 0 0 0 1 \"/>" << std::endl;
         of << "   <VCGCamera TranslationVector=\"0 0 0 1\" LensDistortion=\"0 0\" ViewportPx=\"" << kf.img.w << " " << kf.img.h << "\" PixelSizeMm=\"" << pu << " " << pv << "\" CenterPx=\"" << u0 << " " << v0 << "\" FocalMm=\"" << f << "\" RotationMatrix=\"" << T(0,0) << " " << T(0,1) << " " << T(0,2) << " " << T(0,3) << " " << T(1,0) << " " << T(1,1) << " " << T(1,2) << " " << T(1,3) << " " << T(2,0) << " " << T(2,1) << " " << T(2,2) << " " << T(2,3) << " 0 0 0 1 \"/>" << std::endl;

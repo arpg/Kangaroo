@@ -61,7 +61,7 @@ int main( int argc, char* argv[] )
 
     Handler3DGpuDepth rayhandler(ray_d, s_cam, AxisNone);
     SetupContainer(container, 2, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adrayimg))
+    container[0].SetDrawFunction(std::ref(adrayimg))
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );

@@ -2,6 +2,7 @@
 
 #include "MatUtils.h"
 #include "launch_utils.h"
+#include "InvalidValue.h"
 
 namespace roo
 {
@@ -142,7 +143,7 @@ void SdfFuse(
 
 void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
 {
-    vol.Fill(SDF_t(0.0/0.0, 0));
+    vol.Fill(SDF_t( InvalidValue<float>::Value(), 0));
 }
 
 void SdfReset(BoundedVolume<float> vol)

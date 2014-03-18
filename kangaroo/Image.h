@@ -426,8 +426,8 @@ struct Image {
     inline  __device__ __host__
     const T& GetWithClampedRange(int x, int y) const
     {
-        x = clamp(x, 0, w-1);
-        y = clamp(y, 0, h-1);
+        x = clamp(x, 0, (int)w-1);
+        y = clamp(y, 0, (int)h-1);
         return RowPtr(y)[x];
     }
 
@@ -703,7 +703,7 @@ struct Image {
     }
 
     inline __host__
-    void Fill(T val) {
+    void Fill(const T& val) {
         thrust::fill(begin(), end(), val);
     }
 

@@ -32,7 +32,8 @@ int main( int argc, char* argv[] )
     if(video.Streams().size() != 2)
         throw pangolin::VideoException("Requires RGB and Depth streams.");    
     
-    unsigned char vid_buffer[video.SizeBytes()];
+    std::unique_ptr<unsigned char> vid_buffer( new unsigned char[video.SizeBytes()] );
+
     std::vector<pangolin::Image<unsigned char> > imgs;    
     const int w = video.Width();
     const int h = video.Height();
@@ -75,7 +76,7 @@ int main( int argc, char* argv[] )
     roo::BoundedVolume<roo::SDF_t, roo::TargetDevice, roo::Manage> vol(volres,volres,volres,reset_bb);
     roo::BoundedVolume<float, roo::TargetDevice, roo::Manage> colorVol(volres,volres,volres,reset_bb);
 
-    boost::ptr_vector<KinectKeyframe> keyframes;
+    std::vector<std::unique_ptr<KinectKeyframe> > keyframes;
     roo::Mat<roo::ImageKeyframe<uchar3>,10> kfs;
 
     SceneGraph::GLSceneGraph glgraph;
@@ -128,15 +129,15 @@ int main( int argc, char* argv[] )
 
     Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
     SetupContainer(container, 4, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adrayimg))
+    container[0].SetDrawFunction(std::ref(adrayimg))
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
-    container[2].SetDrawFunction(boost::ref(adraycolor))
+    container[2].SetDrawFunction(std::ref(adraycolor))
                 .SetHandler(&rayhandler);
-//    container[3].SetDrawFunction(boost::ref(addebug));
-    container[3].SetDrawFunction(boost::ref(adnormals));
-//    container[5].SetDrawFunction(boost::ref(adraynorm));
+//    container[3].SetDrawFunction(std::ref(addebug));
+    container[3].SetDrawFunction(std::ref(adnormals));
+//    container[5].SetDrawFunction(std::ref(adraynorm));
 
     Sophus::SE3d T_wl;
 
@@ -153,11 +154,11 @@ int main( int argc, char* argv[] )
         if(Pushed(save_kf)) {
             KinectKeyframe* kf = new KinectKeyframe(w,h,T_cd * T_wl.inverse());
             kf->img.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].ptr,imgs[0].w,imgs[0].h,imgs[0].pitch));
-            keyframes.push_back(kf);
+            keyframes.push_back( std::unique_ptr<KinectKeyframe>(kf) );
         }
 
         if(go) {
-            if(video.Grab(vid_buffer, imgs,true,false)) {
+            if(video.Grab(vid_buffer.get(), imgs,true,false)) {
                 dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)imgs[1].ptr, imgs[1].w, imgs[1].h, imgs[1].pitch ));
                 drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].ptr, imgs[0].w, imgs[0].h, imgs[0].pitch ));
                 roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
@@ -208,8 +209,8 @@ int main( int argc, char* argv[] )
                     for( int k=0; k< kfs.Rows(); k++)
                     {
                         if(k < keyframes.size()) {
-                            kfs[k].img = keyframes[k].img;
-                            kfs[k].T_iw = keyframes[k].T_iw.matrix3x4();
+                            kfs[k].img = keyframes[k]->img;
+                            kfs[k].T_iw = keyframes[k]->T_iw.matrix3x4();
                             kfs[k].K = roo::ImageIntrinsics(rgb_fl, kfs[k].img);
                         }else{
                             kfs[k].img.ptr = 0;

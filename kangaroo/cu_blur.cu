@@ -3,6 +3,11 @@
 #include "launch_utils.h"
 #include "ImageApron.h"
 
+#ifndef M_PI
+// Some trouble with Maths defines with MSVC
+#define M_PI 3.14159265358979323846
+#endif
+
 namespace roo {
 
 //////////////////////////////////////////////////////

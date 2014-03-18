@@ -3,6 +3,7 @@
 #include "launch_utils.h"
 #include "patch_score.h"
 #include "MatUtils.h"
+#include "InvalidValue.h"
 
 namespace roo
 {
@@ -17,7 +18,7 @@ void KernDisp2Depth(const Image<float> dIn, Image<float> dOut, float fu, float f
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
     if( dOut.InBounds(x,y) ) {
-        dOut(x,y) = dIn(x,y) >= fMinDisp ? fu * fBaseline / dIn(x,y) : 0.0f/0.0f;
+        dOut(x,y) = dIn(x,y) >= fMinDisp ? fu * fBaseline / dIn(x,y) : InvalidValue<float>::Value();
     }
 }
 
@@ -34,7 +35,7 @@ __global__ void KernFilterBadKinectData(Image<Tout> dFiltered, Image<Tin> dKinec
     const int u = blockIdx.x*blockDim.x + threadIdx.x;
     const int v = blockIdx.y*blockDim.y + threadIdx.y;
     const float z_mm = dKinectDepth(u,v);
-    dFiltered(u,v) = z_mm >= 200 ? z_mm : NAN;
+    dFiltered(u,v) = z_mm >= 200 ? z_mm : InvalidValue<float>::Value();
 }
 
 void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDepth)

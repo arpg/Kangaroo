@@ -20,9 +20,11 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
         const int imy = depth.h * (float)(view.v.t()-y) / (float)view.v.h;
         depth.SubImage(imx, imy, 1,1).MemcpyToHost(&z);
         
-        if( z == 0 || !std::isfinite(z) ) {
-            z = default_z;
-        }
+#    ifdef _MSVC_
+        if( z == 0 || !_finite(z) ) z = default_z;
+#    else
+        if( z == 0 || !std::isfinite(z) ) z = default_z;
+#    endif // _MSVC_
         
         const float zw = 0.5*(1 + proj.m[2*4+2] + proj.m[3*4+2] / z);
         gluUnProject(x, y, zw, mv.m, proj.m, viewport, &Pw[0], &Pw[1], &Pw[2]);

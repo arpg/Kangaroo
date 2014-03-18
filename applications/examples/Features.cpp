@@ -36,8 +36,8 @@ int main( int argc, char* argv[] )
 
     Handler2dImageSelect handler2d(w,h);
     SetupContainer(container, 2, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adg)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(ads)).SetHandler(&handler2d);
+    container[0].SetDrawFunction(std::ref(adg)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(std::ref(ads)).SetHandler(&handler2d);
 
     Var<bool> run("ui.run", true, true);
     Var<bool> step("ui.step", false, false);

@@ -1,5 +1,7 @@
 #include "cu_dense_stereo.h"
 
+#include <stdexcept>
+
 #include "launch_utils.h"
 #include "MatUtils.h"
 #include "patch_score.h"

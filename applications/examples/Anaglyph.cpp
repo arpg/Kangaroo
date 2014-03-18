@@ -1,3 +1,6 @@
+#include <chrono>
+#include <thread>
+
 #include <pangolin/pangolin.h>
 #include <pangolin/glcuda.h>
 
@@ -15,8 +18,9 @@ int main( int argc, char* argv[] )
     if(video.Streams().size() != 2)
         throw pangolin::VideoException("Requires two video streams.");    
     if(video.PixFormat().format != "GRAY8" || video.Streams()[1].PixFormat().format != "GRAY8" )
-        throw pangolin::VideoException("Wrong format. Gray8 required.");    
-    unsigned char vid_buffer[video.SizeBytes()];
+        throw pangolin::VideoException("Wrong format. Gray8 required."); 
+
+    std::unique_ptr<unsigned char> vid_buffer( new unsigned char[video.SizeBytes()] );
 
     // Image dimensions
     const unsigned int w = video.Width();
@@ -42,7 +46,8 @@ int main( int argc, char* argv[] )
     GlTextureCudaArray texrgb(w,h,GL_RGBA8);
 
     // Allocate Camera Images on device for processing
-    roo::Image<unsigned char, TargetDevice, Manage> dCamImg[] = {{w,h},{w,h}};
+    roo::Image<unsigned char, TargetDevice, Manage> dleft(w,h);
+    roo::Image<unsigned char, TargetDevice, Manage> dright(w,h);
     roo::Image<uchar4, TargetDevice, Manage> d3d(w,h);
 
     int shift = 0;
@@ -60,19 +65,21 @@ int main( int argc, char* argv[] )
 
         if( run || frame == 0 ) {
             std::vector<pangolin::Image<unsigned char> > images;
-            if(video.Grab(vid_buffer,images)) {
+            if(video.Grab(vid_buffer.get(),images)) {
                 // Upload images to device
-                for(int i=0; i<2; ++i ) {
-                    dCamImg[i].CopyFrom( roo::Image<unsigned char,TargetHost>(
-                        images[i].ptr, images[i].w,
-                        images[i].h, images[i].pitch
-                    ));
-                }
+                dleft.CopyFrom( roo::Image<unsigned char,TargetHost>(
+                    images[0].ptr, images[0].w,
+                    images[0].h, images[0].pitch
+                ));
+                dright.CopyFrom( roo::Image<unsigned char,TargetHost>(
+                    images[1].ptr, images[1].w,
+                    images[1].h, images[1].pitch
+                ));
             }
         }
 
         // Perform Processing
-        MakeAnaglyth(d3d, dCamImg[0], dCamImg[1], shift);
+        MakeAnaglyth(d3d, dleft, dright, shift);
 
         // Draw Anaglyph
         screen.Activate();
@@ -80,6 +87,6 @@ int main( int argc, char* argv[] )
         texrgb.RenderToViewportFlipY();
 
         pangolin::FinishFrame();
-        usleep(1000000 / 30);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/30));
     }
 }
