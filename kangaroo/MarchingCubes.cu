@@ -20,8 +20,8 @@
 #include "math.h"
 
 #include <kangaroo/Sdf.h>
-#include "MarchingCubes.h"
-#include "MarchingCubesTables.h"
+#include <kangaroo/MarchingCubes.h>
+#include <kangaroo/MarchingCubesTables.h>
 
 #ifdef HAVE_ASSIMP
 #include <assimp/cexport.h>
@@ -241,6 +241,6 @@ void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol, const
 }
 
 // Instantiate templates
-template void SaveMesh<SDF_t,float>(std::string, const BoundedVolume<SDF_t,TargetHost,DontManage> vol, const BoundedVolume<float,TargetHost> volColor);
+template KANGAROO_EXPORT void SaveMesh<SDF_t,float>(std::string, const BoundedVolume<SDF_t,TargetHost,DontManage> vol, const BoundedVolume<float,TargetHost> volColor);
 
 }

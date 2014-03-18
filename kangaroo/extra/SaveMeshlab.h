@@ -7,7 +7,7 @@
 #include "SaveGIL.h"
 #endif // HAVE_BOOST_GIL
 
-#include "../MarchingCubes.h"
+#include <kangaroo/MarchingCubes.h>
 
 struct KinectKeyframe
 {
