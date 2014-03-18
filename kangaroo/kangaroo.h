@@ -2,22 +2,22 @@
 
 #include <cuda_runtime.h>
 
-#include "Image.h"
+#include <kangaroo/Image.h>
 #include "Pyramid.h"
-#include "Volume.h"
-#include "Mat.h"
+#include <kangaroo/Volume.h>
+#include <kangaroo/Mat.h>
 #include "MatUtils.h"
 #include "reduce.h"
 #include "CudaTimer.h"
-#include "Sdf.h"
-#include "CostVolElem.h"
+#include <kangaroo/Sdf.h>
+#include <kangaroo/CostVolElem.h>
 #include "BoundingBox.h"
-#include "BoundedVolume.h"
+#include <kangaroo/BoundedVolume.h>
 #include "ImageKeyframe.h"
 
 #include "cu_convert.h"
 #include "cu_depth_tools.h"
-#include "cu_operations.h"
+#include <kangaroo/cu_operations.h>
 #include "cu_lookup_warp.h"
 #include "cu_census.h"
 #include "cu_dense_stereo.h"

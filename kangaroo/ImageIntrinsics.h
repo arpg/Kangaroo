@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Image.h"
+#include <kangaroo/Image.h>
 #include "MatUtils.h"
 
 #ifndef __CUDACC__
@@ -16,6 +16,7 @@
 namespace roo
 {
 
+#ifdef HAVE_NPP
 inline NppiRect GetTopLeftAlignedRegion(int w, int h, int blockx, int blocky)
 {
     NppiRect ret;
@@ -35,6 +36,7 @@ inline NppiRect GetCenteredAlignedRegion(int w, int h, int blockx, int blocky)
     ret.y = (h - ret.height) / 2;
     return ret;
 }
+#endif // HAVE_NPP
 
 inline int GetLevelFromMaxPixels(size_t w, size_t h, unsigned long maxpixels)
 {
@@ -154,6 +156,7 @@ struct ImageIntrinsics
         return scaledImage;
     }
 
+#ifdef HAVE_NPP
     inline __host__ __device__
     ImageIntrinsics CropToROI(const NppiRect& roi)
     {
@@ -164,7 +167,7 @@ struct ImageIntrinsics
         roidImage.fv = fv;
         return roidImage;
     }
-
+#endif // HAVE_NPP
 
     //////////////////////////////////////////////////////
     // Interop

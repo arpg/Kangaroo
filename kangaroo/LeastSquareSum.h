@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Mat.h"
-#include "Image.h"
+#include <kangaroo/Mat.h>
+#include <kangaroo/Image.h>
 
 namespace roo
 {

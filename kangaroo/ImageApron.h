@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Image.h"
+#include <kangaroo/Image.h>
 #include "InvalidValue.h"
 
 namespace roo

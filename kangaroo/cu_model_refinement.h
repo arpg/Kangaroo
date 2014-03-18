@@ -1,11 +1,13 @@
 #pragma once
 
-#include "Mat.h"
-#include "Image.h"
+#include <kangaroo/platform.h>
+#include <kangaroo/Mat.h>
+#include <kangaroo/Image.h>
 
 namespace roo
 {
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,6> PoseRefinementFromVbo(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float4> dPr,
@@ -13,6 +15,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromVbo(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float> dDispr,
@@ -21,6 +24,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparity(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
     const Image<unsigned char> dImgl, const Image<unsigned char> dImgr,
     const Image<float> dDisp, const float baseline,
@@ -30,6 +34,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDisparityESM(
     const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
 );
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr,
@@ -40,6 +45,7 @@ LeastSquaresSystem<float,6> PoseRefinementFromDepthESM(
     const float c, const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
 );
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,6> CalibrationRgbdFromDepthESM(
     const Image<unsigned char> dImgl,
     const Image<unsigned char> dImgr, const Image<float> dDepth,
@@ -49,6 +55,7 @@ LeastSquaresSystem<float,6> CalibrationRgbdFromDepthESM(
     const bool bDiscardMaxMin, const float fMinDepth, const float fMaxDepth
 );
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     const Image<float4> dPl,
     const Image<float4> dPr, const Image<float4> dNr,
@@ -56,6 +63,7 @@ LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
     Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 
+KANGAROO_EXPORT
 LeastSquaresSystem<float,2*6> KinectCalibration(
     const Image<float4> dPl, const Image<uchar3> dIl,
     const Image<float4> dPr, const Image<uchar3> dIr,
@@ -63,6 +71,7 @@ LeastSquaresSystem<float,2*6> KinectCalibration(
     float c, Image<unsigned char> dWorkspace, Image<float4> dDebug
 );
 
+KANGAROO_EXPORT
 void SumSpeedTest(
     Image<unsigned char> dWorkspace, int w, int h, int blockx, int blocky
 );

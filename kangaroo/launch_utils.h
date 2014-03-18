@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-#include "Image.h"
+#include <kangaroo/Image.h>
 
 #define GPU_CHECK_ERRORS
 //#define GPU_CHECK_ERRORS_SYNC

@@ -2,6 +2,8 @@
 
 #include <cuda_runtime.h>
 
+#include <kangaroo/platform.h>
+
 namespace roo
 {
 

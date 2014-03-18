@@ -1,21 +1,24 @@
 #pragma once
 
-#include "Image.h"
-
-#include "cu_operations.h"
+#include <kangaroo/platform.h>
+#include <kangaroo/Image.h>
+#include <kangaroo/cu_operations.h>
 
 namespace roo
 {
 
 template<typename Tout, typename Tin>
+KANGAROO_EXPORT
 void Transpose(Image<Tout> out, Image<Tin> in);
 
 template<typename Tout, typename Tin>
+KANGAROO_EXPORT
 void PrefixSumRows(Image<Tout> out, Image<Tin> in);
 
 //////////////////////////////////////////////////////
 
 template<typename Tout, typename Tin>
+KANGAROO_EXPORT
 void BoxFilterIntegralImage(Image<Tout> out, Image<Tin> IntegralImageT, int rad);
 
 template<typename Tout, typename Tin, typename TSum>

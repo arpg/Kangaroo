@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BoundedVolume.h"
+#include <kangaroo/BoundedVolume.h>
 
 namespace roo {
 

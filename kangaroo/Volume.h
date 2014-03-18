@@ -11,8 +11,8 @@
 #include <npp.h>
 #endif // HAVE_NPP
 
-#include "Image.h"
-#include "Mat.h"
+#include <kangaroo/Image.h>
+#include <kangaroo/Mat.h>
 #include "sampling.h"
 
 namespace roo

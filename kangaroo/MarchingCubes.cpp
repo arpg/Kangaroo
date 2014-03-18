@@ -21,7 +21,7 @@
 #include "stdio.h"
 #include "math.h"
 
-#include "Sdf.h"
+#include <kangaroo/Sdf.h>
 #include "MarchingCubes.h"
 #include "MarchingCubesTables.h"
 

@@ -2,6 +2,7 @@
 
 #include "MatUtils.h"
 #include "launch_utils.h"
+#include "InvalidValue.h"
 
 namespace roo
 {
@@ -72,7 +73,7 @@ __global__ void KernVboFromHeightmap(Image<float4> dVbo, const Image<float4> dHe
     const unsigned int v = blockIdx.y*blockDim.y + threadIdx.y;
 
     const float4 hm = dHeightMap(u,v);
-    const float z = hm.y > 0 ? hm.x : 0.0f/0.0f;
+    const float z = hm.y > 0 ? hm.x : InvalidValue<float>::Value();
     dVbo(u,v) = make_float4(u,v,z,1.0);
 }
 

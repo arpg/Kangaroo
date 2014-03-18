@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Image.h"
+#include <kangaroo/Image.h>
 #include "MatUtils.h"
-#include "ImageIntrinsics.h"
+#include <kangaroo/ImageIntrinsics.h>
 
 namespace roo
 {

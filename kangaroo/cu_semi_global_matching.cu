@@ -5,7 +5,7 @@
 #include "disparity.h"
 #include "InvalidValue.h"
 #include "ImageApron.h"
-#include "CostVolElem.h"
+#include <kangaroo/CostVolElem.h>
 
 namespace roo
 {

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Volume.h"
-#include "BoundingBox.h"
+#include <kangaroo/platform.h>
+#include <kangaroo/Volume.h>
+#include <kangaroo/BoundingBox.h>
 
 namespace roo
 {

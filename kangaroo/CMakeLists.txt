@@ -103,6 +103,18 @@ include_directories( ${INTERNAL_INC} )
 cuda_add_library( ${LIBRARY_NAME} ${SRC_H} ${SRC_CU} )
 target_link_libraries(${LIBRARY_NAME} ${LINK_LIBS})
 
+## Generate symbol export helper header on MSVC
+IF(MSVC)
+    string(TOUPPER ${LIBRARY_NAME} LIBRARY_NAME_CAPS)
+    include(GenerateExportHeader)
+    GENERATE_EXPORT_HEADER( ${LIBRARY_NAME}
+        BASE_NAME ${LIBRARY_NAME_CAPS}
+        EXPORT_MACRO_NAME ${LIBRARY_NAME_CAPS}_EXPORT
+        EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/${LIBRARY_NAME}_export.h"
+        STATIC_DEFINE ${LIBRARY_NAME_CAPS}_BUILT_AS_STATIC
+    )
+ENDIF()
+
 #######################################################
 
 # This relative path allows installed files to be relocatable.

@@ -2,6 +2,7 @@
 
 #include "MatUtils.h"
 #include "launch_utils.h"
+#include "InvalidValue.h"
 
 namespace roo
 {
@@ -55,7 +56,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
         if(max_tmin < min_tmax ) {
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
-            float last_sdf = 0.0f/0.0f;
+            float last_sdf = InvalidValue<float>::Value();
             float min_delta_lambda = vol.VoxelSizeUnits().x;
             float delta_lambda = 0;
 
@@ -95,7 +96,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
 //            norm(u,v) = make_float4(0.5,0.5,0.5,1) + make_float4(n_c, 0) /2.0f;
             norm(u,v) = make_float4(n_c, 1);
         }else{
-            imgdepth(u,v) = 0.0f/0.0f;
+            imgdepth(u,v) = InvalidValue<float>::Value();
             img(u,v) = 0;
             norm(u,v) = make_float4(0,0,0,0);
         }
@@ -140,7 +141,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
         if(max_tmin < min_tmax ) {
             // Go between max_tmin and min_tmax
             float lambda = max_tmin;
-            float last_sdf = 0.0f/0.0f;
+            float last_sdf = InvalidValue<float>::Value();
             float min_delta_lambda = vol.VoxelSizeUnits().x;
             float delta_lambda = 0;
 
@@ -178,7 +179,7 @@ __global__ void KernRaycastSdf(Image<float> imgdepth, Image<float4> norm, Image<
             img(u,v) = c;
             norm(u,v) = make_float4(n_c, 1);
         }else{
-            imgdepth(u,v) = 0.0f/0.0f;
+            imgdepth(u,v) = InvalidValue<float>::Value();
             img(u,v) = 0;
             norm(u,v) = make_float4(0,0,0,0);
         }
@@ -223,7 +224,7 @@ __global__ void KernRaycastBox(Image<float> imgd, const Mat<float,3,4> T_wc, Ima
         if(max_tmin < min_tmax ) {
             d = max_tmin;
         }else{
-            d = 0.0f/0.0f;
+            d = InvalidValue<float>::Value();
         }
 
         imgd(u,v) = d;

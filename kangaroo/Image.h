@@ -27,7 +27,7 @@
 #include <npp.h>
 #endif // HAVE_NPP
 
-#include "Mat.h"
+#include <kangaroo/Mat.h>
 #include "sampling.h"
 #include "pixel_convert.h"
 

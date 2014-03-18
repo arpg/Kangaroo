@@ -15,8 +15,8 @@ endif()
 include(SetPlatformVars)
 
 if(MSVC)
-    # Report unknown pragma only once in MSVC - there are many
-    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wo4068" )
+    # Disable unknown pragma warnings in MSVC - there are many
+    add_definitions( "/wd4068" )
 endif()
 
 add_subdirectory(kangaroo)

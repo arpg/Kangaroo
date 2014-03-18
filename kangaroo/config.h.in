@@ -7,6 +7,11 @@
 #cmakedefine _OSX_
 #cmakedefine _LINUX_
 
+/// Compiler
+#cmakedefine _GCC_
+#cmakedefine _CLANG_
+#cmakedefine _MSVC_
+
 /// Configured libraries
 #cmakedefine HAVE_EIGEN
 #cmakedefine HAVE_ASSIMP

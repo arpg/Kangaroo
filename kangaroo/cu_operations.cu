@@ -1,4 +1,4 @@
-#include "cu_operations.h"
+#include <kangaroo/cu_operations.h>
 
 #include "MatUtils.h"
 #include "launch_utils.h"

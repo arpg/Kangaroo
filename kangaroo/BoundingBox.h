@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MatUtils.h"
-#include "ImageIntrinsics.h"
+#include <kangaroo/ImageIntrinsics.h>
 #include <iostream>
 
 namespace roo
