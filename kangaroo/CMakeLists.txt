@@ -53,16 +53,20 @@ set(CUDA_PROPAGATE_HOST_FLAGS off)
 # Generate code for 2.0 and 3.0 CUDA compute architectures (TODO: Verify this works)
 set(CUDA_NVCC_FLAGS "-use_fast_math -gencode arch=compute_30,code=sm_30 -gencode arch=compute_20,code=sm_20" )
 
-## Make sure that NPP is found
-#if(NOT CUDA_npp_LIBRARY)
-#    # TODO: Fix FindCUDA or make this more robust
-#    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-#        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/libnpp.dylib")
-#    else()
-#        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpp.so")
-#    endif()
-#endif()
-#list(APPEND LINK_LIBS ${CUDA_npp_LIBRARY} )
+# Make sure that NPP is found
+if(NOT CUDA_npp_LIBRARY)
+    # TODO: Fix FindCUDA or make this more robust
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/libnpp.dylib")
+    elseif(WIN32)
+        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32/nppc.lib;${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32/nppi.lib;${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32/npps.lib")
+    elseif(WIN64)
+        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib/x64/nppc.lib;${CUDA_TOOLKIT_ROOT_DIR}/lib/x64/nppi.lib;${CUDA_TOOLKIT_ROOT_DIR}/lib/x64/npps.lib")
+    else()
+        set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpp.so")
+    endif()
+endif()
+list(APPEND LINK_LIBS ${CUDA_npp_LIBRARY} )
 
 find_package( Eigen3 QUIET )
 if(EIGEN3_FOUND)
@@ -104,16 +108,16 @@ cuda_add_library( ${LIBRARY_NAME} ${SRC_H} ${SRC_CU} )
 target_link_libraries(${LIBRARY_NAME} ${LINK_LIBS})
 
 ## Generate symbol export helper header on MSVC
-IF(MSVC)
+if(MSVC)
     string(TOUPPER ${LIBRARY_NAME} LIBRARY_NAME_CAPS)
     include(GenerateExportHeader)
-    GENERATE_EXPORT_HEADER( ${LIBRARY_NAME}
+    generate_export_header( ${LIBRARY_NAME}
         BASE_NAME ${LIBRARY_NAME_CAPS}
         EXPORT_MACRO_NAME ${LIBRARY_NAME_CAPS}_EXPORT
         EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/${LIBRARY_NAME}_export.h"
         STATIC_DEFINE ${LIBRARY_NAME_CAPS}_BUILT_AS_STATIC
     )
-ENDIF()
+endif()
 
 #######################################################
 

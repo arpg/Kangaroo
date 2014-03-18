@@ -16,8 +16,6 @@
 // This code is public domain.
 //
 
-#include <kangaroo/config.h>
-
 #include "stdio.h"
 #include "math.h"
 

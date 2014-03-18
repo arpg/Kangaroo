@@ -1,5 +1,6 @@
 #pragma once
 
+#include <kangaroo/platform.h>
 #include <kangaroo/BoundedVolume.h>
 
 namespace roo {
@@ -9,6 +10,7 @@ namespace roo {
 //////////////////////////////////////////
 
 template<typename T, typename TColor>
+KANGAROO_EXPORT
 void SaveMesh(std::string filename, const BoundedVolume<T,TargetHost> vol, const BoundedVolume<TColor,TargetHost> volColor );
 
 template<typename T, typename Manage>

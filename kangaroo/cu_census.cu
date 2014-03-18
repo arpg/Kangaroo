@@ -306,11 +306,11 @@ void CensusStereoVolume(Volume<Tvol> vol, Image<T> left, Image<T> right, int max
     KernCensusStereoVolume<Tvol,T><<<gridDim,blockDim,sizeof(T)*left.w>>>(vol,left,right,maxDisp, sd);
 }
 
-template void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);
-template void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp, float);
-template void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp, float);
-template void CensusStereoVolume(Volume<float> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);
-template void CensusStereoVolume(Volume<float> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp, float);
-template void CensusStereoVolume(Volume<float> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp, float);
+template KANGAROO_EXPORT void CensusStereoVolume(Volume<unsigned short> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);
+template KANGAROO_EXPORT void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp, float);
+template KANGAROO_EXPORT void CensusStereoVolume(Volume<unsigned short> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp, float);
+template KANGAROO_EXPORT void CensusStereoVolume(Volume<float> vol, Image<unsigned long> left, Image<unsigned long> right, int maxDisp, float);
+template KANGAROO_EXPORT void CensusStereoVolume(Volume<float> vol, Image<ulong2> left, Image<ulong2> right, int maxDisp, float);
+template KANGAROO_EXPORT void CensusStereoVolume(Volume<float> vol, Image<ulong4> left, Image<ulong4> right, int maxDisp, float);
 
 }

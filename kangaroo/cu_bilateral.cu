@@ -49,8 +49,8 @@ void BilateralFilter(
     KernBilateralFilter<To,Ti><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size);
 }
 
-template void BilateralFilter(Image<float>, const Image<float>, float, float, uint);
-template void BilateralFilter(Image<float>, const Image<unsigned char>, float, float, uint);
+template KANGAROO_EXPORT void BilateralFilter(Image<float>, const Image<float>, float, float, uint);
+template KANGAROO_EXPORT void BilateralFilter(Image<float>, const Image<unsigned char>, float, float, uint);
 
 /////////////////////////////////////////////////////
 // Bilateral Filter (Spatial and intensity weights) ignore vals below min
@@ -100,8 +100,8 @@ void BilateralFilter(
     KernBilateralFilter<To,Ti><<<gridDim,blockDim>>>(dOut, dIn, gs, gr, size, minval);
 }
 
-template void BilateralFilter(Image<float>, const Image<float>, float, float, uint, float);
-template void BilateralFilter(Image<float>, const Image<unsigned short>, float, float, uint, unsigned short);
+template KANGAROO_EXPORT void BilateralFilter(Image<float>, const Image<float>, float, float, uint, float);
+template KANGAROO_EXPORT void BilateralFilter(Image<float>, const Image<unsigned short>, float, float, uint, unsigned short);
 
 /////////////////////////////////////////////////////
 // Bilateral Filter (Spatial, intensity and colour (external) weights)
@@ -151,8 +151,8 @@ void BilateralFilter(
     KernBilateralFilter<To,Ti><<<gridDim,blockDim>>>(dOut, dIn, dImg, gs, gr, gc, size);
 }
 
-template void BilateralFilter(Image<float>, const Image<float>, const Image<unsigned char>, float, float, float, uint);
-template void BilateralFilter(Image<float>, const Image<float>, const Image<float>, float, float, float, uint);
+template KANGAROO_EXPORT void BilateralFilter(Image<float>, const Image<float>, const Image<unsigned char>, float, float, float, uint);
+template KANGAROO_EXPORT void BilateralFilter(Image<float>, const Image<float>, const Image<float>, float, float, float, uint);
 
 
 }

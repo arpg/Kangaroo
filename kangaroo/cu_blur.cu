@@ -131,10 +131,10 @@ void GaussianBlur(Image<Tout> out, Image<Tin> in, Image<Tout> temp, float sigma)
     }
 }
 
-template void GaussianBlur<unsigned char,unsigned char, 5,  1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
-template void GaussianBlur<unsigned char,unsigned char, 10, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
-template void GaussianBlur<unsigned char,unsigned char, 15, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
-template void GaussianBlur<unsigned char,unsigned char, 20, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template KANGAROO_EXPORT void GaussianBlur<unsigned char,unsigned char, 5,  1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template KANGAROO_EXPORT void GaussianBlur<unsigned char,unsigned char, 10, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template KANGAROO_EXPORT void GaussianBlur<unsigned char,unsigned char, 15, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
+template KANGAROO_EXPORT void GaussianBlur<unsigned char,unsigned char, 20, 1024>(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, float);
 
 
 }

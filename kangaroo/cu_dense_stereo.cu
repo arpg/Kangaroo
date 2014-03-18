@@ -770,7 +770,7 @@ __global__ void KernCostVolumeCrossSection(
         const float score = (elem.sum / elem.n) / 255.0f;
         dScore(x,d) = score;
     }else{
-        dScore(x,d) = 0.0f / 0.0f;
+        dScore(x,d) = InvalidValue<float>::Value();
     }
 }
 

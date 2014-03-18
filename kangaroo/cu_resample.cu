@@ -110,8 +110,8 @@ void BoxHalfIgnoreInvalid( Image<To> out, const Image<Ti> in)
 }
 
 // Instantiate
-template void BoxHalfIgnoreInvalid<unsigned char,unsigned int,unsigned char>(Image<unsigned char>, const Image<unsigned char>);
-template void BoxHalfIgnoreInvalid<float,float,float>(Image<float>, const Image<float>);
+template KANGAROO_EXPORT void BoxHalfIgnoreInvalid<unsigned char,unsigned int,unsigned char>(Image<unsigned char>, const Image<unsigned char>);
+template KANGAROO_EXPORT void BoxHalfIgnoreInvalid<float,float,float>(Image<float>, const Image<float>);
 
 
 }

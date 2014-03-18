@@ -43,7 +43,7 @@ void PaintCircle(Image<T> img, T val, float x, float y, float r )
 // Template instantiations
 //////////////////////////////////////////////////////
 
-template void PaintCircle(Image<float> img, float val, float x, float y, float r );
-template void PaintCircle(Image<unsigned char> img, unsigned char val, float x, float y, float r );
+template KANGAROO_EXPORT void PaintCircle(Image<float> img, float val, float x, float y, float r );
+template KANGAROO_EXPORT void PaintCircle(Image<unsigned char> img, unsigned char val, float x, float y, float r );
 
 }

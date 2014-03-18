@@ -42,9 +42,9 @@ void Transpose(Image<Tout> out, Image<Tin> in)
 }
 
 // Instantiate useful versions
-template void Transpose(Image<unsigned char>,Image<unsigned char>);
-template void Transpose(Image<int>,Image<int>);
-template void Transpose(Image<float>,Image<float>);
+template KANGAROO_EXPORT void Transpose(Image<unsigned char>,Image<unsigned char>);
+template KANGAROO_EXPORT void Transpose(Image<int>,Image<int>);
+template KANGAROO_EXPORT void Transpose(Image<float>,Image<float>);
 
 //////////////////////////////////////////////////////
 // PrefixSum
@@ -118,9 +118,9 @@ void PrefixSumRows(Image<Tout> out, Image<Tin> in)
 }
 
 // Instantiate useful versions
-template void PrefixSumRows(Image<int>, Image<unsigned char>);
-template void PrefixSumRows(Image<int>, Image<int>);
-template void PrefixSumRows(Image<float>, Image<float>);
+template KANGAROO_EXPORT void PrefixSumRows(Image<int>, Image<unsigned char>);
+template KANGAROO_EXPORT void PrefixSumRows(Image<int>, Image<int>);
+template KANGAROO_EXPORT void PrefixSumRows(Image<float>, Image<float>);
 
 //////////////////////////////////////////////////////
 // Large Radius Box Filter using Integral Image
@@ -162,8 +162,8 @@ void BoxFilterIntegralImage(Image<Tout> out, Image<Tin> IntegralImageT, int rad)
 }
 
 // Instantiate useful versions
-template void BoxFilterIntegralImage(Image<float>, Image<int>, int);
-template void BoxFilterIntegralImage(Image<float>, Image<float>, int);
+template KANGAROO_EXPORT void BoxFilterIntegralImage(Image<float>, Image<int>, int);
+template KANGAROO_EXPORT void BoxFilterIntegralImage(Image<float>, Image<float>, int);
 
 
 }

@@ -30,18 +30,18 @@ void ConvertImage(Image<To> dOut, const Image<Ti> dIn)
 }
 
 // Explicit instantiation
-template void ConvertImage<float,unsigned char>(Image<float>, const Image<unsigned char>);
-template void ConvertImage<float,unsigned short>(Image<float>, const Image<unsigned short>);
-template void ConvertImage<float,char>(Image<float>, const Image<char>);
-template void ConvertImage<uchar4,uchar3>(Image<uchar4>, const Image<uchar3>);
-template void ConvertImage<uchar3,uchar4>(Image<uchar3>, const Image<uchar4>);
-template void ConvertImage<uchar3,unsigned char>(Image<uchar3>, const Image<unsigned char>);
-template void ConvertImage<uchar4,unsigned char>(Image<uchar4>, const Image<unsigned char>);
-template void ConvertImage<uchar4,float4>(Image<uchar4>, const Image<float4>);
-template void ConvertImage<unsigned char, uchar3>(Image<unsigned char>, const Image<uchar3>);
-template void ConvertImage<unsigned char, uchar4>(Image<unsigned char>, const Image<uchar4>);
-template void ConvertImage<float4, float>(Image<float4>, const Image<float>);
-template void ConvertImage<float4, uchar3>(Image<float4>, const Image<uchar3>);
+template KANGAROO_EXPORT void ConvertImage<float,unsigned char>(Image<float>, const Image<unsigned char>);
+template KANGAROO_EXPORT void ConvertImage<float,unsigned short>(Image<float>, const Image<unsigned short>);
+template KANGAROO_EXPORT void ConvertImage<float,char>(Image<float>, const Image<char>);
+template KANGAROO_EXPORT void ConvertImage<uchar4,uchar3>(Image<uchar4>, const Image<uchar3>);
+template KANGAROO_EXPORT void ConvertImage<uchar3,uchar4>(Image<uchar3>, const Image<uchar4>);
+template KANGAROO_EXPORT void ConvertImage<uchar3,unsigned char>(Image<uchar3>, const Image<unsigned char>);
+template KANGAROO_EXPORT void ConvertImage<uchar4,unsigned char>(Image<uchar4>, const Image<unsigned char>);
+template KANGAROO_EXPORT void ConvertImage<uchar4,float4>(Image<uchar4>, const Image<float4>);
+template KANGAROO_EXPORT void ConvertImage<unsigned char, uchar3>(Image<unsigned char>, const Image<uchar3>);
+template KANGAROO_EXPORT void ConvertImage<unsigned char, uchar4>(Image<unsigned char>, const Image<uchar4>);
+template KANGAROO_EXPORT void ConvertImage<float4, float>(Image<float4>, const Image<float>);
+template KANGAROO_EXPORT void ConvertImage<float4, uchar3>(Image<float4>, const Image<uchar3>);
 
 
 } // namespace roo

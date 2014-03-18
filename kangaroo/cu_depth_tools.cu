@@ -217,6 +217,6 @@ void TextureDepth(Image<Tout> img, const Mat<ImageKeyframe<Tin>,N> kfs, const Im
     KernTextureDepth<Tout,Tin,N><<<gridDim,blockDim>>>(img,kfs,depth,norm,phong,T_wd,Kdepth);
 }
 
-template void TextureDepth<float4,uchar3,10>(Image<float4> img, const Mat<ImageKeyframe<uchar3>,10> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth);
+template KANGAROO_EXPORT void TextureDepth<float4,uchar3,10>(Image<float4> img, const Mat<ImageKeyframe<uchar3>,10> kfs, const Image<float> depth, const Image<float4> norm, const Image<float> phong, const Mat<float,3,4> T_wd, ImageIntrinsics Kdepth);
 
 }

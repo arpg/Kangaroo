@@ -251,22 +251,22 @@ Tout ImageL1(Image<T> img, Image<unsigned char> scratch)
 // Instantiate Templates
 //////////////////////////////////////////////////////
 
-template void Fill(Image<float> img, float val);
-template void Fill(Image<unsigned char> img, unsigned char val);
-template void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
-template void ElementwiseScaleBias(Image<float> b, const Image<unsigned short> a, float s, float offset);
-template void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
-template void ElementwiseScaleBias(Image<float2> b, const Image<float2> a, float s, float2 offset);
-template void ElementwiseAdd(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, int, int, int);
-template void ElementwiseAdd(Image<float>, Image<float>, Image<float>, float, float, float);
-template void ElementwiseMultiply(Image<float>, Image<float>, Image<float>, float,float);
-template void ElementwiseMultiply(Image<float>, Image<unsigned char>, Image<unsigned char>, float,float);
-template void ElementwiseSquare<float,float,float>(Image<float>, Image<float>, float, float);
-template void ElementwiseSquare<float,unsigned char,float>(Image<float>, Image<unsigned char>, float, float);
-template void ElementwiseMultiplyAdd(Image<float> d, const Image<float> a, const Image<float> b, const Image<float> c, float sab, float sc, float offset);
-template void ElementwiseMultiplyAdd(Image<float> d, const Image<float> a, const Image<unsigned char> b, const Image<float> c, float sab, float sc, float offset);
-template void ElementwiseDivision(Image<float> c, const Image<float> a, const Image<float> b, float sa, float sb, float scalar, float offset);
+template KANGAROO_EXPORT void Fill(Image<float> img, float val);
+template KANGAROO_EXPORT void Fill(Image<unsigned char> img, unsigned char val);
+template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
+template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float> b, const Image<unsigned short> a, float s, float offset);
+template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
+template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float2> b, const Image<float2> a, float s, float2 offset);
+template KANGAROO_EXPORT void ElementwiseAdd(Image<unsigned char>, Image<unsigned char>, Image<unsigned char>, int, int, int);
+template KANGAROO_EXPORT void ElementwiseAdd(Image<float>, Image<float>, Image<float>, float, float, float);
+template KANGAROO_EXPORT void ElementwiseMultiply(Image<float>, Image<float>, Image<float>, float,float);
+template KANGAROO_EXPORT void ElementwiseMultiply(Image<float>, Image<unsigned char>, Image<unsigned char>, float,float);
+template KANGAROO_EXPORT void ElementwiseSquare<float,float,float>(Image<float>, Image<float>, float, float);
+template KANGAROO_EXPORT void ElementwiseSquare<float,unsigned char,float>(Image<float>, Image<unsigned char>, float, float);
+template KANGAROO_EXPORT void ElementwiseMultiplyAdd(Image<float> d, const Image<float> a, const Image<float> b, const Image<float> c, float sab, float sc, float offset);
+template KANGAROO_EXPORT void ElementwiseMultiplyAdd(Image<float> d, const Image<float> a, const Image<unsigned char> b, const Image<float> c, float sab, float sc, float offset);
+template KANGAROO_EXPORT void ElementwiseDivision(Image<float> c, const Image<float> a, const Image<float> b, float sa, float sb, float scalar, float offset);
 
-template float ImageL1(Image<float2> img, Image<unsigned char> scratch);
+template KANGAROO_EXPORT float ImageL1(Image<float2> img, Image<unsigned char> scratch);
 
 }

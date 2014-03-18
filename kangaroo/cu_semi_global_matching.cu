@@ -85,7 +85,7 @@ void SemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<Timg> left, int 
     }
 }
 
-template void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
-template void SemiGlobalMatching(Volume<float> volH, Volume<float> volC, Image<float> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+template KANGAROO_EXPORT void SemiGlobalMatching(Volume<float> volH, Volume<CostVolElem> volC, Image<unsigned char> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
+template KANGAROO_EXPORT void SemiGlobalMatching(Volume<float> volH, Volume<float> volC, Image<float> left, int maxDisp, float P1, float P2, bool dohoriz, bool dovert, bool doreverse);
 
 }

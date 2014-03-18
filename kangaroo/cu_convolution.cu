@@ -48,8 +48,8 @@ void Convolution(
 // Instantiate templates
 //////////////////////////////////////////////////////
 
-template void Convolution<float,float,float,float>(Image<float> out,  Image<float> in,  Image<float> kern, int kx, int ky);
-template void Convolution<float,unsigned char,unsigned char,float>(Image<float> out,  Image<unsigned char> in,  Image<unsigned char> kern, int kx, int ky);
+template KANGAROO_EXPORT void Convolution<float,float,float,float>(Image<float> out,  Image<float> in,  Image<float> kern, int kx, int ky);
+template KANGAROO_EXPORT void Convolution<float,unsigned char,unsigned char,float>(Image<float> out,  Image<unsigned char> in,  Image<unsigned char> kern, int kx, int ky);
 
 }
 
