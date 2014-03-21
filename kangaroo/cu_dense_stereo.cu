@@ -654,7 +654,13 @@ void CostVolumeZero(Volume<CostVolElem> costvol )
     CostVolElem initial;
     initial.sum = 0;
     initial.n = 0;
+
+#ifndef _MSC_VER
     costvol.Fill(initial);
+#else
+    // Cannot use thrust::fill on windows with aligned structure.
+    throw std::runtime_error("Not implemented on MSVC.");
+#endif
 }
 
 //////////////////////////////////////////////////////
