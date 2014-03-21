@@ -18,7 +18,9 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
         float z = 0;
         const int imx = depth.w * (float)(x-view.v.l) / (float)view.v.w;
         const int imy = depth.h * (float)(view.v.t()-y) / (float)view.v.h;
-        depth.SubImage(imx, imy, 1,1).MemcpyToHost(&z);
+        if( 0 <= imx && imx < depth.w && 0 <= imy && imy < depth.h) {
+            depth.SubImage(imx, imy, 1,1).MemcpyToHost(&z);
+        }
         
 #    ifdef _MSVC_
         if( z == 0 || !_finite(z) ) z = default_z;
