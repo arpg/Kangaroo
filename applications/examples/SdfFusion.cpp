@@ -112,6 +112,7 @@ int main( int argc, char* argv[] )
             if(shape == 0) {
                 roo::RaycastBox(gtd, T_cw.inverse().matrix3x4(), K, roo::BoundingBox(make_float3(-0.9,-0.9,-0.9), make_float3(0.9,0.9,0.9)) );
             }else if(shape ==1) {
+                roo::Fill<float>(gtd, std::numeric_limits<float>::quiet_NaN() );
                 roo::RaycastSphere(gtd, roo::Image<float>(), T_cw.inverse().matrix3x4(), K, make_float3(0,0,0), 0.9);
             }
             CudaScopedMappedPtr dvbo(vbo);

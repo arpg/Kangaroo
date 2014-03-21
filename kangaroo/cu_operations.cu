@@ -252,7 +252,11 @@ Tout ImageL1(Image<T> img, Image<unsigned char> scratch)
 //////////////////////////////////////////////////////
 
 template KANGAROO_EXPORT void Fill(Image<float> img, float val);
+template KANGAROO_EXPORT void Fill(Image<float3> img, float3 val);
+template KANGAROO_EXPORT void Fill(Image<float4> img, float4 val);
 template KANGAROO_EXPORT void Fill(Image<unsigned char> img, unsigned char val);
+template KANGAROO_EXPORT void Fill(Image<uchar3> img, uchar3 val);
+template KANGAROO_EXPORT void Fill(Image<uchar4> img, uchar4 val);
 template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float> b, const Image<unsigned char> a, float s, float offset);
 template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float> b, const Image<unsigned short> a, float s, float offset);
 template KANGAROO_EXPORT void ElementwiseScaleBias(Image<float> b, const Image<float> a, float s, float offset);
