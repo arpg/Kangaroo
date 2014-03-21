@@ -27,7 +27,9 @@ struct Pyramid {
 
         // Build power of two structure
         for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l ) {
-            imgs[l] = roo::Image<T,Target,Management>(w>>l,h>>l);
+            // Avoid r-value assignment in case it isn't available.
+            roo::Image<T,Target,Management> temp(w>>l,h>>l);
+            imgs[l].Swap(temp);
         }
     }
 

@@ -19,4 +19,10 @@
 #cmakedefine HAVE_NPP
 #cmakedefine HAVE_OPENCV
 
+/// Host defines, not to be used in compiled library code
+#if (__cplusplus > 199711L) || (_MSC_VER >= 1700)
+#define API_HAVE_CPP11
+#define API_HAVE_RVALREF
+#endif
+
 #endif // KANGAROO_CONFIG_H
