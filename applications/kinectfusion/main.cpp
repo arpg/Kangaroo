@@ -21,6 +21,12 @@
 using namespace std;
 using namespace pangolin;
 
+template<typename T>
+bool isFinite(const T& x)
+{
+  return x==x;
+}
+
 int main( int argc, char* argv[] )
 {
     // Initialise window
@@ -28,9 +34,8 @@ int main( int argc, char* argv[] )
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
 
     // Open video device
-    pangolin::VideoInput video(argc >= 2 ? argv[1] : "openni:[img1=rgb,img2=depth]//" );
-    if(video.Streams().size() != 2)
-        throw pangolin::VideoException("Requires RGB and Depth streams.");    
+    pangolin::VideoInput video(argc >= 2 ? argv[1] : "openni:[img1=depth]//" );
+    const bool use_colour = video.Streams().size() == 2;
     
     std::unique_ptr<unsigned char> vid_buffer( new unsigned char[video.SizeBytes()] );
 
@@ -46,7 +51,7 @@ int main( int argc, char* argv[] )
     const double knear = 0.4;
     const double kfar = 4;
     const int volres = 256;
-    const float volrad = 0.6;
+    const float volrad = 1.0;
 
     roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
 //    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
@@ -135,9 +140,7 @@ int main( int argc, char* argv[] )
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
     container[2].SetDrawFunction(std::ref(adraycolor))
                 .SetHandler(&rayhandler);
-//    container[3].SetDrawFunction(std::ref(addebug));
     container[3].SetDrawFunction(std::ref(adnormals));
-//    container[5].SetDrawFunction(std::ref(adraynorm));
 
     Sophus::SE3d T_wl;
 
@@ -158,12 +161,15 @@ int main( int argc, char* argv[] )
         }
 
         if(go) {
-            if(video.Grab(vid_buffer.get(), imgs,true,false)) {
-                dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)imgs[1].ptr, imgs[1].w, imgs[1].h, imgs[1].pitch ));
-                drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[0].ptr, imgs[0].w, imgs[0].h, imgs[0].pitch ));
+            if(video.Grab(vid_buffer.get(), imgs,true,false))
+            {
+                dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)imgs[0].ptr, imgs[0].w, imgs[0].h, imgs[0].pitch ));
+                if(use_colour) {
+                    drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[1].ptr, imgs[1].w, imgs[1].h, imgs[1].pitch ));
+                }
                 roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
                 roo::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
-    
+
                 roo::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);
                 for(int l=0; l<MaxLevels; ++l) {
                     roo::DepthToVbo(kin_v[l], kin_d[l], K[l] );
@@ -186,8 +192,11 @@ int main( int argc, char* argv[] )
 
             // Fuse first kinect frame in.
             const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
-//            roo::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
-            roo::SdfFuse(vol, colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), roo::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
+            if(use_colour) {
+                roo::SdfFuse(vol, colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), roo::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
+            }else{
+                roo::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
+            }
         }
 
         if(viewonly) {
@@ -278,7 +287,9 @@ int main( int argc, char* argv[] )
                             }else{
                                 Eigen::FullPivLU<Eigen::Matrix<double,6,6> > lu_JTJ( sysJTJ );
                                 Eigen::Matrix<double,6,1> x = -1.0 * lu_JTJ.solve( sysJTy );
-                                T_lp = T_lp * Sophus::SE3d::exp(x);
+                                if( isFinite(x) ) {
+                                    T_lp = T_lp * Sophus::SE3d::exp(x);
+                                }
                             }
 
                         }
