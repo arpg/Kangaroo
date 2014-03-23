@@ -42,23 +42,30 @@ int main( int argc, char* argv[] )
     std::vector<pangolin::Image<unsigned char> > imgs;    
     const int w = video.Width();
     const int h = video.Height();
-    const int MaxLevels = 4;
 
+    const int MaxLevels = 4;
+    const int its[] = {1,0,2,3};
+
+    // Xtrion
     const double baseline_m = 0.08; //camera.GetDeviceProperty(<double>("Depth0Baseline", 0) / 100;
     const double depth_focal = 570.342; //camera.GetProperty<double>("Depth0FocalLength", 570.342);
-    const roo::ImageIntrinsics K(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );
-    
+    const roo::ImageIntrinsics K(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );  
     const double knear = 0.4;
     const double kfar = 4;
-    const int volres = 256;
-    const float volrad = 1.0;
 
-    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,0.5), make_float3(volrad,volrad,0.5+2*volrad));
+//    // DepthSense
+//    const double baseline_m = 0.02;
+//    const roo::ImageIntrinsics K(224.501999, 230.494003, w/2.0 - 0.5, h/2.0 - 0.5 );
+//    const double knear = 0.15;
+//    const double kfar = 2.0;
+
+    const float volrad = 1.0;
+    const int volres = 256;
+
+    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,knear), make_float3(volrad,volrad,knear+2*volrad));
 //    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
 
     CVarUtils::AttachCVar<roo::BoundingBox>("BoundingBox", &reset_bb);
-
-    const Eigen::Vector4d its(1,0,2,3);
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
@@ -308,8 +315,11 @@ int main( int argc, char* argv[] )
                     roo::BoundedVolume<float> work_colorVol = colorVol.SubBoundingVolume( roi );
                     if(work_vol.IsValid()) {
                         const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
-//                        roo::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
-                        roo::SdfFuse(work_vol, work_colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), roo::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
+                        if(use_colour) {
+                            roo::SdfFuse(work_vol, work_colorVol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, drgb, (T_cd * T_wl.inverse()).matrix3x4(), roo::ImageIntrinsics(rgb_fl, drgb), trunc_dist, max_w, mincostheta );
+                        }else{
+                            roo::SdfFuse(work_vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
+                        }
                     }
                 }
             }
