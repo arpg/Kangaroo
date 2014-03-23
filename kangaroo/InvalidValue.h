@@ -18,7 +18,11 @@ template<>
 struct InvalidValue<float> {
 
     inline __host__ __device__ static float Value() {
+#ifdef _MSC_VER
         return nanf(NULL);
+#else
+        return 0.0f / 0.0f;
+#endif // _MSC_VER
     }
 
     /*
