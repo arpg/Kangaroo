@@ -14,9 +14,11 @@ endif()
 # Platform configuration vars
 include(SetPlatformVars)
 
+# Disable unknown pragma warnings - pragma unrolls are for NVCC.
 if(MSVC)
-    # Disable unknown pragma warnings in MSVC - there are many
     add_definitions( "/wd4068" )
+else()
+    add_definitions( "-Wno-unknown-pragmas" )
 endif()
 
 add_subdirectory(kangaroo)
