@@ -47,22 +47,20 @@ void BuildPoseRefinementFromDepthmapSystem(
     const Mat<float,3,4>& KT_lr, float c,
     LeastSquaresSystem<float,6>& lss, Image<float4> dDebug
 ) {
-    const Mat<float,4> Pr = {Pr4.x, Pr4.y, Pr4.z, 1.0f};
+    const float3 KPl = KT_lr * Pr4;
+    const float2 pl = {KPl.x/KPl.z, KPl.y/KPl.z};
 
-    const Mat<float,3> KPl = KT_lr * Pr;
-    const Mat<float,2> pl = {KPl(0)/KPl(2), KPl(1)/KPl(2)};
+    if(isfinite(Pr4.z) && dImgl.InBounds(pl.x, pl.y, 2)) {
 
-    if(isfinite(Pr4.z) && dImgl.InBounds(pl(0), pl(1), 2)) {
-
-        float Il = dImgl./*template*/ GetBilinear<float>(pl(0), pl(1));
+        float Il = dImgl./*template*/ GetBilinear<float>(pl);
         float Ir = dImgr(u,v);
         const float y = Il - Ir;
 
-        const Mat<float,1,2> dIl = dImgl./*template*/ GetCentralDiff<float>(pl(0), pl(1));
+        const Mat<float,1,2> dIl = dImgl./*template*/ GetCentralDiff<float>(pl.x, pl.y);
 
-        const Mat<float,2,3> dPl_by_dpl = {
-          1.0/KPl(2), 0, -KPl(0)/(KPl(2)*KPl(2)),
-          0, 1.0/KPl(2), -KPl(1)/(KPl(2)*KPl(2))
+        Mat<float,2,3> dPl_by_dpl = {
+          1.0/KPl.z, 0, -KPl.x/(KPl.z*KPl.z),
+          0, 1.0/KPl.z, -KPl.y/(KPl.z*KPl.z)
         };
 
         const Mat<float,1,4> dIldPlKT_lr = dIl * dPl_by_dpl * KT_lr;
@@ -72,9 +70,9 @@ void BuildPoseRefinementFromDepthmapSystem(
             dIldPlKT_lr(0),
             dIldPlKT_lr(1),
             dIldPlKT_lr(2),
-            -dIldPlKT_lr(1)*Pr(2) + dIldPlKT_lr(2)*Pr(1),
-            +dIldPlKT_lr(0)*Pr(2) - dIldPlKT_lr(2)*Pr(0),
-            -dIldPlKT_lr(0)*Pr(1) + dIldPlKT_lr(1)*Pr(0)
+            -dIldPlKT_lr(1)*Pr4.z + dIldPlKT_lr(2)*Pr4.y,
+            +dIldPlKT_lr(0)*Pr4.z - dIldPlKT_lr(2)*Pr4.x,
+            -dIldPlKT_lr(0)*Pr4.y + dIldPlKT_lr(1)*Pr4.x
         };
 
         const float w = LSReweightTukey(y,c);
