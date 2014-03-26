@@ -3,6 +3,7 @@
 #include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
+#include <pangolin/compat/function.h>
 #include <pangolin/glcuda.h>
 #include <pangolin/glsl.h>
 
@@ -256,13 +257,13 @@ int main( int argc, char* argv[] )
     graph.AddChild(&glvbo);
 
     SetupContainer(container, 6, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(adright)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(boost::ref(adisp)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(boost::ref(adVol)).SetHandler(&handler2d);
+    container[0].SetDrawFunction(boostd::ref(adleft)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(boostd::ref(adright)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(boostd::ref(adisp)).SetHandler(&handler2d);
+    container[3].SetDrawFunction(boostd::ref(adVol)).SetHandler(&handler2d);
     container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( new pangolin::Handler3D(s_cam, pangolin::AxisNone) );
-    container[5].SetDrawFunction(boost::ref(adw)).SetHandler(&handler2d);
+    container[5].SetDrawFunction(boostd::ref(adw)).SetHandler(&handler2d);
 
     bool bFirstTime = true;
 

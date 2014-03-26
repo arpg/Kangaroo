@@ -3,25 +3,25 @@
 #include <sophus/se3.hpp>
 
 #include <pangolin/pangolin.h>
+#include <pangolin/compat/function.h>
 #include <pangolin/glcuda.h>
 #include <pangolin/glsl.h>
 #include <npp.h>
 
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLVbo.h>
-#include "common/GLCameraHistory.h"
-
-#include <kangaroo/extra/RpgCameraOpen.h>
-#include <kangaroo/extra/DisplayUtils.h>
-#include "common/ScanlineRectify.h"
-#include <kangaroo/extra/ImageSelect.h>
-#include <kangaroo/extra/BaseDisplayCuda.h>
-#include "common/HeightmapFusion.h"
-#include "common/CameraModelPyramid.h"
-#include "common/LoadPosesFromFile.h"
-#include "common/SavePPM.h"
 
 #include <kangaroo/kangaroo.h>
+#include <kangaroo/extra/GLCameraHistory.h>
+#include <kangaroo/extra/RpgCameraOpen.h>
+#include <kangaroo/extra/DisplayUtils.h>
+#include <kangaroo/extra/ScanlineRectify.h>
+#include <kangaroo/extra/ImageSelect.h>
+#include <kangaroo/extra/BaseDisplayCuda.h>
+#include <kangaroo/extra/HeightmapFusion.h>
+#include <kangaroo/extra/CameraModelPyramid.h>
+#include <kangaroo/extra/LoadPosesFromFile.h>
+#include <kangaroo/extra/SavePPM.h>
 
 //#define HM_FUSION
 //#define PLANE_FIT
@@ -331,10 +331,10 @@ int main( int argc, char* argv[] )
 #endif
 
     SetupContainer(container, 5, (float)w/h);
-    container[0].SetDrawFunction(boost::ref(adleft)).SetHandler(&handler2d);
-    container[1].SetDrawFunction(boost::ref(adright)).SetHandler(&handler2d);
-    container[2].SetDrawFunction(boost::ref(adisp)).SetHandler(&handler2d);
-    container[3].SetDrawFunction(boost::ref(adVol)).SetHandler(&handler2d);
+    container[0].SetDrawFunction(boostd::ref(adleft)).SetHandler(&handler2d);
+    container[1].SetDrawFunction(boostd::ref(adright)).SetHandler(&handler2d);
+    container[2].SetDrawFunction(boostd::ref(adisp)).SetHandler(&handler2d);
+    container[3].SetDrawFunction(boostd::ref(adVol)).SetHandler(&handler2d);
     container[4].SetDrawFunction(SceneGraph::ActivateDrawFunctor(graph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
 
