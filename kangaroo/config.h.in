@@ -23,10 +23,11 @@
 #define CUDA_VERSION_MAJOR @CUDA_VERSION_MAJOR@
 #define CUDA_VERSION_MINOR @CUDA_VERSION_MINOR@
 
-/// Host defines, not to be used in compiled library code
+/// Defines generated when calling into Kangaroo API. Not to be
+/// used in compiled library code, only inlined header code.
 #if (__cplusplus > 199711L) || (_MSC_VER >= 1700)
-#define API_HAVE_CPP11
-#define API_HAVE_RVALREF
+#define CALLEE_HAS_CPP11
+#define CALLEE_HAS_RVALREF
 #endif
 
 #endif // KANGAROO_CONFIG_H
