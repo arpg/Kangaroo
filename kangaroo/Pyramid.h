@@ -33,11 +33,11 @@ struct Pyramid {
         }
     }
 
-    template<typename ManagementCopyFrom>
+    template<typename TargetFrom, typename ManagementFrom>
     inline __host__ __device__
-    Pyramid(const Pyramid<T,Levels,Target,ManagementCopyFrom>& pyramid)
+    Pyramid(const Pyramid<T,Levels,TargetFrom,ManagementFrom>& pyramid)
     {
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target,TargetFrom>();
         for(int l=0; l<Levels; ++l) {
             imgs[l] = pyramid.imgs[l];
         }
@@ -120,7 +120,7 @@ struct Pyramid {
     void AllocateFromImage(unsigned w, unsigned h, Image<unsigned char, Target, DontManage> scratch )
     {
         // Verify that this is DontManage pyramid type
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target,Target>();
 
         // Build power of two structure
         for(unsigned l=0; l < Levels && (w>>l > 0) && (h>>l > 0); ++l ) {

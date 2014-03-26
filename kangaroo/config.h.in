@@ -19,6 +19,10 @@
 #cmakedefine HAVE_NPP
 #cmakedefine HAVE_OPENCV
 
+/// CUDA Toolkit Version
+#define CUDA_VERSION_MAJOR @CUDA_VERSION_MAJOR@
+#define CUDA_VERSION_MINOR @CUDA_VERSION_MINOR@
+
 /// Host defines, not to be used in compiled library code
 #if (__cplusplus > 199711L) || (_MSC_VER >= 1700)
 #define API_HAVE_CPP11

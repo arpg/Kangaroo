@@ -27,143 +27,14 @@
 #include <npp.h>
 #endif // HAVE_NPP
 
+#include <kangaroo/Memory.h>
 #include <kangaroo/Mat.h>
-#include "sampling.h"
-#include "pixel_convert.h"
+
+#include <kangaroo/sampling.h>
+#include <kangaroo/pixel_convert.h>
 
 namespace roo
 {
-
-struct CudaException : public std::exception
-{
-    CudaException(const std::string& what, cudaError err = cudaSuccess) : mWhat(what), mErr(err) { }
-    virtual ~CudaException() throw() {}
-    virtual const char* what() const throw() {
-        std::stringstream ss;
-        ss << "CudaException: " << mWhat << std::endl;
-        if(mErr != cudaSuccess) {
-            ss << "cudaError code: " << cudaGetErrorString(mErr);
-            ss << " (" << mErr << ")" << std::endl;
-        }
-        return ss.str().c_str();
-    }
-    std::string mWhat;
-    cudaError mErr;
-};
-
-struct TargetHost
-{
-    template<typename T> inline static
-    void AllocatePitchedMem(T** hostPtr, size_t *pitch, size_t w, size_t h){
-        *pitch = w*sizeof(T);
-        const cudaError err = cudaMallocHost(hostPtr, *pitch * h);
-        if( err != cudaSuccess ) {
-            throw CudaException("Unable to cudaMallocHost", err);
-        }
-    }
-
-    template<typename T> inline static
-    void AllocatePitchedMem(T** hostPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d){
-        *pitch = w*sizeof(T);
-        *img_pitch = *pitch*h;
-        const cudaError err = cudaMallocHost(hostPtr, *pitch * h * d);
-        if( err != cudaSuccess ) {
-            throw CudaException("Unable to cudaMallocHost", err);
-        }
-    }
-
-    template<typename T> inline static
-    void DeallocatePitchedMem(T* hostPtr){
-		cudaFreeHost(hostPtr);
-    }
-};
-
-struct TargetDevice
-{
-    template<typename T> inline static
-    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t w, size_t h)
-    {
-        const cudaError err = cudaMallocPitch(devPtr,pitch,w*sizeof(T),h);
-        if( err != cudaSuccess ) {
-            throw CudaException("Unable to cudaMallocPitch", err);
-        }
-    }
-
-    template<typename T> inline static
-    void AllocatePitchedMem(T** devPtr, size_t *pitch, size_t *img_pitch, size_t w, size_t h, size_t d)
-    {
-        const cudaError err = cudaMallocPitch(devPtr,pitch,w*sizeof(T),h*d);
-        if( err != cudaSuccess ) {
-            throw CudaException("Unable to cudaMallocPitch", err);
-        }
-        *img_pitch = *pitch * h;
-    }
-
-    template<typename T> inline static
-    void DeallocatePitchedMem(T* devPtr){
-        cudaFree(devPtr);
-    }
-};
-
-template<typename TargetTo, typename TargetFrom>
-cudaMemcpyKind TargetCopyKind();
-
-template<> inline cudaMemcpyKind TargetCopyKind<TargetHost,TargetHost>() { return cudaMemcpyHostToHost;}
-template<> inline cudaMemcpyKind TargetCopyKind<TargetDevice,TargetHost>() { return cudaMemcpyHostToDevice;}
-template<> inline cudaMemcpyKind TargetCopyKind<TargetHost,TargetDevice>() { return cudaMemcpyDeviceToHost;}
-template<> inline cudaMemcpyKind TargetCopyKind<TargetDevice,TargetDevice>() { return cudaMemcpyDeviceToDevice;}
-
-#ifdef HAVE_THRUST
-template<typename T, typename Target> struct ThrustType;
-template<typename T> struct ThrustType<T,TargetHost> { typedef T* Ptr; };
-template<typename T> struct ThrustType<T,TargetDevice> { typedef thrust::device_ptr<T> Ptr; };
-#endif // HAVE_THRUST
-
-struct Manage
-{
-    inline static __host__
-    void AllocateCheck()
-    {
-    }
-
-    inline static __host__ __device__
-    void AssignmentCheck()
-    {
-        assert(0);
-        exit(-1);
-    }
-
-    template<typename T, typename Target> inline static __host__
-    void Cleanup(T* ptr)
-    {
-        if(ptr) {
-            Target::template DeallocatePitchedMem<T>(ptr);
-            ptr = 0;
-        }
-    }
-};
-
-struct DontManage
-{
-    inline static __host__
-    void AllocateCheck()
-    {
-        std::cerr << "Image that doesn't own data should not call this constructor" << std::endl;
-        assert(0);
-        exit(-1);
-    }
-
-    inline static __host__ __device__
-    void AssignmentCheck()
-    {
-    }
-
-
-    template<typename T, typename Target> inline static __device__ __host__
-    void Cleanup(T* /*ptr*/)
-    {
-    }
-};
 
 //! Simple templated pitched image type for use with Cuda
 //! Type encapsulates ptr, pitch, width and height
@@ -186,14 +57,15 @@ struct Image {
     Image( const Image<T,Target,Management>& img )
         : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h)
     {
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target,Target>();
     }
 
-    template<typename ManagementCopyFrom> inline __host__ __device__
-    Image( const Image<T,Target,ManagementCopyFrom>& img )
+    template<typename TargetFrom, typename ManagementFrom>
+    inline __host__ __device__
+    Image( const Image<T,TargetFrom,ManagementFrom>& img )
         : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h)
     {
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target, TargetFrom>();
     }
 
     inline __host__
@@ -239,8 +111,7 @@ struct Image {
     Image( const cv::Mat& img )
         : pitch(img.step), ptr((T*)img.data), w(img.cols), h(img.rows)
     {
-        // TODO: Assert only TargetHost
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target,TargetHost>();
     }
 #endif
 
@@ -614,7 +485,7 @@ struct Image {
     Image<TP,Target,DontManage> SplitAlignedImage(unsigned int nwidth, unsigned int nheight, unsigned int align_bytes=16)
     {
         // Only let us split DontManage image types (so we can't orthan memory)
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target,Target>();
 
         // Extract aligned image of type TP from start of this image
         const unsigned int wbytes = nwidth*sizeof(TP);

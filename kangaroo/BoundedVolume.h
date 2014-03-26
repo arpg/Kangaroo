@@ -16,14 +16,14 @@ public:
     // Constructors
     //////////////////////////////////////////////////////
 
-    template<typename ManagementCopyFrom> inline __host__ __device__
-    BoundedVolume( const BoundedVolume<T,Target,ManagementCopyFrom>& vol )
+    template<typename TargetFrom, typename ManagementFrom> inline __host__ __device__
+    BoundedVolume( const BoundedVolume<T,TargetFrom,ManagementFrom>& vol )
         : Volume<T,Target,Management>(vol), bbox(vol.bbox)
     {
     }
 
-    template<typename ManagementCopyFrom> inline __host__ __device__
-    BoundedVolume(const Volume<T,Target,ManagementCopyFrom>& vol, const BoundingBox& bbox)
+    template<typename TargetFrom, typename ManagementFrom> inline __host__ __device__
+    BoundedVolume(const Volume<T,TargetFrom,ManagementFrom>& vol, const BoundingBox& bbox)
         : Volume<T,Target,Management>(vol), bbox(bbox)
     {
     }

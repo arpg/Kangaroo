@@ -31,11 +31,11 @@ struct Volume
     // Constructors
     //////////////////////////////////////////////////////
 
-    template<typename ManagementCopyFrom> inline __host__ __device__
-    Volume( const Volume<T,Target,ManagementCopyFrom>& img )
+    template<typename TargetFrom, typename ManagementFrom> inline __host__ __device__
+    Volume( const Volume<T,TargetFrom,ManagementFrom>& img )
         : pitch(img.pitch), ptr(img.ptr), w(img.w), h(img.h), img_pitch(img.img_pitch), d(img.d)
     {
-        Management::AssignmentCheck();
+        AssignmentCheck<Management,Target, TargetFrom>();
     }
 
     inline __host__
