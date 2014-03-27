@@ -112,7 +112,11 @@ void vMarchCube(
             const float3 deriv = vol.GetUnitsBackwardDiffDxDyDz( asEdgeVertex[iEdge] );
             asEdgeNorm[iEdge] = deriv / length(deriv);
 
+#ifdef _MSVC_
             if( !std::isfinite(asEdgeNorm[iEdge].x) || !std::isfinite(asEdgeNorm[iEdge].y) || !std::isfinite(asEdgeNorm[iEdge].z) ) {
+#else
+            if( !isfinite(asEdgeNorm[iEdge].x) || !isfinite(asEdgeNorm[iEdge].y) || !isfinite(asEdgeNorm[iEdge].z) ) {
+#endif // _MSVC_
                 asEdgeNorm[iEdge] = make_float3(0,0,0);
             }
         }
