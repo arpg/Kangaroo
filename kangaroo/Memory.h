@@ -167,6 +167,7 @@ struct DontManage
 
 // Empty definition to trigger compile time error by default.
 template<typename ManagementTo, typename TargetTo, typename TargetFrom>
+__device__ __host__
 void AssignmentCheck();
 
 // Define valid assignments

@@ -39,11 +39,11 @@ bool IsFinite(const Mat<float3,R,C>& mat)
 // Pose refinement from depthmap
 //////////////////////////////////////////////////////
 
-//template<typename Ti>
+template<typename Ti>
 __device__ inline
 void BuildPoseRefinementFromDepthmapSystem(
     const unsigned int u,  const unsigned int v, const float4 Pr4,
-    const Image<unsigned char>& dImgl, const Image<unsigned char>& dImgr,
+    const Image<Ti>& dImgl, const Image<Ti>& dImgr,
     const Mat<float,3,4>& KT_lr, float c,
     LeastSquaresSystem<float,6>& lss, Image<float4> dDebug
 ) {
@@ -52,28 +52,28 @@ void BuildPoseRefinementFromDepthmapSystem(
 
     if(isfinite(Pr4.z) && dImgl.InBounds(pl.x, pl.y, 2)) {
 
-        float Il = dImgl./*template*/ GetBilinear<float>(pl);
+        float Il = dImgl.template GetBilinear<float>(pl);
         float Ir = dImgr(u,v);
         const float y = Il - Ir;
 
-        const Mat<float,1,2> dIl = dImgl./*template*/ GetCentralDiff<float>(pl.x, pl.y);
+        const Mat<float,1,2> dIl = dImgl.template GetCentralDiff<float>(pl.x, pl.y);
 
-        Mat<float,2,3> dPl_by_dpl = {
+        Mat<float,2,3> dPl_by_dpl = {{
           1.0/KPl.z, 0, -KPl.x/(KPl.z*KPl.z),
           0, 1.0/KPl.z, -KPl.y/(KPl.z*KPl.z)
-        };
+        }};
 
         const Mat<float,1,4> dIldPlKT_lr = dIl * dPl_by_dpl * KT_lr;
 
         // Sparse Jr_i = dIldPlKT_lr * gen_i * Pr
-        const Mat<float,1,6> Jr = {
+        const Mat<float,1,6> Jr = {{
             dIldPlKT_lr(0),
             dIldPlKT_lr(1),
             dIldPlKT_lr(2),
             -dIldPlKT_lr(1)*Pr4.z + dIldPlKT_lr(2)*Pr4.y,
             +dIldPlKT_lr(0)*Pr4.z - dIldPlKT_lr(2)*Pr4.x,
             -dIldPlKT_lr(0)*Pr4.y + dIldPlKT_lr(1)*Pr4.x
-        };
+        }};
 
         const float w = LSReweightTukey(y,c);
         lss.JTJ = OuterProduct(Jr,w);
@@ -91,11 +91,11 @@ void BuildPoseRefinementFromDepthmapSystem(
     }
 }
 
-//template<typename Ti>
+template<typename Ti>
 __device__ inline
 void BuildPoseRefinementFromDepthmapSystemESM(
     const unsigned int u,  const unsigned int v, const float depth,
-    const Image<unsigned char>& dImgl, const Image<unsigned char>& dImgr,
+    const Image<Ti>& dImgl, const Image<Ti>& dImgr,
     const Mat<float,3,3>& Klg, const Mat<float,3,3>& Krg, const Mat<float,3,3>& Krd, const Mat<float,4,4>& Tgd,
     const Mat<float,4,4>& Tlr, const Mat<float,3,4>& KlgTlr,
     LeastSquaresSystem<float,6>& lss, Image<float4> dDebug,
@@ -118,7 +118,7 @@ void BuildPoseRefinementFromDepthmapSystemESM(
     KrPr(2) = Pr_g(2);
 
     // de-homogenized point in reference grey camera
-    const Mat<float,2> pr = {KrPr(0)/KrPr(2), KrPr(1)/KrPr(2)};
+    const Mat<float,2> pr = {{KrPr(0)/KrPr(2), KrPr(1)/KrPr(2)}};
 
     // 3d point in live grey camera
     const Mat<float,4> Pl = Tlr * Pr_g;
@@ -130,13 +130,13 @@ void BuildPoseRefinementFromDepthmapSystemESM(
     KlPl(2) = Pl(2);
 
     // de-homogenized point in live grey camera
-    const Mat<float,2> pl = {KlPl(0)/KlPl(2), KlPl(1)/KlPl(2)};
+    const Mat<float,2> pl = {{KlPl(0)/KlPl(2), KlPl(1)/KlPl(2)}};
 
     if(isfinite(depth) && depth > fMinDepth && depth < fMaxDepth) {
         if( dImgr.InBounds(pr(0), pr(1), 2) &&  dImgl.InBounds(pl(0), pl(1), 2) ) {
 
-            float Il = dImgl./*template*/ GetBilinear<float>(pl(0), pl(1));
-            float Ir = dImgr./*template*/ GetBilinear<float>(pr(0), pr(1));
+            float Il = dImgl.template GetBilinear<float>(pl(0), pl(1));
+            float Ir = dImgr.template GetBilinear<float>(pr(0), pr(1));
 
             if( bDiscardMaxMin && ( Il == 0 || Il == 255 || Ir == 0 || Ir == 255 ) ) {
                 dDebug(u, v) = make_float4(1, 1, 0, 1);
@@ -148,25 +148,25 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                 //----- Forward Compositional Approach
 
                 // calculate image derivative
-                const Mat<float,1,2> dIl = dImgl./*template*/ GetCentralDiff<float>(pl(0), pl(1));
+                const Mat<float,1,2> dIl = dImgl.template GetCentralDiff<float>(pl(0), pl(1));
 
                 // derivative of projection (L) and dehomogenization
-                const Mat<float,2,3> dPl_by_dpl = {
+                const Mat<float,2,3> dPl_by_dpl = {{
                   1.0/KlPl(2), 0, -KlPl(0)/(KlPl(2)*KlPl(2)),
                   0, 1.0/KlPl(2), -KlPl(1)/(KlPl(2)*KlPl(2))
-                };
+                }};
 
                 const Mat<float,1,4> dIldPlKlgTlr = dIl * dPl_by_dpl * KlgTlr;
 
                 // Sparse Jl = dIldPlKT_lr * gen_i * Pr
-                const Mat<float,1,6> Jl = {
+                const Mat<float,1,6> Jl = {{
                     dIldPlKlgTlr(0),
                     dIldPlKlgTlr(1),
                     dIldPlKlgTlr(2),
                     -dIldPlKlgTlr(1)*Pr_g(2) + dIldPlKlgTlr(2)*Pr_g(1),
                     +dIldPlKlgTlr(0)*Pr_g(2) - dIldPlKlgTlr(2)*Pr_g(0),
                     -dIldPlKlgTlr(0)*Pr_g(1) + dIldPlKlgTlr(1)*Pr_g(0)
-                };
+                }};
 
 
 
@@ -222,18 +222,18 @@ void BuildPoseRefinementFromDepthmapSystemESM(
     }
 }
 
-//template<typename Ti>
+template<typename Ti>
 __device__ inline
 void BuildCalibrationRgbdFromDepthmapSystemESM(
     const unsigned int u,  const unsigned int v, const float4 Pr4,
-    const Image<unsigned char>& dImgl, const Image<unsigned char>& dImgr,
+    const Image<Ti>& dImgl, const Image<Ti>& dImgr,
     const float fu, const float fv, const float u0, const float v0,
     const Mat<float,3,3>& K,const Mat<float,3,4>& Tcd,const Mat<float,3,4>& Tlr, float c,
     LeastSquaresSystem<float,6>& lss, Image<float4> dDebug, const bool bDiscardMaxMin,
     const float fMinDepth, const float fMaxDepth
 ) {
     // Point in reference keyframe's *DEPTH* camera
-    const Mat<float,4> Pr_d = {Pr4.x, Pr4.y, Pr4.z, 1};
+    const Mat<float,4> Pr_d = {{Pr4.x, Pr4.y, Pr4.z, 1}};
     const Mat<float,3> Pl_d = Tlr * Pr_d;
 
     // Point in reference keyframe's *COLOR* camera
@@ -247,10 +247,10 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
     const Mat<float,3> KPl = K * Pl_c;
 
     // pr is pi(KPr) which is the homogenized point in the reference camera image coordinates
-    const Mat<float,2> pr = {KPr(0)/KPr(2), KPr(1)/KPr(2)};
+    const Mat<float,2> pr = {{KPr(0)/KPr(2), KPr(1)/KPr(2)}};
 
     // pl is pi(KPl) which is the homogenized point in the live camera image coordinates
-    const Mat<float,2> pl = {KPl(0)/KPl(2), KPl(1)/KPl(2)};
+    const Mat<float,2> pl = {{KPl(0)/KPl(2), KPl(1)/KPl(2)}};
 
 
     // check if distance from depth camera is valid
@@ -258,8 +258,8 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
         // check if projected points fall in bounds
         if( dImgl.InBounds(pl(0), pl(1), 2) && dImgr.InBounds(pr(0), pr(1), 2) ) {
 
-            float Il = dImgl./*template*/ GetBilinear<float>(pl(0), pl(1));
-            float Ir = dImgr./*template*/ GetBilinear<float>(pr(0), pr(1));
+            float Il = dImgl.template GetBilinear<float>(pl(0), pl(1));
+            float Ir = dImgr.template GetBilinear<float>(pr(0), pr(1));
 
             if( bDiscardMaxMin && ( Il == 0 || Il == 255 || Ir == 0 || Ir == 255 ) ) {
                 // yellow points are over/under saturated
@@ -269,44 +269,44 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
                 const float y = Il - Ir;
 
                 // calcualte image derivatives
-                const Mat<float,1,2> dIl = dImgl./*template*/ GetCentralDiff<float>(pl(0), pl(1));
-                const Mat<float,1,2> dIr = dImgr./*template*/ GetCentralDiff<float>(pr(0), pr(1));
+                const Mat<float,1,2> dIl = dImgl.template GetCentralDiff<float>(pl(0), pl(1));
+                const Mat<float,1,2> dIr = dImgr.template GetCentralDiff<float>(pr(0), pr(1));
 
                 // derivative of pi evaluated at KPl
-                const Mat<float,2,3> dpiKPl = {
+                const Mat<float,2,3> dpiKPl = {{
                   1.0/KPl(2), 0, -KPl(0)/(KPl(2)*KPl(2)),
                   0, 1.0/KPl(2), -KPl(1)/(KPl(2)*KPl(2))
-                };
+                }};
 
                 // derivative of pi evaluated at KPr
-                const Mat<float,2,3> dpiKPr = {
+                const Mat<float,2,3> dpiKPr = {{
                   1.0/KPr(2), 0, -KPr(0)/(KPr(2)*KPr(2)),
                   0, 1.0/KPr(2), -KPr(1)/(KPr(2)*KPr(2))
-                };
+                }};
 
                 const Mat<float,1,4> dIl_dpiKPl_K_Tcd = dIl * dpiKPl * K * Tcd;   // 1x4
                 const Mat<float,1,4> dIr_dpiKPr_K_Tcd = dIr * dpiKPr * K * Tcd;
 
 
                 // Sparse Jl1 = dIl_dpiKPl_K_Tcd * gen_i * T_lr * Pr_d   -> T_lr * Pr_d = Pl_d
-                const Mat<float,1,6> Jl1 = {
+                const Mat<float,1,6> Jl1 = {{
                     dIl_dpiKPl_K_Tcd(0),
                     dIl_dpiKPl_K_Tcd(1),
                     dIl_dpiKPl_K_Tcd(2),
                     -dIl_dpiKPl_K_Tcd(1)*Pl_d(2) + dIl_dpiKPl_K_Tcd(2)*Pl_d(1),
                     +dIl_dpiKPl_K_Tcd(0)*Pl_d(2) - dIl_dpiKPl_K_Tcd(2)*Pl_d(0),
                     -dIl_dpiKPl_K_Tcd(0)*Pl_d(1) + dIl_dpiKPl_K_Tcd(1)*Pl_d(0)
-                };
+                }};
 
                 // Sparse Jl2 = dIr_dpiKPr_K_Tcd * gen_i * Pr_d
-                const Mat<float,1,6> Jl2 = {
+                const Mat<float,1,6> Jl2 = {{
                     dIr_dpiKPr_K_Tcd(0),
                     dIr_dpiKPr_K_Tcd(1),
                     dIr_dpiKPr_K_Tcd(2),
                     -dIr_dpiKPr_K_Tcd(1)*Pr_d(2) + dIr_dpiKPr_K_Tcd(2)*Pr_d(1),
                     +dIr_dpiKPr_K_Tcd(0)*Pr_d(2) - dIr_dpiKPr_K_Tcd(2)*Pr_d(0),
                     -dIr_dpiKPr_K_Tcd(0)*Pr_d(1) + dIr_dpiKPr_K_Tcd(1)*Pr_d(0)
-                };
+                }};
 
                 const Mat<float,1,6> Jl = Jl1 - Jl2;
 
@@ -324,14 +324,14 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
                 const Mat<float,1,6> Jr = Jl;
 
                 // ESM Jacobian
-                const Mat<float,1,6> J = {
+                const Mat<float,1,6> J = {{
                     (Jr(0) + Jl(0))/2,
                     (Jr(1) + Jl(1))/2,
                     (Jr(2) + Jl(2))/2,
                     (Jr(3) + Jl(3))/2,
                     (Jr(4) + Jl(4))/2,
                     (Jr(5) + Jl(5))/2
-                };
+                }};
 
                 const float w = 1; // LSReweightTukey(y,c);
                 lss.JTJ = OuterProduct(J,w);
@@ -611,10 +611,10 @@ LeastSquaresSystem<float,6> PoseRefinementProjectiveIcpPointPlane(
 // Kinect Calibration
 //////////////////////////////////////////////////////
 
-//template<typename TI>
+template<typename TI>
 __global__ void KernKinectCalibration(
-    const Image<float4> dPl, const Image<uchar3> dIl,
-    const Image<float4> dPr, const Image<uchar3> dIr,
+    const Image<float4> dPl, const Image<TI> dIl,
+    const Image<float4> dPr, const Image<TI> dIr,
     const Mat<float,3,4> KcT_cd, const Mat<float,3,4> T_lr,
     float c, Image<LeastSquaresSystem<float,2*6> > dSum, Image<float4> dDebug
 ){
@@ -632,26 +632,26 @@ __global__ void KernKinectCalibration(
     const float2 pr = dn(_pr);
 
     if( isfinite(Pr.z) && isfinite(Pl.z) && dIl.InBounds(pl,2) && dIr.InBounds(pr,2) ) {
-        const float3 y = dIl./*template*/ GetBilinear<float3>(pl) - dIr./*template*/ GetBilinear<float3>(pr);
+        const float3 y = dIl.template GetBilinear<float3>(pl) - dIr.template GetBilinear<float3>(pr);
 
-        const Mat<float3,1,2> dIldxy = dIl./*template*/ GetCentralDiff<float3>(pl.x, pl.y);
-        const Mat<float,2,3> dpld_pl = {
+        const Mat<float3,1,2> dIldxy = dIl.template GetCentralDiff<float3>(pl.x, pl.y);
+        const Mat<float,2,3> dpld_pl = {{
           1.0/_pl.z, 0, -_pl.x/(_pl.z*_pl.z),
           0, 1.0/_pl.z, -_pl.y/(_pl.z*_pl.z)
-        };
+        }};
         const Mat<float,2,4> dpld_plKcT_cd = dpld_pl * KcT_cd;
         const Mat<float3,1,4> dIldxydpld_plKcT_cd = dIldxy * dpld_plKcT_cd;
         const Mat<float3,1,4> dIldxydpld_plKcT_cdT_lr = dIldxy * (dpld_pl * (KcT_cd * T_lr) );
 
-        const Mat<float3,1,2> dIrdxy = dIr./*template*/ GetCentralDiff<float3>(pr.x, pr.y);
-        const Mat<float,2,3> dprd_pr = {
+        const Mat<float3,1,2> dIrdxy = dIr.template GetCentralDiff<float3>(pr.x, pr.y);
+        const Mat<float,2,3> dprd_pr = {{
             1.0/_pr.z, 0, -_pr.x/(_pr.z*_pr.z),
             0, 1.0/_pr.z, -_pr.y/(_pr.z*_pr.z)
-        };
+        }};
 
         const Mat<float3,1,4> dIrdxydprd_prKcT_cd = dIrdxy * (dprd_pr * KcT_cd);
 
-        const Mat<float3,1,12> Jr = {
+        const Mat<float3,1,12> Jr = {{
             dIldxydpld_plKcT_cd * SE3gen0mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen0mul(Pr),
             dIldxydpld_plKcT_cd * SE3gen1mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen1mul(Pr),
             dIldxydpld_plKcT_cd * SE3gen2mul(Pl) - dIrdxydprd_prKcT_cd * SE3gen2mul(Pr),
@@ -664,7 +664,7 @@ __global__ void KernKinectCalibration(
             dIldxydpld_plKcT_cdT_lr * SE3gen3mul(Pr),
             dIldxydpld_plKcT_cdT_lr * SE3gen4mul(Pr),
             dIldxydpld_plKcT_cdT_lr * SE3gen5mul(Pr)
-        };
+        }};
 
         const float w = LSReweightTukey(y.x,c)+LSReweightTukey(y.y,c)+LSReweightTukey(y.z,c);
         sum.JTJ = OuterProduct(Jr,w);
@@ -692,7 +692,7 @@ LeastSquaresSystem<float,2*6> KinectCalibration(
     InitDimFromOutputImage(blockDim, gridDim, dPl);
     Image<LeastSquaresSystem<float,2*6> > dSum = dWorkspace.PackedImage<LeastSquaresSystem<float,2*6> >(dPl.w, dPl.h);
 
-    KernKinectCalibration/*<uchar3>*/<<<gridDim,blockDim>>>(dPl, dIl, dPr, dIr, KcT_cd, T_lr, c, dSum, dDebug );
+    KernKinectCalibration<uchar3><<<gridDim,blockDim>>>(dPl, dIl, dPr, dIr, KcT_cd, T_lr, c, dSum, dDebug );
 
     LeastSquaresSystem<float,2*6> sum;
     sum.SetZero();
