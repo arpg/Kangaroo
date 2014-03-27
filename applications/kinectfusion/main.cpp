@@ -48,7 +48,7 @@ int main( int argc, char* argv[] )
 
     // Xtrion
     const double baseline_m = 0.08; //camera.GetDeviceProperty(<double>("Depth0Baseline", 0) / 100;
-    const double depth_focal = 570.342; //camera.GetProperty<double>("Depth0FocalLength", 570.342);
+    const double depth_focal = w * 570.342/640.0; //camera.GetProperty<double>("Depth0FocalLength", 570.342);
     const roo::ImageIntrinsics K(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );  
     const double knear = 0.4;
     const double kfar = 4;
@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
 //    const double knear = 0.15;
 //    const double kfar = 2.0;
 
-    const float volrad = 1.0;
+    const float volrad = 2.0;
     const int volres = 256;
 
     roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,knear), make_float3(volrad,volrad,knear+2*volrad));
@@ -206,8 +206,9 @@ int main( int argc, char* argv[] )
             }
         }
 
+        const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
+
         if(viewonly) {
-            const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
             Sophus::SE3d T_vw(s_cam.GetModelViewMatrix());
             const roo::BoundingBox roi(T_vw.inverse().matrix3x4(), w, h, K, 0, 50);
@@ -247,9 +248,9 @@ int main( int argc, char* argv[] )
                     if(its[l] > 0) {
                         const roo::ImageIntrinsics Kl = K[l];
                         if(showcolor) {
-                            roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, colorVol, T_wl.matrix3x4(), Kl, knear,kfar, true );
+                            roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, colorVol, T_wl.matrix3x4(), Kl, knear,kfar, trunc_dist, true );
                         }else{
-                            roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), Kl, knear,kfar, true );
+                            roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), Kl, knear,kfar, trunc_dist, true );
                         }
                         roo::DepthToVbo(ray_v[l], ray_d[l], Kl );
     //                    roo::DepthToVbo(ray_v[l], ray_d[l], Kl.fu, Kl.fv, Kl.u0, Kl.v0 );
@@ -286,7 +287,7 @@ int main( int argc, char* argv[] )
                             rmse = sqrt(lss.sqErr / lss.obs);
                             tracking_good = rmse < max_rmse;
 
-                            if(l == MaxLevels-1) {
+                            if(l == MaxLevels-1 && MaxLevels > 1) {
                                 // Solve for rotation only
                                 Eigen::FullPivLU<Eigen::Matrix<double,3,3> > lu_JTJ( sysJTJ.block<3,3>(3,3) );
                                 Eigen::Matrix<double,3,1> x = -1.0 * lu_JTJ.solve( sysJTy.segment<3>(3) );
