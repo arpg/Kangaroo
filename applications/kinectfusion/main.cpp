@@ -16,7 +16,10 @@
 #include <kangaroo/extra/Handler3dGpuDepth.h>
 #include <kangaroo/extra/SavePPM.h>
 #include <kangaroo/extra/SaveMeshlab.h>
+
+#ifdef HAVE_CVARS
 #include <kangaroo/extra/CVarHelpers.h>
+#endif // HAVE_CVARS
 
 using namespace std;
 using namespace pangolin;
@@ -65,7 +68,9 @@ int main( int argc, char* argv[] )
     roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,knear), make_float3(volrad,volrad,knear+2*volrad));
 //    roo::BoundingBox reset_bb(make_float3(-volrad,-volrad,-volrad), make_float3(volrad,volrad,volrad));
 
+#ifdef HAVE_CVARS
     CVarUtils::AttachCVar<roo::BoundingBox>("BoundingBox", &reset_bb);
+#endif // HAVE_CVARS
 
     // Camera (rgb) to depth
     Eigen::Vector3d c_d(baseline_m,0,0);
