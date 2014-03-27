@@ -29,7 +29,7 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
 #    endif // _MSVC_
         
         const float zw = 0.5*(1 + proj.m[2*4+2] + proj.m[3*4+2] / z);
-        gluUnProject(x, y, zw, mv.m, proj.m, viewport, &Pw[0], &Pw[1], &Pw[2]);
+        pangolin::glUnProject(x, y, zw, mv.m, proj.m, viewport, &Pw[0], &Pw[1], &Pw[2]);
         pangolin::LieApplySE34x4vec3(Pc, mv.m, Pw);
         p[0] = x; p[1] = y; p[2] = zw;
     }
