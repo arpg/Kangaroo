@@ -1,4 +1,4 @@
-#include "cu_manhatten.h"
+#include "cu_manhattan.h"
 
 #include "LeastSquareSum.h"
 #include "launch_utils.h"
@@ -8,7 +8,7 @@ namespace roo
 {
 
 template<typename T>
-__global__ void KernManhattenLineCost(
+__global__ void KernManhattanLineCost(
     Image<float4> out, Image<float4> out2, const Image<T> in,
     Mat<float,3,3> Rhat, float fu, float fv, float u0, float v0,
     float cut, float scale, float min_grad,
@@ -117,7 +117,7 @@ __global__ void KernManhattenLineCost(
     sumlss.ReducePutBlock(dsum);
 }
 
-LeastSquaresSystem<float,3> ManhattenLineCost(
+LeastSquaresSystem<float,3> ManhattanLineCost(
     Image<float4> out, Image<float4> out2, const Image<unsigned char> in,
     Mat<float,3,3> Rhat, float fu, float fv, float u0, float v0,
     float cut, float scale, float min_grad,
@@ -126,7 +126,7 @@ LeastSquaresSystem<float,3> ManhattenLineCost(
     dim3 gridDim, blockDim;
     InitDimFromOutputImageOver(blockDim,gridDim, out);
     HostSumLeastSquaresSystem<float,3> lss(dWorkspace, blockDim, gridDim);
-    KernManhattenLineCost<unsigned char><<<gridDim,blockDim>>>(out,out2,in,Rhat,fu,fv,u0,v0,cut,scale,min_grad,lss.LeastSquareImage() );
+    KernManhattanLineCost<unsigned char><<<gridDim,blockDim>>>(out,out2,in,Rhat,fu,fv,u0,v0,cut,scale,min_grad,lss.LeastSquareImage() );
     return lss.FinalSystem();
 }
 

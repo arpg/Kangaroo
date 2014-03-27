@@ -31,7 +31,7 @@
 #include "cu_heightmap.h"
 #include "cu_semi_global_matching.h"
 #include "cu_blur.h"
-#include "cu_manhatten.h"
+#include "cu_manhattan.h"
 #include "cu_convolution.h"
 #include "cu_integral_image.h"
 #include "cu_segment_test.h"

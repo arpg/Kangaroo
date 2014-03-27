@@ -16,7 +16,7 @@ list(APPEND SRC_H
     Divergence.h      Sdf.h                 cu_index_buffer.h     cu_resample.h             reduce.h
     Image.h           Volume.h              cu_integral_image.h   cu_rof_denoising.h        reweighting.h
     ImageApron.h      cu_anaglyph.h         cu_lookup_warp.h      cu_sdffusion.h            sampling.h
-    ImageIntrinsics.h cu_bilateral.h        cu_manhatten.h        cu_segment_test.h         variational.h
+    ImageIntrinsics.h cu_bilateral.h        cu_manhattan.h        cu_segment_test.h         variational.h
     ImageKeyframe.h   cu_blur.h             cu_median.h           cu_semi_global_matching.h
     InvalidValue.h    cu_census.h           cu_model_refinement.h cu_tgv.h
     LeastSquareSum.h  cu_convert.h          cu_normals.h          disparity.h
@@ -29,7 +29,7 @@ list(APPEND SRC_CU
     cu_median.cu cu_normals.cu cu_depth_tools.cu cu_plane_fit.cu
     cu_resample.cu cu_heightmap.cu cu_blur.cu cu_operations.cu
     cu_census.cu cu_semi_global_matching.cu
-    cu_manhatten.cu cu_integral_image.cu
+    cu_manhattan.cu cu_integral_image.cu
     cu_convolution.cu cu_deconvolution.cu
     cu_rof_denoising.cu cu_tgv.cu
     cu_segment_test.cu
