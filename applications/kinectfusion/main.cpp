@@ -192,7 +192,7 @@ int main( int argc, char* argv[] )
             }
         }
 
-        if(Pushed(reset)) {
+        if(Pushed(reset) || !std::isfinite(rmse) ) {
             T_wl = Sophus::SE3d();
 
             vol.bbox = reset_bb;
