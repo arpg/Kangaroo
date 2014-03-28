@@ -38,7 +38,7 @@ struct Pyramid {
     Pyramid(const Pyramid<T,Levels,TargetFrom,ManagementFrom>& pyramid)
     {
         AssignmentCheck<Management,Target,TargetFrom>();
-        for(int l=0; l<Levels; ++l) {
+        for(unsigned int l=0; l<Levels; ++l) {
             imgs[l] = pyramid.imgs[l];
         }
     }
@@ -65,7 +65,7 @@ struct Pyramid {
     inline __host__
     void CopyFrom(const Pyramid<T,Levels,TargetFrom,ManagementFrom>& pyramid)
     {
-        for(int l=0; l<Levels; ++l) {
+        for(unsigned int l=0; l<Levels; ++l) {
             imgs[l].CopyFrom(pyramid.imgs[l]);
         }
     }

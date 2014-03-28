@@ -88,7 +88,7 @@ public:
     {
     }
 
-    virtual void Keyboard(View&, unsigned char key, int x, int y, bool pressed)
+    virtual void Keyboard(View&, unsigned char key, int /*x*/, int /*y*/, bool /*pressed*/)
     {
         if(key == 'r') {
             selected = false;
@@ -96,7 +96,7 @@ public:
         }
     }
 
-    virtual void Mouse(View& view, MouseButton button, int x, int y, bool pressed, int button_state)
+    virtual void Mouse(View& view, MouseButton button, int x, int y, bool pressed, int /*button_state*/)
     {
         if(button == MouseWheelUp) {
             pixel_scale *= 1.02;
@@ -108,7 +108,7 @@ public:
         }
     }
 
-    virtual void MouseMotion(View& view, int x, int y, int button_state)
+    virtual void MouseMotion(View& view, int x, int y, int /*button_state*/)
     {
         WindowToImage(view.v, x,y, topleft[0], topleft[1]);
         selected = true;

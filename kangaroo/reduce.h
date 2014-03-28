@@ -53,7 +53,7 @@ inline void BoxReduceIgnoreInvalid(Pyramid<T,Levels> pyramid)
     const int h = pyramid.imgs[0].h;
 
     // Downsample from pyramid.imgs[0]
-    for(int l=1; l<Levels && (w>>l > 0) && (h>>l > 0); ++l) {
+    for(unsigned int l=1; l<Levels && (w>>l > 0) && (h>>l > 0); ++l) {
         BoxHalfIgnoreInvalid<T,UpType,T>(pyramid.imgs[l], pyramid.imgs[l-1]);
     }
 }

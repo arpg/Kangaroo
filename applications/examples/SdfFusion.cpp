@@ -117,7 +117,7 @@ int main( int argc, char* argv[] )
             }
             CudaScopedMappedPtr dvbo(vbo);
             roo::Image<float4> vboimg((float4*)*dvbo,w,h);
-            roo::DepthToVbo(vboimg, gtd, K, 1.0f);
+            roo::DepthToVbo<float>(vboimg, gtd, K, 1.0f);
             roo::NormalsFromVbo(gtn,vboimg);
             glvbo.SetPose(T_cw.inverse().matrix());
         }

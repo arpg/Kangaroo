@@ -9,7 +9,7 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
     {
     }
 
-    void GetPosNormal(pangolin::View& view, int x, int y, double p[3], double Pw[3], double Pc[3], double n[3], double default_z)
+    void GetPosNormal(pangolin::View& view, int x, int y, double p[3], double Pw[3], double Pc[3], double /*n*/[3], double default_z)
     {
         const GLint viewport[4] = {view.v.l,view.v.b,view.v.w,view.v.h};
         const pangolin::OpenGlMatrix proj = cam_state->GetProjectionMatrix();
@@ -18,7 +18,7 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
         float z = 0;
         const int imx = depth.w * (float)(x-view.v.l) / (float)view.v.w;
         const int imy = depth.h * (float)(view.v.t()-y) / (float)view.v.h;
-        if( 0 <= imx && imx < depth.w && 0 <= imy && imy < depth.h) {
+        if( 0 <= imx && imx < (int)depth.w && 0 <= imy && imy < (int)depth.h) {
             depth.SubImage(imx, imy, 1,1).MemcpyToHost(&z);
         }
         

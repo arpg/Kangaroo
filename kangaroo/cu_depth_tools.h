@@ -16,18 +16,12 @@ void FilterBadKinectData(Image<float> dFiltered, Image<unsigned short> dKinectDe
 KANGAROO_EXPORT
 void FilterBadKinectData(Image<float> dFiltered, Image<float> dKinectDepth);
 
+template<typename T>
 KANGAROO_EXPORT
-void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, ImageIntrinsics K, float scale = 1.0f);
+void DepthToVbo( Image<float4> dVbo, const Image<T> dKinectDepth, ImageIntrinsics K, float scale = 1.0f);
 
-KANGAROO_EXPORT
-void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, ImageIntrinsics K, float scale = 1.0f);
-
-inline void DepthToVbo( Image<float4> dVbo, const Image<unsigned short> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f)
-{
-    DepthToVbo(dVbo, dKinectDepth, ImageIntrinsics(fu,fv,u0,v0), scale);
-}
-
-inline void DepthToVbo( Image<float4> dVbo, const Image<float> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f)
+template<typename T>
+inline void DepthToVbo( Image<float4> dVbo, const Image<T> dKinectDepth, float fu, float fv, float u0, float v0, float scale = 1.0f)
 {
     DepthToVbo(dVbo, dKinectDepth, ImageIntrinsics(fu,fv,u0,v0), scale);
 }

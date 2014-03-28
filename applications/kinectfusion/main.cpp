@@ -184,7 +184,7 @@ int main( int argc, char* argv[] )
 
                 roo::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);
                 for(int l=0; l<MaxLevels; ++l) {
-                    roo::DepthToVbo(kin_v[l], kin_d[l], K[l] );
+                    roo::DepthToVbo<float>(kin_v[l], kin_d[l], K[l] );
                     roo::NormalsFromVbo(kin_n[l], kin_v[l]);
                 }
     
@@ -257,7 +257,7 @@ int main( int argc, char* argv[] )
                         }else{
                             roo::RaycastSdf(ray_d[l], ray_n[l], ray_i[l], work_vol, T_wl.matrix3x4(), Kl, knear,kfar, trunc_dist, true );
                         }
-                        roo::DepthToVbo(ray_v[l], ray_d[l], Kl );
+                        roo::DepthToVbo<float>(ray_v[l], ray_d[l], Kl );
     //                    roo::DepthToVbo(ray_v[l], ray_d[l], Kl.fu, Kl.fv, Kl.u0, Kl.v0 );
     //                    roo::NormalsFromVbo(ray_n[l], ray_v[l]);
                     }
