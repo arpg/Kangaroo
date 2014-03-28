@@ -154,9 +154,7 @@ struct DontManage
     inline static __host__
     void AllocateCheck()
     {
-        std::cerr << "Image that doesn't own data should not call this constructor" << std::endl;
-        assert(0);
-        exit(-1);
+        throw CudaException("Image that doesn't own data should not call this constructor");
     }
 
     template<typename T, typename Target> inline static __device__ __host__
