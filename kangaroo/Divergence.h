@@ -11,7 +11,7 @@ namespace roo {
 inline __host__ __device__
 float ProjectUnitBall(float val, float maxrad = 1.0f)
 {
-    return val / fmaxf(1.0f, abs(val) / maxrad );
+    return val / fmaxf(1.0f, fabs(val) / maxrad );
 }
 
 inline __host__ __device__

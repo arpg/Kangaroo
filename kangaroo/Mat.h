@@ -65,7 +65,17 @@ struct Mat
         return C;
     }
 
-    inline __device__ __host__ void operator+=(const Mat<P,R,C>& rhs) {
+    template<typename P2>
+    inline __device__ __host__
+    void operator=(const Mat<P2,R,C>& rhs) {
+        #pragma unroll
+        for( size_t i=0; i<R*C; ++i )
+            m[i] = rhs.m[i];
+    }
+
+    template<typename P2>
+    inline __device__ __host__
+    void operator+=(const Mat<P2,R,C>& rhs) {
         #pragma unroll
         for( size_t i=0; i<R*C; ++i )
             m[i] += rhs.m[i];
@@ -343,7 +353,7 @@ inline __device__ __host__ Mat<P,R,C> operator/(const Mat<P,R,C>& lhs, const P r
 template<typename P, unsigned N>
 struct SymMat
 {
-    static const int unique = N*(N+1)/2;
+    static const unsigned int unique = N*(N+1)/2;
 
     template<typename PT>
     inline __device__ __host__ operator Mat<PT,N,N>()
@@ -401,18 +411,38 @@ struct SymMat
     }
 #endif // USE_TOON
 
-    inline __device__ __host__ void operator+=(const SymMat<P,N>& rhs)
+    template<typename P2>
+    inline __device__ __host__
+    void operator=(const SymMat<P2,N>& rhs)
+    {
+        #pragma unroll
+        for( size_t i=0; i<unique; ++i )
+            m[i] = rhs.m[i];
+    }
+
+    template<typename P2>
+    inline __device__ __host__
+    void operator+=(const SymMat<P2,N>& rhs)
     {
         #pragma unroll
         for( size_t i=0; i<unique; ++i )
             m[i] += rhs.m[i];
     }
 
-    inline __device__ __host__ void operator*=(const P w)
+    inline __device__ __host__
+    void operator*=(const P w)
     {
         #pragma unroll
         for( size_t i=0; i<unique; ++i )
             m[i] *= w;
+    }
+
+    template<typename P2>
+    inline __device__ __host__
+    void operator=(SymMat<P2,N>& o)
+    {
+        for( size_t i=0; i<unique; ++i)
+            m[i] = (P)o.m[i];
     }
 
     P m[unique];
@@ -425,6 +455,16 @@ inline __device__ __host__ SymMat<P,N> operator+(const SymMat<P,N>& lhs, const S
 #pragma unroll
     for( size_t i=0; i<SymMat<P,N>::unique; ++i )
         ret.m[i] = lhs.m[i] + rhs.m[i];
+    return ret;
+}
+
+template<typename P, unsigned N>
+inline __device__ __host__ SymMat<P,N> operator-(const SymMat<P,N>& lhs, const SymMat<P,N>& rhs)
+{
+    SymMat<P,N> ret;
+#pragma unroll
+    for( size_t i=0; i<SymMat<P,N>::unique; ++i )
+        ret.m[i] = lhs.m[i] - rhs.m[i];
     return ret;
 }
 
@@ -486,26 +526,48 @@ struct LeastSquaresSystem
   P sqErr;
   unsigned obs;
 
-  inline __device__ __host__ void SetZero() {
+  inline __device__ __host__
+  void SetZero() {
       JTJ.SetZero();
       JTy.SetZero();
       sqErr = 0;
       obs = 0;
   }
 
-  inline __device__ __host__ void operator+=(const LeastSquaresSystem<P,N>& rhs)
+  template<typename P2>
+  inline __device__ __host__
+  void operator+=(const LeastSquaresSystem<P2,N>& rhs)
   {
     JTy += rhs.JTy;
     JTJ += rhs.JTJ;
     sqErr += rhs.sqErr;
     obs += rhs.obs;
   }
+
+  template<typename P2>
+  inline __device__ __host__
+  void operator=(const LeastSquaresSystem<P2,N>& rhs)
+  {
+    JTy = rhs.JTy;
+    JTJ = rhs.JTJ;
+    sqErr = rhs.sqErr;
+    obs = rhs.obs;
+  }
 };
 
 template<typename P, unsigned N>
-inline __device__ __host__ LeastSquaresSystem<P,N> operator+(const LeastSquaresSystem<P,N>& lhs, const LeastSquaresSystem<P,N>& rhs)
+inline __device__ __host__
+LeastSquaresSystem<P,N> operator+(const LeastSquaresSystem<P,N>& lhs, const LeastSquaresSystem<P,N>& rhs)
 {
   const LeastSquaresSystem<P,N> ret = {lhs.JTy+rhs.JTy, lhs.JTJ+rhs.JTJ, lhs.sqErr + rhs.sqErr, lhs.obs + rhs.obs };
+  return ret;
+}
+
+template<typename P, unsigned N>
+inline __device__ __host__
+LeastSquaresSystem<P,N> operator-(const LeastSquaresSystem<P,N>& lhs, const LeastSquaresSystem<P,N>& rhs)
+{
+  const LeastSquaresSystem<P,N> ret = {lhs.JTy-rhs.JTy, lhs.JTJ-rhs.JTJ, lhs.sqErr-rhs.sqErr, lhs.obs-rhs.obs };
   return ret;
 }
 

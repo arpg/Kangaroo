@@ -41,7 +41,7 @@ __global__ void KernSemiGlobalMatching(Volume<TH> volH, Volume<TC> volC, Image<T
     {
         const Timg c = left(x,y);
         const float diff = last_c-c;
-        const float _P2 = P2 / (1.0f+abs(diff) );
+        const float _P2 = P2 / (1.0f+fabs(diff) );
         TH bestCr = MAX_ERROR;
         const int maxDisp = min(maxDispVal,x+1);
 #pragma unroll 128

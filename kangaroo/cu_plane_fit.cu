@@ -22,7 +22,7 @@ __global__ void KernPlaneFitGN(const Image<float4> dVbo, const Mat<float,3,3> Qi
 
         const float np_p1 = nhat[0] * P.x + nhat[1] * P.y + nhat[2] * P.z + 1;
         const float y = d * np_p1;
-        const float absy = abs(y);
+        const float absy = fabs(y);
         const float roc = y/c;
         const float omrocsq = (1-roc*roc);
         const float w = (absy <= c) ? omrocsq*omrocsq : 0;

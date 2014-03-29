@@ -421,14 +421,14 @@ struct Image {
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
-    const Image<T,Target,DontManage> SubImage(int x, int y, int width, int height) const
+    const Image<T,Target,DontManage> SubImage(size_t x, size_t y, size_t width, size_t height) const
     {
         assert( (x+width) <= w && (y+height) <= h);
         return Image<T,Target,DontManage>( RowPtr(y)+x, width, height, pitch);
     }
 
     inline __device__ __host__
-    Image<T,Target,DontManage> SubImage(int x, int y, int width, int height)
+    Image<T,Target,DontManage> SubImage(size_t x, size_t y, size_t width, size_t height)
     {
         assert( (x+width) <= w && (y+height) <= h);
         return Image<T,Target,DontManage>( RowPtr(y)+x, width, height, pitch);
@@ -461,7 +461,7 @@ struct Image {
     //! size w x h which uses this memory
     template<typename TP>
     inline __device__ __host__
-    Image<TP,Target,DontManage> PackedImage(int width, int height)
+    Image<TP,Target,DontManage> PackedImage(size_t width, size_t height)
     {
         assert(width*height*sizeof(TP) <= h*pitch );
         return Image<TP,Target,DontManage>((TP*)ptr, width, height, width*sizeof(TP) );
@@ -469,10 +469,10 @@ struct Image {
 
     template<typename TP>
     inline __device__ __host__
-    Image<TP,Target,DontManage> AlignedImage(int width, int height, int align_bytes=16)
+    Image<TP,Target,DontManage> AlignedImage(size_t width, size_t height, size_t align_bytes=16)
     {
-        const int wbytes = width*sizeof(TP);
-        const int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
+        const size_t wbytes = width*sizeof(TP);
+        const size_t npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
         assert(npitch*height <= h*pitch );
         return Image<TP,Target,DontManage>((TP*)ptr, width, height, npitch );
     }
@@ -482,14 +482,14 @@ struct Image {
     //! Only applicable for DontManage types
     template<typename TP>
     inline __device__ __host__
-    Image<TP,Target,DontManage> SplitAlignedImage(unsigned int nwidth, unsigned int nheight, unsigned int align_bytes=16)
+    Image<TP,Target,DontManage> SplitAlignedImage(size_t nwidth, size_t nheight, size_t align_bytes=16)
     {
         // Only let us split DontManage image types (so we can't orthan memory)
         AssignmentCheck<Management,Target,Target>();
 
         // Extract aligned image of type TP from start of this image
-        const unsigned int wbytes = nwidth*sizeof(TP);
-        const unsigned int npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
+        const size_t wbytes = nwidth*sizeof(TP);
+        const size_t npitch = (wbytes%align_bytes) == 0 ? wbytes : align_bytes*(1 + wbytes/align_bytes);
         TP* nptr = (TP*)ptr;
         assert(npitch*nheight <= h*pitch );
 
@@ -507,24 +507,42 @@ struct Image {
     //////////////////////////////////////////////////////
 
     inline __device__ __host__
-    T GetNearestNeighbour(const float2 p) const
+    T GetNearestNeighbour(const float2& p) const
+    {
+        return GetNearestNeighbour(p.x,p.y);
+    }
+
+    inline __device__ __host__
+    T GetNearestNeighbour(const double2& p) const
     {
         return GetNearestNeighbour(p.x,p.y);
     }
 
     template<typename TR>
     inline __device__ __host__
-    TR GetBilinear(const float2 p) const
+    TR GetBilinear(const float2& p) const
+    {
+        return GetBilinear<TR>(p.x, p.y);
+    }
+
+    template<typename TR>
+    inline __device__ __host__
+    TR GetBilinear(const double2& p) const
     {
         return GetBilinear<TR>(p.x, p.y);
     }
 
     inline  __device__ __host__
-    bool InBounds(const float2 p, float border) const
+    bool InBounds(const float2& p, float border) const
     {
         return InBounds(p.x, p.y, border);
     }
 
+    inline  __device__ __host__
+    bool InBounds(const double2& p, float border) const
+    {
+        return InBounds(p.x, p.y, border);
+    }
 
     //////////////////////////////////////////////////////
     // NVidia Performance Primitives convenience methods

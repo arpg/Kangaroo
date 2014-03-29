@@ -6,6 +6,7 @@
 #  include <math_constants.h>
 #else
 #  include <limits>
+#  include <cmath>
 #endif
 
 namespace roo
@@ -38,7 +39,11 @@ struct InvalidValue<float> {
     */
 
     inline __host__ __device__ static bool IsValid(float val) {
+#ifdef __CUDACC__
         return isfinite(val);
+#else
+        return std::isfinite(val);
+#endif
     }
 };
 

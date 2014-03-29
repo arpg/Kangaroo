@@ -494,25 +494,25 @@ float3 Plane_b_from_a(const Mat<float,3,4> T_ab, const float3 n_a)
 inline __device__ __host__
 float L1(float val)
 {
-    return abs(val);
+    return fabs(val);
 }
 
 inline __device__ __host__
 float L1(float2 val)
 {
-    return abs(val.x) + abs(val.y);
+    return fabs(val.x) + fabs(val.y);
 }
 
 inline __device__ __host__
 float L1(float3 val)
 {
-    return abs(val.x) + abs(val.y) + abs(val.z);
+    return fabs(val.x) + fabs(val.y) + fabs(val.z);
 }
 
 inline __device__ __host__
 float L1(float4 val)
 {
-    return abs(val.x) + abs(val.y) + abs(val.z) + abs(val.w);
+    return fabs(val.x) + fabs(val.y) + fabs(val.z) + fabs(val.w);
 }
 
 #ifdef USE_EIGEN

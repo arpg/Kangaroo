@@ -831,8 +831,8 @@ __global__ void KernCostVolumeFromStereoTruncatedAbsAndGrad(
 
     const int r = u + sd*d;
     if( 0 <= r && r < dimgr.w ) {
-        const float absI = abs( (float)dimgr(r,v) - (float)dimgl(u,v));
-        const float absGrad = abs( dimgr.template GetCentralDiffDx<float>(r,v) - dimgl.template GetCentralDiffDx<float>(u,v) );
+        const float absI = fabs( (float)dimgr(r,v) - (float)dimgl(u,v));
+        const float absGrad = fabs( dimgr.template GetCentralDiffDx<float>(r,v) - dimgl.template GetCentralDiffDx<float>(u,v) );
         const Tout cost = (1.0f-alpha)*min(absI,r1) + alpha*min(absGrad,r2);
         dvol(u,v,d) = cost;
     }else{

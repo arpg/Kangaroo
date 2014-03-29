@@ -81,7 +81,7 @@ void BuildPoseRefinementFromDepthmapSystem(
         lss.obs = 1;
         lss.sqErr = y*y;
 
-        const float debug = (abs(y) + 128) / 255.0f;
+        const float debug = (fabs(y) + 128) / 255.0f;
         dDebug(u,v) = make_float4(debug,0,w,1);
 //        dDebug(u,v) = make_float4(debug,debug,debug,1);
 //        dDebug(u,v) = make_float4(0.5 + dIl(0)/100.0,0.5 + dIl(1)/100.0, 0,1);
@@ -211,7 +211,7 @@ void BuildPoseRefinementFromDepthmapSystemESM(
                 lss.obs = 1;
                 lss.sqErr = y * y;
 
-                const float debug = ( abs(y) + 128 ) / 255.0f;
+                const float debug = ( fabs(y) + 128 ) / 255.0f;
                 dDebug(u,v) = make_float4(debug, 0, w, 1);
             }
         } else {
@@ -339,7 +339,7 @@ void BuildCalibrationRgbdFromDepthmapSystemESM(
                 lss.obs = 1;
                 lss.sqErr = y*y;
 
-                const float debug = (abs(y) + 128) / 255.0f;
+                const float debug = (fabs(y) + 128) / 255.0f;
                 dDebug(u,v) = make_float4(debug,0,w,1);
             }
         } else {
@@ -580,7 +580,7 @@ __global__ void KernPoseRefinementProjectiveIcpPointPlane(
             sum.obs = 1;
             sum.sqErr = y*y;
 
-            const float db = abs(y);
+            const float db = fabs(y);
             dDebug(u,v) = make_float4(db,db,db,1);
         }else{
             dDebug(u,v) = make_float4(0,0,1,1);
@@ -672,7 +672,7 @@ __global__ void KernKinectCalibration(
         sum.obs = 1;
         sum.sqErr = dot(y,y);
 
-        const float f = abs(y.x) + abs(y.y) + abs(y.z);
+        const float f = fabs(y.x) + fabs(y.y) + fabs(y.z);
         const float d = f/(3*255.0f);
 
         dDebug(u,v) = make_float4(d,d,d,1);
