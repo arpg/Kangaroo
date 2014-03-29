@@ -150,7 +150,7 @@ int main( int argc, char* argv[] )
                 .SetHandler(&rayhandler);
     container[1].SetDrawFunction(SceneGraph::ActivateDrawFunctor(glgraph, s_cam))
                 .SetHandler( new Handler3D(s_cam, AxisNone) );
-    container[2].SetDrawFunction(std::ref(adraycolor))
+    container[2].SetDrawFunction(std::ref(use_colour?adraycolor:adraynorm))
                 .SetHandler(&rayhandler);
     container[3].SetDrawFunction(std::ref(adnormals));
 
@@ -192,11 +192,14 @@ int main( int argc, char* argv[] )
             }
         }
 
+        const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
+
         if(Pushed(reset) || !std::isfinite(rmse) ) {
             T_wl = Sophus::SE3d();
 
             vol.bbox = reset_bb;
-            roo::SdfReset(vol);
+//            roo::SdfReset(vol, trunc_dist );
+            roo::SdfReset(vol, std::numeric_limits<float>::quiet_NaN() );
             keyframes.clear();
 
             colorVol.bbox = reset_bb;
@@ -210,8 +213,6 @@ int main( int argc, char* argv[] )
                 roo::SdfFuse(vol, kin_d[0], kin_n[0], T_wl.inverse().matrix3x4(), K, trunc_dist, max_w, mincostheta );
             }
         }
-
-        const float trunc_dist = trunc_dist_factor*length(vol.VoxelSizeUnits());
 
         if(viewonly) {
 

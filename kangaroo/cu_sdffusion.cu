@@ -141,24 +141,24 @@ void SdfFuse(
 // Reset SDF
 //////////////////////////////////////////////////////
 
-__global__ void KernSdfReset(BoundedVolume<SDF_t> vol)
+__global__ void KernSdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
 {
     const int x = blockIdx.x*blockDim.x + threadIdx.x;
     const int y = blockIdx.y*blockDim.y + threadIdx.y;
     const int z = blockIdx.z*blockDim.z + threadIdx.z;
 
-    vol(x,y,z) = SDF_t( InvalidValue<float>::Value(), 0);
+    vol(x,y,z) = SDF_t( trunc_dist, 0);
 }
 
-void SdfReset(BoundedVolume<SDF_t> vol, float /*trunc_dist*/)
+void SdfReset(BoundedVolume<SDF_t> vol, float trunc_dist)
 {
 #ifndef _MSC_VER
-    vol.Fill(SDF_t( InvalidValue<float>::Value(), 0));
+    vol.Fill(SDF_t( trunc_dist, 0));
 #else
     // On Windows, can't call thrust::fill with aligned struct...
     dim3 blockDim(8,8,8);
     dim3 gridDim(vol.w / blockDim.x, vol.h / blockDim.y, vol.d / blockDim.z);
-    KernSdfReset<<<gridDim,blockDim>>>(vol);
+    KernSdfReset<<<gridDim,blockDim>>>(vol,trunc_dist);
     GpuCheckErrors();
 #endif
 }
