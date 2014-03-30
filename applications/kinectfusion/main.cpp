@@ -144,7 +144,7 @@ int main( int argc, char* argv[] )
     ActivateDrawPyramid<float4,MaxLevels> adnormals( kin_n, GL_RGBA32F_ARB, false, true);
     ActivateDrawImage<float4> addebug( dDebug, GL_RGBA32F_ARB, false, true);
 
-    Handler3DGpuDepth rayhandler(ray_d[0], s_cam, AxisNone);
+    Handler3DDepth<float,roo::TargetDevice> rayhandler(ray_d[0], s_cam, AxisNone);
     SetupContainer(container, 4, (float)w/h);
     container[0].SetDrawFunction(std::ref(adrayimg))
                 .SetHandler(&rayhandler);

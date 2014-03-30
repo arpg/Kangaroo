@@ -59,7 +59,7 @@ int main( int argc, char* argv[] )
 
     ActivateDrawImage<float4> adrayimg(vis, GL_RGBA32F, true, true);
 
-    Handler3DGpuDepth rayhandler(ray_d, s_cam, AxisNone);
+    Handler3DDepth<float,roo::TargetDevice> rayhandler(ray_d, s_cam, AxisNone);
     SetupContainer(container, 2, (float)w/h);
     container[0].SetDrawFunction(std::ref(adrayimg))
                 .SetHandler(&rayhandler);

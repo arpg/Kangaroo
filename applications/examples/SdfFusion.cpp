@@ -60,7 +60,7 @@ int main( int argc, char* argv[] )
         ModelViewLookAtRDF(0,0,-4,0,0,1,0,-1,0)
     );
 
-    Handler3DGpuDepth handler(depth,stacks_view, AxisNone);
+    Handler3DDepth<float,roo::TargetDevice> handler(depth,stacks_view, AxisNone);
     SceneGraph::HandlerSceneGraph handlerView(graph, stacks_view, AxisNone);
     SceneGraph::HandlerSceneGraph handlerCapture(graph, stacks_capture, AxisNone);
     SetupContainer(container, 5, (float)w/h);

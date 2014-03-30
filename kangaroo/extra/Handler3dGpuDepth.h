@@ -2,9 +2,10 @@
 #include <pangolin/simple_math.h>
 #include <kangaroo/Image.h>
 
-struct Handler3DGpuDepth : public pangolin::Handler3D
+template<typename T, typename Target>
+struct Handler3DDepth : public pangolin::Handler3D
 {
-    Handler3DGpuDepth(roo::Image<float> depth, pangolin::OpenGlRenderState& cam_state, pangolin::AxisDirection enforce_up=pangolin::AxisNone, float trans_scale=0.01f)
+    Handler3DDepth(roo::Image<T,Target> depth, pangolin::OpenGlRenderState& cam_state, pangolin::AxisDirection enforce_up=pangolin::AxisNone, float trans_scale=0.01f)
         : pangolin::Handler3D(cam_state,enforce_up, trans_scale), depth(depth)
     {
     }
@@ -19,7 +20,9 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
         const int imx = depth.w * (float)(x-view.v.l) / (float)view.v.w;
         const int imy = depth.h * (float)(view.v.t()-y) / (float)view.v.h;
         if( 0 <= imx && imx < (int)depth.w && 0 <= imy && imy < (int)depth.h) {
-            depth.SubImage(imx, imy, 1,1).MemcpyToHost(&z);
+            T tz = 0;
+            depth.SubImage(imx, imy, 1,1).MemcpyToHost(&tz);
+            z = tz;
         }
         
 #    ifdef _MSVC_
@@ -35,5 +38,5 @@ struct Handler3DGpuDepth : public pangolin::Handler3D
     }
 
 protected:
-    roo::Image<float> depth;
+    roo::Image<T,Target> depth;
 };

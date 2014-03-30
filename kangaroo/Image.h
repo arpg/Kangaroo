@@ -182,7 +182,7 @@ struct Image {
     inline __host__
     void MemcpyFromHost(DT* hptr, size_t hpitch )
     {
-        const cudaError err = cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, cudaMemcpyHostToDevice );
+        const cudaError err = cudaMemcpy2D( (void*)ptr, pitch, hptr, hpitch, w*sizeof(T), h, TargetCopyKind<Target,TargetHost>() );
         if( err != cudaSuccess ) {
             throw CudaException("Unable to cudaMemcpy2D in MemcpyFromHost", err);
         }
@@ -199,7 +199,7 @@ struct Image {
     inline __host__
     void MemcpyToHost(DT* hptr, size_t hpitch )
     {
-        const cudaError err = cudaMemcpy2D( hptr, hpitch, (void*)ptr, pitch, w*sizeof(T), h, cudaMemcpyDeviceToHost );
+        const cudaError err = cudaMemcpy2D( hptr, hpitch, (void*)ptr, pitch, w*sizeof(T), h, TargetCopyKind<TargetHost,Target>() );
         if( err != cudaSuccess ) {
             throw CudaException("Unable to cudaMemcpy2D in MemcpyToHost", err);
         }
