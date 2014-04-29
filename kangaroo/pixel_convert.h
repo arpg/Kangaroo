@@ -51,6 +51,52 @@ uchar4 ConvertPixel(uchar3 p)
 
 template<>
 __host__ __device__ inline
+uchar3 ConvertPixel(uint3 p)
+{
+    return make_uchar3(
+        (unsigned char)(p.x),
+        (unsigned char)(p.y),
+        (unsigned char)(p.z)
+        );
+}
+
+template<>
+__host__ __device__ inline
+uint3 ConvertPixel(uchar3 p)
+{
+    return make_uint3(
+        (unsigned int)(p.x),
+        (unsigned int)(p.y),
+        (unsigned int)(p.z)
+        );
+}
+
+template<>
+__host__ __device__ inline
+uchar4 ConvertPixel(uint4 p)
+{
+    return make_uchar4(
+        (unsigned char)(p.x),
+        (unsigned char)(p.y),
+        (unsigned char)(p.z),
+        (unsigned char)(p.w)
+        );
+}
+
+template<>
+__host__ __device__ inline
+uint4 ConvertPixel(uchar4 p)
+{
+    return make_uint4(
+        (unsigned int)(p.x),
+        (unsigned int)(p.y),
+        (unsigned int)(p.z),
+        (unsigned int)(p.w)
+        );
+}
+
+template<>
+__host__ __device__ inline
 uchar4 ConvertPixel(float4 p)
 {
     return make_uchar4(

@@ -3,6 +3,9 @@
 #include "launch_utils.h"
 #include "sampling.h"
 #include "InvalidValue.h"
+#include "pixel_convert.h"
+
+#include "CUDA_SDK/cutil_math.h"
 
 namespace roo
 {
@@ -56,7 +59,12 @@ __global__ void KernBoxHalf( Image<To> out, const Image<Ti> in )
     const Ti* tl = &in(2*x,2*y);
     const Ti* bl = &in(2*x,2*y+1);
 
-    out(x,y) = (To)((UpType)(*tl + *(tl+1) + *bl + *(bl+1)) / 4.0f);
+    out(x,y) = ConvertPixel<To>( (
+        ConvertPixel<UpType>(*tl) +
+        ConvertPixel<UpType>(*(tl+1)) +
+        ConvertPixel<UpType>(*bl) +
+        ConvertPixel<UpType>(*(bl+1))
+    ) / 4.0f);
 }
 
 template<typename To, typename UpType, typename Ti>
@@ -71,6 +79,8 @@ void BoxHalf( Image<To> out, const Image<Ti> in)
 // Instantiate
 template void BoxHalf<unsigned char,unsigned int,unsigned char>(Image<unsigned char>, const Image<unsigned char>);
 template void BoxHalf<float,float,float>(Image<float>, const Image<float>);
+template void BoxHalf<uchar3,uint3,uchar3>(Image<uchar3>, const Image<uchar3>);
+template void BoxHalf<uchar4,uint4,uchar4>(Image<uchar4>, const Image<uchar4>);
 
 //////////////////////////////////////////////////////
 // Downsampling (Ignore invalid)

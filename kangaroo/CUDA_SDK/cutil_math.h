@@ -764,4 +764,97 @@ inline __device__ __host__ uint3 clamp(uint3 v, uint3 a, uint3 b)
     return make_uint3(clamp(v.x, a.x, b.x), clamp(v.y, a.y, b.y), clamp(v.z, a.z, b.z));
 }
 
+// uint4 functions
+////////////////////////////////////////////////////////////////////////////////
+
+// additional constructors
+inline __host__ __device__ uint4 make_uint4(uint s)
+{
+    return make_uint4(s, s, s, s);
+}
+inline __host__ __device__ uint4 make_uint4(float4 a)
+{
+    return make_uint4(uint(a.x), uint(a.y), uint(a.z), uint(a.w));
+}
+
+// min
+inline __host__ __device__ uint4 min(uint4 a, uint4 b)
+{
+    return make_uint4(min(a.x,b.x), min(a.y,b.y), min(a.z,b.z), min(a.w,b.w));
+}
+
+// max
+inline __host__ __device__ uint4 max(uint4 a, uint4 b)
+{
+    return make_uint4(max(a.x,b.x), max(a.y,b.y), max(a.z,b.z), max(a.w,b.w));
+}
+
+// addition
+inline __host__ __device__ uint4 operator+(uint4 a, uint4 b)
+{
+    return make_uint4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+}
+inline __host__ __device__ void operator+=(uint4 &a, uint4 b)
+{
+    a.x += b.x; a.y += b.y; a.z += b.z; a.w += b.w;
+}
+
+// subtract
+inline __host__ __device__ uint4 operator-(uint4 a, uint4 b)
+{
+    return make_uint4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+}
+
+inline __host__ __device__ void operator-=(uint4 &a, uint4 b)
+{
+    a.x -= b.x; a.y -= b.y; a.z -= b.z; a.w -= b.w;
+}
+
+// multiply
+inline __host__ __device__ uint4 operator*(uint4 a, uint4 b)
+{
+    return make_uint4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+}
+inline __host__ __device__ uint4 operator*(uint4 a, uint s)
+{
+    return make_uint4(a.x * s, a.y * s, a.z * s, a.w * s);
+}
+inline __host__ __device__ uint4 operator*(uint s, uint4 a)
+{
+    return make_uint4(a.x * s, a.y * s, a.z * s, a.w * s);
+}
+inline __host__ __device__ void operator*=(uint4 &a, uint s)
+{
+    a.x *= s; a.y *= s; a.z *= s; a.w *= s;
+}
+
+// divide
+inline __host__ __device__ uint4 operator/(uint4 a, uint4 b)
+{
+    return make_uint4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
+}
+inline __host__ __device__ uint4 operator/(uint4 a, uint s)
+{
+    return make_uint4(a.x / s, a.y / s, a.z / s, a.w / s);
+}
+inline __host__ __device__ uint4 operator/(uint s, uint4 a)
+{
+    return make_uint4(a.x / s, a.y / s, a.z / s, a.w / s);
+}
+inline __host__ __device__ void operator/=(uint4 &a, uint s)
+{
+    a.x /= s; a.y /= s; a.z /= s; a.w /= s;
+}
+
+inline __device__ __host__ uint4 clamp(uint4 v, uint a, uint b)
+{
+    return make_uint4(clamp(v.x, a, b), clamp(v.y, a, b), clamp(v.z, a, b), clamp(v.w, a, b));
+}
+
+inline __device__ __host__ uint4 clamp(uint4 v, uint4 a, uint4 b)
+{
+    return make_uint4(clamp(v.x, a.x, b.x), clamp(v.y, a.y, b.y), clamp(v.z, a.z, b.z), clamp(v.w, a.w, b.w));
+}
+
+
 #endif
