@@ -23,11 +23,6 @@ list(APPEND SRC_H
     MarchingCubes.h   cu_convolution.h      cu_operations.h       hamming_distance.h
 )
 
-list(APPEND SRC_CUDA_SDK_H
-    CUDA_SDK/cutil_math.h
-    CUDA_SDK/sharedmem.h
-)
-
 list(APPEND SRC_CU
     cu_anaglyph.cu cu_bilateral.cu cu_convert.cu cu_index_buffer.cu
     cu_model_refinement.cu cu_dense_stereo.cu cu_lookup_warp.cu
@@ -162,8 +157,11 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 install(FILES ${SRC_H}
   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
 )
-install(FILES ${SRC_CUDA_SDK_H}
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}/CUDA_SDK
+install(DIRECTORY extra
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
+)
+install(DIRECTORY CUDA_SDK
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
 )
 install(TARGETS ${LIBRARY_NAME}
   EXPORT "${PROJECT_NAME}Targets"
