@@ -17,8 +17,8 @@ list(APPEND SRC_H
     Image.h           Volume.h              cu_integral_image.h   cu_rof_denoising.h        reweighting.h
     ImageApron.h      cu_anaglyph.h         cu_lookup_warp.h      cu_sdffusion.h            sampling.h
     ImageIntrinsics.h cu_bilateral.h        cu_manhattan.h        cu_segment_test.h         variational.h
-    ImageKeyframe.h   cu_blur.h             cu_median.h           cu_semi_global_matching.h
-    InvalidValue.h    cu_census.h           cu_model_refinement.h cu_tgv.h
+    ImageKeyframe.h   cu_blur.h             cu_median.h           cu_semi_global_matching.h Memory.h
+    InvalidValue.h    cu_census.h           cu_model_refinement.h cu_tgv.h                  platform.h
     LeastSquareSum.h  cu_convert.h          cu_normals.h          disparity.h
     MarchingCubes.h   cu_convolution.h      cu_operations.h       hamming_distance.h
 )
@@ -155,6 +155,12 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h"
   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
 )
 install(FILES ${SRC_H}
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
+)
+install(DIRECTORY extra
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
+)
+install(DIRECTORY CUDA_SDK
   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${PROJECT_NAME}
 )
 install(TARGETS ${LIBRARY_NAME}
