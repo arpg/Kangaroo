@@ -237,7 +237,7 @@ int main( int argc, char* argv[] )
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
     pangolin::RegisterKeyPressCallback('l', [&lockToCam](){lockToCam = !lockToCam;} );
-    pangolin::RegisterKeyPressCallback(pangolin::PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback(pangolin::PANGO_SPECIAL + pangolin::PANGO_KEY_RIGHT, [&step](){step=true;} );
     pangolin::RegisterKeyPressCallback(']', [&jump_frames](){jump_frames=100;} );
     pangolin::RegisterKeyPressCallback('}', [&jump_frames](){jump_frames=1000;} );
 

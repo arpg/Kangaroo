@@ -50,7 +50,7 @@ int main( int argc, char* argv[] )
     Var<bool> do_fast("ui.do fast", false, true);
 
     pangolin::RegisterKeyPressCallback(' ', [&run](){run = !run;} );
-    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + GLUT_KEY_RIGHT, [&step](){step=true;} );
+    pangolin::RegisterKeyPressCallback(PANGO_SPECIAL + pangolin::PANGO_KEY_RIGHT, [&step](){step=true;} );
 
     for(unsigned long frame=0; !pangolin::ShouldQuit(); ++frame)
     {

@@ -100,6 +100,10 @@ CONFIGURE_FILE(
 )
 
 ################################################################################
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang") 
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++") 
+endif() 
+
 # Include collected includes / libraries
 include_directories( ${USER_INC} )
 include_directories( ${LIB_INC_DIR} )
