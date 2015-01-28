@@ -35,7 +35,6 @@ list(APPEND SRC_CU
     cu_segment_test.cu
     cu_painting.cu cu_remap.cu
     cu_raycast.cu cu_sdffusion.cu
-    MarchingCubes.cu
 )
 
 ################################################################################
