@@ -386,7 +386,8 @@ int main( int argc, char* argv[] )
 
                 // save depth image
                 char            Index[10];
-                sprintf( Index, "%05d", frame );
+                int frame_int = frame;
+                sprintf( Index, "%05d", frame_int );
                 std::string DepthPrefix = "SDepth-";
                 std::string DepthFile;
                 DepthFile = DepthPrefix + Index + ".pdm";

@@ -2,7 +2,10 @@
 
 #include <kangaroo/Image.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++11-narrowing"
 #include <boost/gil/gil_all.hpp>
+#pragma clang diagnostic pop
 
 // TODO Test for PNG precence
 #define HAVE_PNG
@@ -16,7 +19,7 @@
 void SaveGIL(const std::string filename, const roo::Image<uchar3,roo::TargetHost>& image)
 {
     boost::gil::rgb8_view_t v = boost::gil::interleaved_view(image.w, image.h, reinterpret_cast<boost::gil::rgb8_ptr_t>(image.ptr), image.pitch);
-    
+
 #ifdef HAVE_PNG
     boost::gil::png_write_view(filename, v );
 #else

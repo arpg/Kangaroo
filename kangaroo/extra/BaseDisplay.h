@@ -44,7 +44,16 @@ inline void SetupContainer(pangolin::View& container, int num_views, float aspec
         container.AddDisplay(v);
     }
 
-    pangolin::RegisterKeyPressCallback('~', [&container](){static bool showpanel=true; showpanel = !showpanel; if(showpanel) { container.SetBounds(0,1,pangolin::Attach::Pix(180), 1); }else{ container.SetBounds(0,1,0, 1); } pangolin::Display("ui").Show(showpanel); } );
+    pangolin::RegisterKeyPressCallback('~', [&container]() {
+      static bool showpanel=true;
+      showpanel = !showpanel;
+      if(showpanel) {
+        container.SetBounds(0,1,pangolin::Attach::Pix(180), 1);
+      } else {
+        container.SetBounds(0,1,0, 1);
+      }
+      pangolin::Display("ui").Show(showpanel);
+    } );
 
     const int keys = 10;
     const char keyShowHide[] = {'1','2','3','4','5','6','7','8','9','0'};
