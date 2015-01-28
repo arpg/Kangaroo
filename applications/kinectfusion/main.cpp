@@ -11,6 +11,7 @@
 #include <kangaroo/BoundedVolume.h>
 #include <kangaroo/MarchingCubes.h>
 #include <kangaroo/extra/BaseDisplayCuda.h>
+#include <kangaroo/extra/BaselineFromCamModel.h>
 #include <kangaroo/extra/DisplayUtils.h>
 #include <kangaroo/extra/ImageSelect.h>
 #include <kangaroo/extra/Handler3dGpuDepth.h>
@@ -29,7 +30,7 @@ bool isFinite(const T& x)
   return x==x;
 }
 
-int main( int argc, char* argv[] )
+int main(int argc, char* argv[])
 {
   // Initialise window
   pangolin::View& container = SetupPangoGLWithCuda(1024, 768);
@@ -50,10 +51,33 @@ int main( int argc, char* argv[] )
   const int MaxLevels = 4;
   const int its[] = {1,0,2,3};
 
-  // Xtrion
-  const double baseline_m = 0.08; //camera.GetDeviceProperty(<double>("Depth0Baseline", 0) / 100;
-  const double depth_focal = w * 570.342/640.0; //camera.GetProperty<double>("Depth0FocalLength", 570.342);
-  const roo::ImageIntrinsics K(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );
+  // Load Camera intrinsics from file
+  roo::ImageIntrinsics K;
+  double baseline_m = 0.08; // Default.
+
+  GetPot clArgs(argc, argv);
+  const std::string filename = clArgs.follow("","-cmod");
+  if (filename.empty()) {
+
+    std::cout << "No camera model provided. Using generic camera model based on image dimensions." << std::endl;
+    const double depth_focal = w * 570.342/640.0;;
+    K = roo::ImageIntrinsics(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );
+  } else {
+    const calibu::CameraRig rig = calibu::ReadXmlRig(filename);
+    Eigen::Matrix3f cam_model = rig.cameras[0].camera.K().cast<float>();
+    K = roo::ImageIntrinsics(cam_model(0,0), cam_model(1,1), cam_model(0,2), cam_model(1,2));
+
+    if (use_colour) {
+      // Estimate baseline.
+      Eigen::Matrix3d RDFvision;
+      RDFvision << 1,0,0,  0,1,0,  0,0,1;
+      const Sophus::SE3d T_rl = T_rlFromCamModelRDF(rig.cameras[0], rig.cameras[1], RDFvision);
+
+      baseline_m = T_rl.translation().norm();
+    }
+  }
+
+  // Near and far planes for bounding box.
   const double knear = 0.4;
   const double kfar = 4;
 
@@ -174,12 +198,10 @@ int main( int argc, char* argv[] )
     }
 
     if(go) {
-      if(video.Capture(*images))
-      {
-//        dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)images->at(0)->data(), images->at(0)->Width(), images->at(0)->Height(), images->at(0)->Width() ));
+      if(video.Capture(*images)) {
         dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)images->at(0)->data(), images->at(0)->Width(), images->at(0)->Height()));
         if(use_colour) {
-//          drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)imgs[1].ptr, imgs[1].w, imgs[1].h, imgs[1].pitch ));
+          drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)images->at(1)->data(), images->at(1)->Width(), images->at(1)->Height() ));
         }
         roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
         roo::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
