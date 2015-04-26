@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
   hal::Camera video = OpenRpgCamera(argc,argv);
 
   // Capture first image
-  std::shared_ptr<pb::ImageArray> images = pb::ImageArray::Create();
+  std::shared_ptr<hal::ImageArray> images = hal::ImageArray::Create();
 
   // Open video device
   const bool use_colour = video.NumChannels() == 2;
@@ -63,15 +63,15 @@ int main(int argc, char* argv[])
     const double depth_focal = w * 570.342/640.0;;
     K = roo::ImageIntrinsics(depth_focal,depth_focal, w/2.0 - 0.5, h/2.0 - 0.5 );
   } else {
-    const calibu::CameraRig rig = calibu::ReadXmlRig(filename);
-    Eigen::Matrix3f cam_model = rig.cameras[0].camera.K().cast<float>();
+    std::shared_ptr<calibu::Rig<double>> rig = calibu::ReadXmlRig(filename);
+    Eigen::Matrix3f cam_model = rig->cameras_[0]->K().cast<float>();
     K = roo::ImageIntrinsics(cam_model(0,0), cam_model(1,1), cam_model(0,2), cam_model(1,2));
 
     if (use_colour) {
       // Estimate baseline.
       Eigen::Matrix3d RDFvision;
       RDFvision << 1,0,0,  0,1,0,  0,0,1;
-      const Sophus::SE3d T_rl = T_rlFromCamModelRDF(rig.cameras[0], rig.cameras[1], RDFvision);
+      const Sophus::SE3d T_rl = T_rlFromCamModelRDF(rig->cameras_[0], rig->cameras_[1], RDFvision);
 
       baseline_m = T_rl.translation().norm();
     }
@@ -183,9 +183,9 @@ int main(int argc, char* argv[])
 
   pangolin::RegisterKeyPressCallback(' ', [&reset,&viewonly]() { reset = true; viewonly=false;} );
   pangolin::RegisterKeyPressCallback('l', [&vol,&viewonly]() {LoadPXM("save.vol", vol); viewonly = true;} );
-  //    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
-  //    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {roo::SaveMesh("mesh",vol,colorVol); } );
-  pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); } );
+//    pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol,&keyframes,&rgb_fl,w,h]() {SavePXM("save.vol", vol); SaveMeshlab(vol,keyframes,rgb_fl,rgb_fl,w/2,h/2); } );
+  pangolin::RegisterKeyPressCallback('s', [&vol,&colorVol]() {roo::SaveMesh("mesh",vol,colorVol); } );
+//  pangolin::RegisterKeyPressCallback('s', [&vol]() {SavePXM("save.vol", vol); } );
 
   for(long frame=-1; !pangolin::ShouldQuit();)
   {
@@ -199,11 +199,13 @@ int main(int argc, char* argv[])
 
     if(go) {
       if(video.Capture(*images)) {
-        dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)images->at(0)->data(), images->at(0)->Width(), images->at(0)->Height()));
+//        dKinect.CopyFrom(roo::Image<unsigned short, roo::TargetHost>((unsigned short*)images->at(0)->data(), images->at(0)->Width(), images->at(0)->Height()));
+        dKinectMeters.CopyFrom(roo::Image<float, roo::TargetHost>((float*)images->at(0)->data(), images->at(0)->Width(), images->at(0)->Height()));
         if(use_colour) {
           drgb.CopyFrom(roo::Image<uchar3, roo::TargetHost>((uchar3*)images->at(1)->data(), images->at(1)->Width(), images->at(1)->Height() ));
         }
-        roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
+//        roo::ElementwiseScaleBias<float,unsigned short,float>(dKinectMeters, dKinect, 1.0f/1000.0f);
+        roo::ElementwiseScaleBias<float,float,float>(dKinectMeters, dKinectMeters, 1.0f/1000.0f);
         roo::BilateralFilter<float,float>(kin_d[0],dKinectMeters,bigs,bigr,biwin,0.2);
 
         roo::BoxReduceIgnoreInvalid<float,MaxLevels,float>(kin_d);

@@ -35,7 +35,7 @@ int main( int argc, char* argv[] )
   hal::Camera video = OpenRpgCamera(argc,argv);
 
   // Capture first image
-  std::shared_ptr<pb::ImageArray> images = pb::ImageArray::Create();
+  std::shared_ptr<hal::ImageArray> images = hal::ImageArray::Create();
 
   // N cameras, each w*h in dimension, greyscale
   const size_t N = video.NumChannels();
@@ -66,15 +66,15 @@ int main( int argc, char* argv[] )
     std::cerr << "Camera models file is required!" << std::endl;
     exit(1);
   }
-  const calibu::CameraRig rig = calibu::ReadXmlRig(filename);
+  std::shared_ptr<calibu::Rig<double>> rig = calibu::ReadXmlRig(filename);
 
-  if( rig.cameras.size() != 2 ) {
+  if( rig->NumCams() != 2 ) {
     std::cerr << "Two camera models are required to run this program!" << std::endl;
     exit(1);
   }
 
-  Eigen::Matrix3f CamModel0 = rig.cameras[0].camera.K().cast<float>();
-  Eigen::Matrix3f CamModel1 = rig.cameras[1].camera.K().cast<float>();
+  Eigen::Matrix3f CamModel0 = rig->cameras_[0]->K().cast<float>();
+  Eigen::Matrix3f CamModel1 = rig->cameras_[1]->K().cast<float>();
 
   roo::ImageIntrinsics camMod[] = {
     {CamModel0(0,0),CamModel0(1,1),CamModel0(0,2),CamModel0(1,2)},
@@ -83,7 +83,7 @@ int main( int argc, char* argv[] )
 
   for(int i=0; i<2; ++i ) {
     // Adjust to match camera image dimensions
-    const double scale = nw / rig.cameras[i].camera.Width();
+    const double scale = nw / rig->cameras_[i]->Width();
     roo::ImageIntrinsics camModel = camMod[i].Scale( scale );
 
     // Adjust to match cropped aligned image
@@ -118,7 +118,8 @@ int main( int argc, char* argv[] )
   Eigen::Matrix4d T_ro_vis = Eigen::Matrix4d::Identity();
   T_ro_vis.block<3,3>(0,0) = RDFrobot.transpose() * RDFvision;
 
-  const Sophus::SE3d T_rl_orig = T_rlFromCamModelRDF(rig.cameras[0], rig.cameras[1], RDFvision);
+  const Sophus::SE3d T_rl_orig = T_rlFromCamModelRDF(rig->cameras_[0],
+                                  rig->cameras_[1], RDFvision);
 
   // TODO(jmf): For now, assume cameras are rectified. Later allow unrectified cameras.
   /*

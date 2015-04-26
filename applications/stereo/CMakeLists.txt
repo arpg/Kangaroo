@@ -21,7 +21,6 @@ find_package(Calibu 0.1 QUIET)
 
 # git clone git://github.com/arpg/HAL
 find_package(HAL 0.1 QUIET)
-find_package(PbMsgs 0.1 QUIET)
 
 if(Pangolin_FOUND AND Sophus_FOUND AND SceneGraph_FOUND AND Calibu_FOUND AND HAL_FOUND )
     include_directories(${Pangolin_INCLUDE_DIRS})
@@ -37,9 +36,6 @@ if(Pangolin_FOUND AND Sophus_FOUND AND SceneGraph_FOUND AND Calibu_FOUND AND HAL
 
     include_directories(${HAL_INCLUDE_DIRS})
     link_libraries(${HAL_LIBRARIES})
-
-    include_directories(${PbMsgs_INCLUDE_DIRS})
-    link_libraries(${PbMsgs_LIBRARIES})
 
     add_executable(SimpleStereo main.cpp)
 endif()
