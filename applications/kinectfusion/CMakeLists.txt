@@ -4,7 +4,8 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -g")
 
 find_package(Kangaroo 0.1 REQUIRED)
-include_directories(${Kangaroo_INCLUDE_DIRS})
+
+include_directories(${Kangaroo_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR})
 link_libraries(${Kangaroo_LIBRARIES})
 
 # git clone git://github.com/arpg/Pangolin.git
