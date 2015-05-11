@@ -58,7 +58,7 @@ void vMarchCube(
     float afCubeValue[8];
     for(int iVertex = 0; iVertex < 8; iVertex++) {
         afCubeValue[iVertex] = vol.Get(x+a2fVertexOffset[iVertex][0],y+a2fVertexOffset[iVertex][1],z+a2fVertexOffset[iVertex][2]);
-#ifdef _MSVC_
+#if defined _MSVC_ || defined __GNUC__
         if(!std::isfinite(afCubeValue[iVertex])) return;
 #else
         if(!isfinite(afCubeValue[iVertex])) return;
@@ -102,7 +102,7 @@ void vMarchCube(
             const float3 deriv = vol.GetUnitsBackwardDiffDxDyDz( asEdgeVertex[iEdge] );
             asEdgeNorm[iEdge] = deriv / length(deriv);
 
-#ifdef _MSVC_
+#if defined _MSVC_ || defined __GNUC__
             if( !std::isfinite(asEdgeNorm[iEdge].x) || !std::isfinite(asEdgeNorm[iEdge].y) || !std::isfinite(asEdgeNorm[iEdge].z) ) {
 #else
             if( !isfinite(asEdgeNorm[iEdge].x) || !isfinite(asEdgeNorm[iEdge].y) || !isfinite(asEdgeNorm[iEdge].z) ) {
