@@ -33,7 +33,7 @@ if(Pangolin_FOUND)
     find_package(SceneGraph 0.1 QUIET)
     
     if(Sophus_FOUND AND SceneGraph_FOUND)
-        include_directories(${Sophus_INCLUDE_DIR})
+        include_directories(${Sophus_INCLUDE_DIRS})
         link_libraries(${Sophus_LIBRARIES})
         
         include_directories(${SceneGraph_INCLUDE_DIRS})
