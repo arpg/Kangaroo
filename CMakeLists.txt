@@ -153,7 +153,7 @@ if(NOT CUDA_npp_LIBRARY)
         set(CUDA_npp_LIBRARY "${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpps.so;${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnppi.so;${CUDA_TOOLKIT_ROOT_DIR}/lib64/libnpps.so")
     endif()
 endif()
-list(APPEND LINK_LIBS ${CUDA_npp_LIBRARY} )
+list(APPEND LINK_LIBS ${CUDA_npp_LIBRARY} ${CUDA_LIBRARIES} )
 
 find_package( Eigen3 QUIET )
 if(EIGEN3_FOUND)
