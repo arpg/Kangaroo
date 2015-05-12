@@ -1,5 +1,7 @@
 cmake_minimum_required( VERSION 2.8 )
 project( Kangaroo )
+set( LIBRARY_NAME kangaroo )
+
 set(KANGAROO_VERSION_MAJOR 0)
 set(KANGAROO_VERSION_MINOR 1)
 
@@ -178,7 +180,7 @@ endif()
 
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/include/kangaroo/config.h.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/include/kangaroo/config.h"
 )
 
 ################################################################################
@@ -189,8 +191,9 @@ endif()
 # Include collected includes / libraries
 include_directories( ${USER_INC} )
 include_directories( ${LIB_INC_DIR} )
-include_directories( ${CMAKE_CURRENT_BINARY_DIR} )
+include_directories( ${CMAKE_CURRENT_BINARY_DIR}/include )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/include )
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/include/kangaroo )
 include_directories( ${INTERNAL_INC} )
 cuda_add_library( ${LIBRARY_NAME} ${SRC_H} ${SRC_CU} )
 target_link_libraries(${LIBRARY_NAME} ${LINK_LIBS})
@@ -217,8 +220,8 @@ endif()
 ## Install it all.
 
 install_package(
-    PKG_NAME Kangaroo
-    LIB_NAME kangaroo
+    PKG_NAME ${PROJECT_NAME}
+    LIB_NAME ${LIBRARY_NAME}
     VERSION ${VERSION}
     DESCRIPTION "CUDA helper library for vision."
     INSTALL_INCLUDE_DIR true
@@ -228,10 +231,10 @@ install_package(
     LINK_LIBS ${LINK_LIBS}
     )
 
-set( KANGAROO_DIR ${CMAKE_CURRENT_BINARY_DIR} )
-set( KANGAROO_LIBRARIES ${REQUIRED_LIBRARIES} pangolin )
-set( KANGAROO_INCLUDE_DIRS ${REQUIRED_INCLUDE_DIRS} )
-link_libraries( ${REQUIRED_LIBRARIES} pangolin )
+#set( KANGAROO_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+#set( KANGAROO_LIBRARIES ${REQUIRED_LIBRARIES} kangaroo )
+#set( KANGAROO_INCLUDE_DIRS ${REQUIRED_INCLUDE_DIRS} )
+link_libraries( ${REQUIRED_LIBRARIES} kangaroo )
 
 if(BUILD_APPLICATIONS)
   add_subdirectory(applications)
