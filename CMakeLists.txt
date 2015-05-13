@@ -185,7 +185,7 @@ CONFIGURE_FILE(
 
 ################################################################################
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch i386 -arch x86_64 -lc++")
 endif()
 
 # Include collected includes / libraries
