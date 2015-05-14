@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMakeModules/")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake_modules/")
 
 if( NOT MSVC )
     set( CMAKE_CXX_FLAGS "-std=c++0x -Wall ${CMAKE_CXX_FLAGS}" )
@@ -8,7 +8,6 @@ if( NOT MSVC )
     endif()
 endif()
 
-find_package( Kangaroo 0.1 REQUIRED)
 include_directories( ${Kangaroo_INCLUDE_DIRS} )
 link_libraries(${Kangaroo_LIBRARIES})
 
@@ -17,7 +16,7 @@ find_package(Pangolin 0.1 QUIET)
 if(Pangolin_FOUND)
     include_directories(${Pangolin_INCLUDE_DIRS})
     link_libraries(${Pangolin_LIBRARIES})
-        
+
     add_executable( Anaglyph Anaglyph.cpp)
     add_executable( BilateralFilter BilateralFilter.cpp)
     add_executable( GuidedFilter GuidedFilter.cpp)
@@ -31,14 +30,14 @@ if(Pangolin_FOUND)
 
     # git clone http://robotics.gwu.edu/git/SceneGraph
     find_package(SceneGraph 0.1 QUIET)
-    
+
     if(Sophus_FOUND AND SceneGraph_FOUND)
         include_directories(${Sophus_INCLUDE_DIRS})
         link_libraries(${Sophus_LIBRARIES})
-        
+
         include_directories(${SceneGraph_INCLUDE_DIRS})
         link_libraries(${SceneGraph_LIBRARIES})
-    
+
         add_executable( Raycast Raycast.cpp)
         add_executable( SdfFusion SdfFusion.cpp)
         add_executable( SdfDifference SdfDifference.cpp)
