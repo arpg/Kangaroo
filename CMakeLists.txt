@@ -129,7 +129,7 @@ list(APPEND SRC_CU
 # Find required dependencies
 
 # Find CUDA toolkit. Thrust and NPP are bundled with CUDA toolkit.
-find_package(CUDA REQUIRED)
+find_package(CUDA 7.0 REQUIRED)
 list( APPEND USER_INC ${CUDA_INCLUDE_DIRS} )
 set(HAVE_THRUST 1)
 set(HAVE_NPP 1)
@@ -184,10 +184,6 @@ CONFIGURE_FILE(
 )
 
 ################################################################################
-if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch i386 -arch x86_64 -lc++")
-endif()
-
 # Include collected includes / libraries
 include_directories( ${USER_INC} )
 include_directories( ${LIB_INC_DIR} )
