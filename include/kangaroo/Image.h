@@ -532,6 +532,18 @@ struct Image {
         return GetBilinear<TR>(p.x, p.y);
     }
 
+    inline __device__ __host__
+    T GetBilinear(const float2& p) const
+    {
+        return GetBilinear<T>(p.x, p.y);
+    }
+
+    inline __device__ __host__
+    T GetBilinear(const double2& p) const
+    {
+        return GetBilinear<T>(p.x, p.y);
+    }
+
     inline  __device__ __host__
     bool InBounds(const float2& p, float border) const
     {
