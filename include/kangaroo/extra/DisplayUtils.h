@@ -1,6 +1,6 @@
 #pragma once
 
-#include <pangolin/glcuda.h>
+#include <pangolin/gl/glcuda.h>
 #include <kangaroo/Image.h>
 
 inline void ApplyPreferredGlSettings()

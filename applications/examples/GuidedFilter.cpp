@@ -1,6 +1,6 @@
 #include <pangolin/pangolin.h>
-#include <pangolin/glcuda.h>
-#include <pangolin/glsl.h>
+#include <pangolin/gl/glcuda.h>
+#include <pangolin/gl/glsl.h>
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/extra/DisplayUtils.h>

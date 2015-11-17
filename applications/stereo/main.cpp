@@ -4,8 +4,8 @@
 
 #include <pangolin/pangolin.h>
 #include <pangolin/compat/function.h>
-#include <pangolin/glcuda.h>
-#include <pangolin/glsl.h>
+#include <pangolin/gl/glcuda.h>
+#include <pangolin/gl/glsl.h>
 
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLVbo.h>
@@ -20,7 +20,7 @@
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
 
-const int MAXD = 128;
+const int MAXD = 64;
 
 
 int main( int argc, char* argv[] )

@@ -1,5 +1,5 @@
 #include <pangolin/pangolin.h>
-#include <pangolin/simple_math.h>
+#include <pangolin/utils/simple_math.h>
 #include <kangaroo/Image.h>
 
 template<typename T, typename Target>

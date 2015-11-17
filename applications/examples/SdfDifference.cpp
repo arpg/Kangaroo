@@ -1,6 +1,6 @@
 #include <pangolin/pangolin.h>
-#include <pangolin/glcuda.h>
-#include <pangolin/glvbo.h>
+#include <pangolin/gl/glcuda.h>
+#include <pangolin/gl/glvbo.h>
 
 #include <SceneGraph/SceneGraph.h>
 

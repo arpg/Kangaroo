@@ -1,5 +1,5 @@
 #include <pangolin/pangolin.h>
-#include <pangolin/glcuda.h>
+#include <pangolin/gl/glcuda.h>
 
 #include <kangaroo/extra/DisplayUtils.h>
 #include <kangaroo/extra/BaseDisplayCuda.h>

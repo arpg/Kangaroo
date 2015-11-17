@@ -1,5 +1,5 @@
 #include <pangolin/pangolin.h>
-#include <pangolin/glcuda.h>
+#include <pangolin/gl/glcuda.h>
 
 #include <kangaroo/kangaroo.h>
 #include <kangaroo/variational.h>
